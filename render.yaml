@@ -81,6 +81,6 @@ services:
 
 databases:
   - name: ocal-db
-    plan: starter
+    plan: basic-256mb
     databaseName: ocal
     postgresMajorVersion: "16"
