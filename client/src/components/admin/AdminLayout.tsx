@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Calendar, Database, Download, RefreshCw, Settings, Menu, X } from 'lucide-react';
+import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 const NAV_ITEMS = [
   { path: '/admin', label: 'סקירה', icon: Settings, exact: true },
@@ -11,6 +12,7 @@ const NAV_ITEMS = [
 export function AdminLayout() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -57,6 +59,20 @@ export function AdminLayout() {
                 <RefreshCw className="w-3.5 h-3.5" />
                 לאתר
               </Link>
+              <div className="w-px h-6 bg-gray-700 mx-2" />
+              {user && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">{user.name || user.email}</span>
+                  <button
+                    onClick={logout}
+                    className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                    aria-label="התנתק"
+                    title="התנתק"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </nav>
 
             {/* Mobile hamburger */}
@@ -102,6 +118,15 @@ export function AdminLayout() {
                   <RefreshCw className="w-4 h-4" />
                   חזרה לאתר
                 </Link>
+                {user && (
+                  <button
+                    onClick={logout}
+                    className="flex items-center gap-2 px-3 py-2.5 text-gray-300 hover:text-white text-sm rounded-md hover:bg-white/10 w-full"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    התנתק ({user.name || user.email})
+                  </button>
+                )}
               </div>
             </nav>
           </div>
