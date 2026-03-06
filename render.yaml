@@ -1,0 +1,86 @@
+services:
+  # API Server (also serves React build in production)
+  - type: web
+    name: ocal-api
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm run migrate && npm run start --workspace=server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ocal-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: ocal-redis
+          type: redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: ODATA_API_KEY
+        sync: false
+      - key: CKAN_BASE_URL
+        value: https://www.odata.org.il
+      - key: CORS_ORIGIN
+        value: https://ocal-api.onrender.com
+      - key: PORT
+        value: "3001"
+      - key: LOG_LEVEL
+        value: info
+
+  # Background Worker (BullMQ sync jobs)
+  - type: worker
+    name: ocal-worker
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build --workspace=shared && npm run build --workspace=server
+    startCommand: npm run worker:prod --workspace=server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ocal-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: ocal-redis
+          type: redis
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: CKAN_BASE_URL
+        value: https://www.odata.org.il
+      - key: JWT_SECRET
+        generateValue: true
+      - key: LOG_LEVEL
+        value: info
+
+  # Redis (for BullMQ job queue)
+  - type: redis
+    name: ocal-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+databases:
+  - name: ocal-db
+    plan: starter
+    databaseName: ocal
+    postgresMajorVersion: "16"

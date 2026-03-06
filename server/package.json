@@ -1,0 +1,45 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "worker": "tsx src/jobs/worker.ts",
+    "worker:prod": "node dist/jobs/worker.js",
+    "migrate": "knex --knexfile src/db/knexfile.ts migrate:latest",
+    "migrate:rollback": "knex --knexfile src/db/knexfile.ts migrate:rollback",
+    "migrate:make": "knex --knexfile src/db/knexfile.ts migrate:make",
+    "seed": "knex --knexfile src/db/knexfile.ts seed:run"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "bullmq": "^5.25.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.4.0",
+    "google-auth-library": "^9.14.0",
+    "helmet": "^8.0.0",
+    "ical.js": "^2.2.1",
+    "ioredis": "^5.4.0",
+    "jsonwebtoken": "^9.0.2",
+    "knex": "^3.1.0",
+    "pg": "^8.13.0",
+    "pino": "^9.5.0",
+    "pino-pretty": "^13.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.7",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "xlsx": "^0.18.5"
+  }
+}

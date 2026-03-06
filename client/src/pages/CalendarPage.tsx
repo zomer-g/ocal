@@ -1,0 +1,137 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useCalendarStore } from '@/stores/calendarStore';
+import { useCalendar } from '@/hooks/useCalendar';
+import { useSources } from '@/hooks/useSources';
+import { CalendarHeader, TimeGrid, MonthGrid, LayerPanel, EventDetailModal } from '@/components/calendar';
+import { Loader2, Layers, X } from 'lucide-react';
+import type { DiaryEvent } from '@/api/events';
+
+export function CalendarPage() {
+  const { date, view, setDate, setView, enabledSourceIds, setAllSources, sourcesInitialized } = useCalendarStore();
+  const { data: sourcesData } = useSources();
+  const sources = sourcesData?.data ?? [];
+  const [selectedEvent, setSelectedEvent] = useState<DiaryEvent | null>(null);
+  const [mobileLayersOpen, setMobileLayersOpen] = useState(false);
+
+  // Initialize all sources as enabled on first load
+  useEffect(() => {
+    if (sources.length > 0 && !sourcesInitialized) {
+      setAllSources(sources.map((s) => s.id), true);
+    }
+  }, [sources, sourcesInitialized, setAllSources]);
+
+  // Build source_ids param for API
+  const sourceIdsParam = enabledSourceIds.size > 0
+    ? Array.from(enabledSourceIds).join(',')
+    : undefined;
+
+  const { data, isLoading } = useCalendar({
+    date,
+    view,
+    source_ids: sourceIdsParam,
+  });
+
+  // All events from API (before client-side source filtering)
+  const allEvents = data?.events ?? [];
+
+  // Filter events client-side as well (for instant toggle response)
+  const filteredEvents = allEvents.filter(
+    (e) => enabledSourceIds.has(e.source_id)
+  );
+
+  // Compute per-source event counts for current view (from all events, not just filtered)
+  const viewSourceCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const event of allEvents) {
+      counts[event.source_id] = (counts[event.source_id] || 0) + 1;
+    }
+    return counts;
+  }, [allEvents]);
+
+  const handleDateClick = (clickedDate: string) => {
+    setDate(clickedDate);
+    setView('day');
+  };
+
+  const handleEventClick = (event: DiaryEvent) => {
+    setSelectedEvent(event);
+  };
+
+  return (
+    <div className="max-w-full mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-4">
+      {/* Calendar Header with navigation & view switcher */}
+      <CalendarHeader />
+
+      {/* Mobile layers toggle */}
+      {sources.length > 0 && (
+        <button
+          onClick={() => setMobileLayersOpen(true)}
+          className="lg:hidden mb-3 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 px-3 py-2 border border-gray-300 rounded-lg"
+        >
+          <Layers className="w-4 h-4" />
+          שכבות ({enabledSourceIds.size}/{sources.length})
+        </button>
+      )}
+
+      {/* Mobile layers drawer */}
+      {mobileLayersOpen && (
+        <div className="lg:hidden fixed inset-0 z-40 flex">
+          <div className="fixed inset-0 bg-black/30" onClick={() => setMobileLayersOpen(false)} />
+          <div className="relative w-72 max-w-[80vw] bg-gray-50 mr-auto shadow-xl overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-gray-400" />
+                <span className="text-sm font-semibold text-gray-700">שכבות</span>
+              </div>
+              <button onClick={() => setMobileLayersOpen(false)} className="p-1 rounded hover:bg-gray-100">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-3">
+              <LayerPanel sources={sources} viewSourceCounts={viewSourceCounts} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-4">
+        {/* Main calendar area */}
+        <div className="flex-1 min-w-0">
+          {isLoading && !data ? (
+            <div className="flex items-center justify-center py-32">
+              <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+            </div>
+          ) : view === 'month' ? (
+            <MonthGrid
+              date={date}
+              events={filteredEvents}
+              eventCounts={data?.event_counts ?? {}}
+              onDateClick={handleDateClick}
+              onEventClick={handleEventClick}
+            />
+          ) : (
+            <TimeGrid
+              date={date}
+              view={view}
+              events={filteredEvents}
+              onEventClick={handleEventClick}
+            />
+          )}
+        </div>
+
+        {/* Desktop layer panel sidebar */}
+        <aside className="w-56 shrink-0 hidden lg:block">
+          <LayerPanel sources={sources} viewSourceCounts={viewSourceCounts} />
+        </aside>
+      </div>
+
+      {/* Event detail modal */}
+      {selectedEvent && (
+        <EventDetailModal
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+        />
+      )}
+    </div>
+  );
+}
