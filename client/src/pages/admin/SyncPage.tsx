@@ -141,14 +141,15 @@ export function SyncPage() {
                   onProfile={(resourceId) => profileMutation.mutate(resourceId)}
                   isProfileLoading={profileMutation.isPending}
                   profilingResourceId={profileMutation.variables}
-                  // inline Step 3 props
-                  activeResourceId={activeProfile?.resource.id}
+                  // all inline props
+                  activeProfile={activeProfile}
                   importName={importName}
                   importColor={importColor}
                   importMapping={importMapping}
                   importResult={importResult}
                   onImportNameChange={setImportName}
                   onImportColorChange={setImportColor}
+                  onImportMappingChange={setImportMapping}
                   onImport={() => importMutation.mutate()}
                   isImporting={importMutation.isPending}
                   importError={importMutation.isError ? (importMutation.error as Error) : null}
@@ -158,84 +159,6 @@ export function SyncPage() {
           </div>
         )}
       </div>
-
-      {/* Step 2: Profile & Mapping (stays at bottom — contains large field mapping editor + sample data) */}
-      {activeProfile && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Database className="w-5 h-5 text-gray-400" />
-            שלב 2: פרופיל ומיפוי שדות
-          </h2>
-
-          {/* Profile summary */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <InfoCard label="מאגר" value={activeProfile.package.title} />
-            <InfoCard label="פורמט" value={activeProfile.format} />
-            <InfoCard label="שיטה" value={activeProfile.fetch_method === 'datastore' ? 'API' : 'הורדה'} />
-            <InfoCard label="רשומות" value={String(activeProfile.total_records)} />
-          </div>
-
-          {/* Duplicate warning */}
-          {activeProfile.is_duplicate && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 flex items-center gap-2 text-sm text-yellow-700">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              מקור זה כבר מיובא. ייבוא חוזר יחליף את הנתונים הקיימים.
-            </div>
-          )}
-
-          {/* Mapping confidence */}
-          <div className="mb-4">
-            <div className="flex items-center gap-2 text-sm mb-2">
-              <span className="font-medium text-gray-700">ביטחון מיפוי:</span>
-              <span className={`font-bold ${
-                activeProfile.mapping_confidence >= 0.8 ? 'text-green-600' :
-                activeProfile.mapping_confidence >= 0.5 ? 'text-yellow-600' : 'text-red-600'
-              }`}>
-                {Math.round(activeProfile.mapping_confidence * 100)}%
-              </span>
-              <span className="text-gray-400">({activeProfile.mapping_method})</span>
-            </div>
-          </div>
-
-          {/* Field mapping editor */}
-          {importMapping && (
-            <FieldMappingEditor
-              mapping={importMapping}
-              availableFields={activeProfile.fields}
-              onChange={setImportMapping}
-            />
-          )}
-
-          {/* Sample data preview */}
-          <div className="mt-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">דוגמת נתונים:</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border border-gray-200 rounded">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {activeProfile.fields.slice(0, 8).map((field) => (
-                      <th key={field} className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">
-                        {field}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeProfile.sample_records.slice(0, 3).map((record, i) => (
-                    <tr key={i} className="border-b last:border-b-0">
-                      {activeProfile.fields.slice(0, 8).map((field) => (
-                        <td key={field} className="px-2 py-1.5 text-gray-600 max-w-[150px] truncate">
-                          {String(record[field] ?? '')}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -250,13 +173,14 @@ function DatasetCard({
   onProfile,
   isProfileLoading,
   profilingResourceId,
-  activeResourceId,
+  activeProfile,
   importName,
   importColor,
   importMapping,
   importResult,
   onImportNameChange,
   onImportColorChange,
+  onImportMappingChange,
   onImport,
   isImporting,
   importError,
@@ -266,13 +190,14 @@ function DatasetCard({
   onProfile: (resourceId: string) => void;
   isProfileLoading: boolean;
   profilingResourceId?: string;
-  activeResourceId?: string;
+  activeProfile: ProfileResponse | null;
   importName: string;
   importColor: string;
   importMapping: FieldMapping | null;
   importResult: { sourceId: string; message: string } | null;
   onImportNameChange: (name: string) => void;
   onImportColorChange: (color: string) => void;
+  onImportMappingChange: (mapping: FieldMapping) => void;
   onImport: () => void;
   isImporting: boolean;
   importError: Error | null;
@@ -318,7 +243,7 @@ function DatasetCard({
       {expanded && (
         <div className="divide-y divide-gray-100">
           {visibleResources.map((resource) => {
-            const isActive = activeResourceId === resource.id;
+            const isActive = activeProfile?.resource.id === resource.id;
             const isSynced = resource.status === 'synced';
 
             return (
@@ -353,80 +278,21 @@ function DatasetCard({
                   </button>
                 </div>
 
-                {/* ── Inline Step 3: Import panel ── */}
-                {isActive && importMapping && (
-                  <div className="px-3 sm:px-4 py-4 bg-blue-50 border-t border-blue-100">
-                    <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-primary-500" />
-                      שלב 3: ייבוא
-                    </h3>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                      {/* Name */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 block mb-1">שם המקור</label>
-                        <input
-                          type="text"
-                          value={importName}
-                          onChange={(e) => onImportNameChange(e.target.value)}
-                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        />
-                      </div>
-
-                      {/* Color */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 block mb-1">צבע</label>
-                        <div className="flex gap-1 flex-wrap mt-1">
-                          {SOURCE_COLORS.map((c) => (
-                            <button
-                              key={c}
-                              onClick={() => onImportColorChange(c)}
-                              className={`w-5 h-5 rounded-full transition-transform ${
-                                importColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'
-                              }`}
-                              style={{ backgroundColor: c }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Import button + error */}
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={onImport}
-                        disabled={isImporting || !importName.trim()}
-                        className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-                      >
-                        {isImporting ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <CheckCircle className="w-4 h-4" />
-                        )}
-                        ייבוא
-                      </button>
-
-                      {importError && (
-                        <span className="text-sm text-red-600 flex items-center gap-1">
-                          <XCircle className="w-4 h-4" />
-                          {importError.message}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Import success */}
-                    {importResult && (
-                      <div className="mt-3 bg-green-100 border border-green-200 rounded-lg p-2.5">
-                        <div className="flex items-center gap-2 text-sm text-green-700">
-                          <CheckCircle className="w-4 h-4" />
-                          <span className="font-medium">{importResult.message}</span>
-                        </div>
-                        <div className="text-xs text-green-600 mt-0.5">
-                          מזהה מקור: {importResult.sourceId}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                {/* ── Inline Profile + Import panel (everything together) ── */}
+                {isActive && activeProfile && importMapping && (
+                  <InlineImportPanel
+                    activeProfile={activeProfile}
+                    importName={importName}
+                    importColor={importColor}
+                    importMapping={importMapping}
+                    importResult={importResult}
+                    onImportNameChange={onImportNameChange}
+                    onImportColorChange={onImportColorChange}
+                    onImportMappingChange={onImportMappingChange}
+                    onImport={onImport}
+                    isImporting={isImporting}
+                    importError={importError}
+                  />
                 )}
               </div>
             );
@@ -436,6 +302,198 @@ function DatasetCard({
     </div>
   );
 }
+
+// ────────────────────────────────────────────
+// Inline panel: profile + mapping + import — all in one
+// ────────────────────────────────────────────
+
+function InlineImportPanel({
+  activeProfile,
+  importName,
+  importColor,
+  importMapping,
+  importResult,
+  onImportNameChange,
+  onImportColorChange,
+  onImportMappingChange,
+  onImport,
+  isImporting,
+  importError,
+}: {
+  activeProfile: ProfileResponse;
+  importName: string;
+  importColor: string;
+  importMapping: FieldMapping;
+  importResult: { sourceId: string; message: string } | null;
+  onImportNameChange: (name: string) => void;
+  onImportColorChange: (color: string) => void;
+  onImportMappingChange: (mapping: FieldMapping) => void;
+  onImport: () => void;
+  isImporting: boolean;
+  importError: Error | null;
+}) {
+  const [showSample, setShowSample] = useState(false);
+
+  return (
+    <div className="bg-blue-50 border-t border-blue-100 px-3 sm:px-4 py-4 space-y-4">
+      {/* ── Profile summary ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <InfoCard label="מאגר" value={activeProfile.package.title} />
+        <InfoCard label="פורמט" value={activeProfile.format} />
+        <InfoCard label="שיטה" value={activeProfile.fetch_method === 'datastore' ? 'API' : 'הורדה'} />
+        <InfoCard label="רשומות" value={String(activeProfile.total_records)} />
+      </div>
+
+      {/* Duplicate warning */}
+      {activeProfile.is_duplicate && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2.5 flex items-center gap-2 text-xs text-yellow-700">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          מקור זה כבר מיובא. ייבוא חוזר יחליף את הנתונים הקיימים.
+        </div>
+      )}
+
+      {/* ── Field mapping ── */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <Database className="w-4 h-4 text-gray-400" />
+            מיפוי שדות
+          </h3>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-gray-500">ביטחון:</span>
+            <span className={`font-bold ${
+              activeProfile.mapping_confidence >= 0.8 ? 'text-green-600' :
+              activeProfile.mapping_confidence >= 0.5 ? 'text-yellow-600' : 'text-red-600'
+            }`}>
+              {Math.round(activeProfile.mapping_confidence * 100)}%
+            </span>
+            <span className="text-gray-400">({activeProfile.mapping_method})</span>
+          </div>
+        </div>
+        <FieldMappingEditor
+          mapping={importMapping}
+          availableFields={activeProfile.fields}
+          onChange={onImportMappingChange}
+        />
+      </div>
+
+      {/* ── Sample data (collapsible) ── */}
+      <div>
+        <button
+          onClick={() => setShowSample(!showSample)}
+          className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+        >
+          {showSample ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {showSample ? 'הסתר דוגמת נתונים' : 'הצג דוגמת נתונים'}
+        </button>
+        {showSample && (
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-xs border border-gray-200 rounded bg-white">
+              <thead className="bg-gray-50">
+                <tr>
+                  {activeProfile.fields.slice(0, 8).map((field) => (
+                    <th key={field} className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">
+                      {field}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {activeProfile.sample_records.slice(0, 3).map((record, i) => (
+                  <tr key={i} className="border-b last:border-b-0">
+                    {activeProfile.fields.slice(0, 8).map((field) => (
+                      <td key={field} className="px-2 py-1.5 text-gray-600 max-w-[150px] truncate">
+                        {String(record[field] ?? '')}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Import form (name, color, button) ── */}
+      <div className="border-t border-blue-200 pt-4">
+        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-primary-500" />
+          ייבוא
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          {/* Name */}
+          <div>
+            <label className="text-xs font-medium text-gray-700 block mb-1">שם המקור</label>
+            <input
+              type="text"
+              value={importName}
+              onChange={(e) => onImportNameChange(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          {/* Color */}
+          <div>
+            <label className="text-xs font-medium text-gray-700 block mb-1">צבע</label>
+            <div className="flex gap-1 flex-wrap mt-1">
+              {SOURCE_COLORS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => onImportColorChange(c)}
+                  className={`w-5 h-5 rounded-full transition-transform ${
+                    importColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'
+                  }`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Import button */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onImport}
+            disabled={isImporting || !importName.trim()}
+            className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            {isImporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <CheckCircle className="w-4 h-4" />
+            )}
+            ייבוא ({activeProfile.total_records} רשומות)
+          </button>
+
+          {importError && (
+            <span className="text-sm text-red-600 flex items-center gap-1">
+              <XCircle className="w-4 h-4" />
+              {importError.message}
+            </span>
+          )}
+        </div>
+
+        {/* Import success */}
+        {importResult && (
+          <div className="mt-3 bg-green-100 border border-green-200 rounded-lg p-2.5">
+            <div className="flex items-center gap-2 text-sm text-green-700">
+              <CheckCircle className="w-4 h-4" />
+              <span className="font-medium">{importResult.message}</span>
+            </div>
+            <div className="text-xs text-green-600 mt-0.5">
+              מזהה מקור: {importResult.sourceId}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// Small helpers
+// ────────────────────────────────────────────
 
 function FormatBadge({ format }: { format: string }) {
   const colors: Record<string, string> = {
@@ -457,7 +515,7 @@ function StatusBadge({ status }: { status: 'synced' | 'excepted' | 'available' }
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-gray-50 rounded-lg p-2.5">
+    <div className="bg-white rounded-lg p-2.5 border border-gray-100">
       <div className="text-[10px] text-gray-400 uppercase font-medium">{label}</div>
       <div className="text-sm font-semibold text-gray-800 truncate">{value}</div>
     </div>
@@ -492,25 +550,22 @@ function FieldMappingEditor({
   };
 
   return (
-    <div>
-      <h3 className="text-sm font-semibold text-gray-700 mb-2">מיפוי שדות:</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-        {Object.entries(FIELD_LABELS).map(([key, label]) => (
-          <div key={key} className="flex items-center gap-2">
-            <label className="text-xs text-gray-600 w-28 shrink-0 text-left">{label}</label>
-            <select
-              value={mapping[key as keyof FieldMapping] || ''}
-              onChange={(e) => handleChange(key as keyof FieldMapping, e.target.value)}
-              className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary-500"
-            >
-              <option value="">—</option>
-              {availableFields.map((field) => (
-                <option key={field} value={field}>{field}</option>
-              ))}
-            </select>
-          </div>
-        ))}
-      </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+      {Object.entries(FIELD_LABELS).map(([key, label]) => (
+        <div key={key} className="flex items-center gap-2">
+          <label className="text-xs text-gray-600 w-28 shrink-0 text-left">{label}</label>
+          <select
+            value={mapping[key as keyof FieldMapping] || ''}
+            onChange={(e) => handleChange(key as keyof FieldMapping, e.target.value)}
+            className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+          >
+            <option value="">—</option>
+            {availableFields.map((field) => (
+              <option key={field} value={field}>{field}</option>
+            ))}
+          </select>
+        </div>
+      ))}
     </div>
   );
 }
