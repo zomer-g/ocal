@@ -344,6 +344,7 @@ function InlineImportPanel({
   importError: Error | null;
 }) {
   const [showSample, setShowSample] = useState(true);
+  const unmappedSet = new Set(activeProfile.unmapped_fields);
 
   return (
     <div className="bg-blue-50 border-t border-blue-100 px-3 sm:px-4 py-4 space-y-4">
@@ -412,33 +413,66 @@ function InlineImportPanel({
 
       {/* ── Sample data (collapsible) ── */}
       <div>
-        <button
-          onClick={() => setShowSample(!showSample)}
-          className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
-        >
-          {showSample ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          {showSample ? 'הסתר דוגמת נתונים' : 'הצג דוגמת נתונים'}
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setShowSample(!showSample)}
+            className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+          >
+            {showSample ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {showSample ? 'הסתר דוגמת נתונים' : 'הצג דוגמת נתונים'}
+          </button>
+          {showSample && unmappedSet.size > 0 && (
+            <div className="flex items-center gap-3 text-[10px] text-gray-500">
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded bg-gray-100 border border-gray-300" />
+                זוהה
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded bg-amber-100 border border-amber-300" />
+                לא זוהה ({unmappedSet.size})
+              </span>
+            </div>
+          )}
+        </div>
         {showSample && (
           <div className="mt-2 overflow-x-auto">
             <table className="w-full text-xs border border-gray-200 rounded bg-white">
-              <thead className="bg-gray-50">
+              <thead>
                 <tr>
-                  {activeProfile.fields.map((field) => (
-                    <th key={field} className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">
-                      {field}
-                    </th>
-                  ))}
+                  {activeProfile.fields.map((field) => {
+                    const isUnmapped = unmappedSet.has(field);
+                    return (
+                      <th
+                        key={field}
+                        className={`px-2 py-1.5 text-right font-medium border-b whitespace-nowrap ${
+                          isUnmapped
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-gray-50 text-gray-600 border-gray-200'
+                        }`}
+                      >
+                        {field}
+                        {isUnmapped && <span className="mr-1 opacity-60">✗</span>}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
                 {activeProfile.sample_records.slice(0, 3).map((record, i) => (
                   <tr key={i} className="border-b last:border-b-0">
-                    {activeProfile.fields.map((field) => (
-                      <td key={field} className="px-2 py-1.5 text-gray-600 max-w-[150px] truncate">
-                        {String(record[field] ?? '')}
-                      </td>
-                    ))}
+                    {activeProfile.fields.map((field) => {
+                      const isUnmapped = unmappedSet.has(field);
+                      return (
+                        <td
+                          key={field}
+                          className={`px-2 py-1.5 max-w-[150px] truncate ${
+                            isUnmapped ? 'bg-amber-50 text-amber-700' : 'text-gray-600'
+                          }`}
+                        >
+                          {String(record[field] ?? '')}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
