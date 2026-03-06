@@ -141,6 +141,17 @@ export function SyncPage() {
                   onProfile={(resourceId) => profileMutation.mutate(resourceId)}
                   isProfileLoading={profileMutation.isPending}
                   profilingResourceId={profileMutation.variables}
+                  // inline Step 3 props
+                  activeResourceId={activeProfile?.resource.id}
+                  importName={importName}
+                  importColor={importColor}
+                  importMapping={importMapping}
+                  importResult={importResult}
+                  onImportNameChange={setImportName}
+                  onImportColorChange={setImportColor}
+                  onImport={() => importMutation.mutate()}
+                  isImporting={importMutation.isPending}
+                  importError={importMutation.isError ? (importMutation.error as Error) : null}
                 />
               ))}
             </div>
@@ -148,7 +159,7 @@ export function SyncPage() {
         )}
       </div>
 
-      {/* Step 2: Profile & Mapping */}
+      {/* Step 2: Profile & Mapping (stays at bottom — contains large field mapping editor + sample data) */}
       {activeProfile && (
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -225,84 +236,6 @@ export function SyncPage() {
           </div>
         </div>
       )}
-
-      {/* Step 3: Import */}
-      {activeProfile && importMapping && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-gray-400" />
-            שלב 3: ייבוא
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            {/* Name */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">שם המקור</label>
-              <input
-                type="text"
-                value={importName}
-                onChange={(e) => setImportName(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-
-            {/* Color */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">צבע</label>
-              <div className="flex items-center gap-2">
-                <div className="flex gap-1 flex-wrap">
-                  {SOURCE_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setImportColor(c)}
-                      className={`w-6 h-6 rounded-full transition-transform ${
-                        importColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Import button */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => importMutation.mutate()}
-              disabled={importMutation.isPending || !importName.trim()}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-            >
-              {importMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <CheckCircle className="w-4 h-4" />
-              )}
-              ייבוא ({activeProfile.total_records} רשומות)
-            </button>
-
-            {importMutation.isError && (
-              <div className="text-sm text-red-600 flex items-center gap-1">
-                <XCircle className="w-4 h-4" />
-                {(importMutation.error as Error).message}
-              </div>
-            )}
-          </div>
-
-          {/* Import result */}
-          {importResult && (
-            <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
-              <div className="flex items-center gap-2 text-sm text-green-700">
-                <CheckCircle className="w-4 h-4" />
-                <span className="font-medium">{importResult.message}</span>
-              </div>
-              <div className="text-xs text-green-600 mt-1">
-                מזהה מקור: {importResult.sourceId}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -317,12 +250,32 @@ function DatasetCard({
   onProfile,
   isProfileLoading,
   profilingResourceId,
+  activeResourceId,
+  importName,
+  importColor,
+  importMapping,
+  importResult,
+  onImportNameChange,
+  onImportColorChange,
+  onImport,
+  isImporting,
+  importError,
 }: {
   dataset: DiscoveredDataset;
   hideConverted: boolean;
   onProfile: (resourceId: string) => void;
   isProfileLoading: boolean;
   profilingResourceId?: string;
+  activeResourceId?: string;
+  importName: string;
+  importColor: string;
+  importMapping: FieldMapping | null;
+  importResult: { sourceId: string; message: string } | null;
+  onImportNameChange: (name: string) => void;
+  onImportColorChange: (color: string) => void;
+  onImport: () => void;
+  isImporting: boolean;
+  importError: Error | null;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -332,8 +285,11 @@ function DatasetCard({
 
   if (visibleResources.length === 0) return null;
 
+  const syncedCount = visibleResources.filter((r) => r.status === 'synced').length;
+
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
+      {/* Dataset header */}
       <div
         className="flex items-center justify-between px-3 py-2 bg-gray-50 cursor-pointer hover:bg-gray-100"
         onClick={() => setExpanded(!expanded)}
@@ -347,36 +303,134 @@ function DatasetCard({
           <span className="text-[10px] sm:text-xs bg-gray-200 text-gray-600 px-1 sm:px-1.5 py-0.5 rounded shrink-0">
             {visibleResources.length} משאבים
           </span>
+          {/* Already-imported badge */}
+          {syncedCount > 0 && (
+            <span className="text-[10px] sm:text-xs bg-green-100 text-green-700 px-1 sm:px-1.5 py-0.5 rounded shrink-0 flex items-center gap-0.5 font-medium">
+              <CheckCircle className="w-3 h-3" />
+              {syncedCount} מיובא{syncedCount > 1 ? 'ים' : ''}
+            </span>
+          )}
         </div>
         {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
       </div>
 
+      {/* Resource list */}
       {expanded && (
         <div className="divide-y divide-gray-100">
-          {visibleResources.map((resource) => (
-            <div key={resource.id} className="flex items-center justify-between px-3 sm:px-4 py-2 gap-2">
-              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                <FormatBadge format={resource.format} />
-                <span className="text-xs sm:text-sm text-gray-700 truncate">{resource.name}</span>
-                <StatusBadge status={resource.status} />
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onProfile(resource.id);
-                }}
-                disabled={isProfileLoading || resource.status === 'synced'}
-                className="px-3 py-1 text-xs font-medium bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-50 flex items-center gap-1 shrink-0"
-              >
-                {isProfileLoading && profilingResourceId === resource.id ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <FileSpreadsheet className="w-3 h-3" />
+          {visibleResources.map((resource) => {
+            const isActive = activeResourceId === resource.id;
+            const isSynced = resource.status === 'synced';
+
+            return (
+              <div key={resource.id}>
+                {/* Resource row */}
+                <div className={`flex items-center justify-between px-3 sm:px-4 py-2 gap-2 ${
+                  isActive ? 'bg-blue-50' : isSynced ? 'bg-green-50' : ''
+                }`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <FormatBadge format={resource.format} />
+                    <span className={`text-xs sm:text-sm truncate ${
+                      isSynced ? 'text-gray-400 line-through' : 'text-gray-700'
+                    }`}>
+                      {resource.name}
+                    </span>
+                    <StatusBadge status={resource.status} />
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onProfile(resource.id);
+                    }}
+                    disabled={isProfileLoading || isSynced}
+                    className="px-3 py-1 text-xs font-medium bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-50 flex items-center gap-1 shrink-0"
+                  >
+                    {isProfileLoading && profilingResourceId === resource.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <FileSpreadsheet className="w-3 h-3" />
+                    )}
+                    {isSynced ? 'מיובא' : 'פרופיל'}
+                  </button>
+                </div>
+
+                {/* ── Inline Step 3: Import panel ── */}
+                {isActive && importMapping && (
+                  <div className="px-3 sm:px-4 py-4 bg-blue-50 border-t border-blue-100">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-primary-500" />
+                      שלב 3: ייבוא
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                      {/* Name */}
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 block mb-1">שם המקור</label>
+                        <input
+                          type="text"
+                          value={importName}
+                          onChange={(e) => onImportNameChange(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
+
+                      {/* Color */}
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 block mb-1">צבע</label>
+                        <div className="flex gap-1 flex-wrap mt-1">
+                          {SOURCE_COLORS.map((c) => (
+                            <button
+                              key={c}
+                              onClick={() => onImportColorChange(c)}
+                              className={`w-5 h-5 rounded-full transition-transform ${
+                                importColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'
+                              }`}
+                              style={{ backgroundColor: c }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Import button + error */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={onImport}
+                        disabled={isImporting || !importName.trim()}
+                        className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isImporting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4" />
+                        )}
+                        ייבוא
+                      </button>
+
+                      {importError && (
+                        <span className="text-sm text-red-600 flex items-center gap-1">
+                          <XCircle className="w-4 h-4" />
+                          {importError.message}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Import success */}
+                    {importResult && (
+                      <div className="mt-3 bg-green-100 border border-green-200 rounded-lg p-2.5">
+                        <div className="flex items-center gap-2 text-sm text-green-700">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="font-medium">{importResult.message}</span>
+                        </div>
+                        <div className="text-xs text-green-600 mt-0.5">
+                          מזהה מקור: {importResult.sourceId}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
-                {resource.status === 'synced' ? 'מיובא' : 'פרופיל'}
-              </button>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
