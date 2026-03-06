@@ -55,7 +55,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
             return (
               <label
                 key={source.id}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
+                className={`flex items-start gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
                   isEnabled
                     ? hasEventsInView ? 'hover:bg-gray-50' : 'opacity-40 hover:opacity-60'
                     : 'opacity-30 hover:opacity-50'
@@ -70,7 +70,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                 />
                 {/* Custom checkbox with source color */}
                 <div
-                  className={`w-3.5 h-3.5 rounded-sm border-2 shrink-0 transition-colors flex items-center justify-center ${
+                  className={`w-3.5 h-3.5 mt-0.5 rounded-sm border-2 shrink-0 transition-colors flex items-center justify-center ${
                     isEnabled ? '' : 'bg-white'
                   }`}
                   style={{
@@ -85,10 +85,10 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                     </svg>
                   )}
                 </div>
-                <span className={`text-sm truncate ${isEnabled ? (hasEventsInView ? 'text-gray-700' : 'text-gray-400') : 'text-gray-400'}`}>
+                <span className={`text-sm leading-snug break-words min-w-0 ${isEnabled ? (hasEventsInView ? 'text-gray-700' : 'text-gray-400') : 'text-gray-400'}`}>
                   {source.name}
                 </span>
-                <span className="mr-auto shrink-0">
+                <span className="shrink-0">
                   {viewSourceCounts && viewCount > 0 ? (
                     <span className="text-xs font-medium text-white rounded-full px-1.5 py-0.5" style={{ backgroundColor: source.color }}>
                       {viewCount}

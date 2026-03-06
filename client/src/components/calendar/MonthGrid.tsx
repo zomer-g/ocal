@@ -117,7 +117,7 @@ export function MonthGrid({ date, events, eventCounts, onDateClick, onEventClick
                 <div className="space-y-0.5">
                   {/* Desktop: show up to 3 events */}
                   {dayEvents.slice(0, MAX_EVENTS_DESKTOP).map((event, idx) => {
-                    const color = event.source_color || '#009688';
+                    const color = event.source_color || '#06607C';
                     return (
                       <div
                         key={event.id}

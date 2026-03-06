@@ -3,7 +3,7 @@ import { Header } from './Header';
 
 export function PublicLayout() {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#F6F6F6' }}>
       <a href="#main-content" className="skip-link">דלג לתוכן הראשי</a>
       <Header />
       <main id="main-content" className="flex-1">

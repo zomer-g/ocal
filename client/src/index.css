@@ -16,7 +16,7 @@ body {
   right: 0;
   z-index: 9999;
   padding: 0.75rem 1.5rem;
-  background: #00796B;
+  background: #06607C;
   color: white;
   font-weight: 600;
   text-decoration: none;
@@ -29,7 +29,7 @@ body {
 
 /* Global focus-visible styles for AA keyboard accessibility */
 *:focus-visible {
-  outline: 3px solid #00796B;
+  outline: 3px solid #06607C;
   outline-offset: 2px;
 }
 *:focus:not(:focus-visible) {

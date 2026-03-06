@@ -9,7 +9,7 @@ import { ChevronRight, ChevronLeft } from 'lucide-react';
 
 const VIEW_OPTIONS: { value: CalendarView; label: string; mobileLabel: string }[] = [
   { value: 'day', label: 'יום', mobileLabel: 'יום' },
-  { value: '4day', label: '4 ימים', mobileLabel: '4י' },
+  { value: '4day', label: '4 ימים', mobileLabel: '4 ימים' },
   { value: 'week', label: 'שבוע', mobileLabel: 'שבוע' },
   { value: 'month', label: 'חודש', mobileLabel: 'חודש' },
 ];
@@ -73,14 +73,13 @@ export function CalendarHeader() {
             key={opt.value}
             onClick={() => setView(opt.value)}
             aria-pressed={view === opt.value}
-            className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+            className={`px-2.5 sm:px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
               view === opt.value
                 ? 'bg-primary-700 text-white'
                 : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
-            <span className="hidden sm:inline">{opt.label}</span>
-            <span className="sm:hidden">{opt.mobileLabel}</span>
+            {opt.label}
           </button>
         ))}
       </div>

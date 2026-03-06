@@ -9,7 +9,7 @@ interface EventDetailModalProps {
 }
 
 export function EventDetailModal({ event, onClose }: EventDetailModalProps) {
-  const color = event.source_color || '#009688';
+  const color = event.source_color || '#06607C';
   const modalRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 

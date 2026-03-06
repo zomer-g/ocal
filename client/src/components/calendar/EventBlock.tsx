@@ -15,7 +15,7 @@ export function EventBlock({ event, top, height, column = 0, totalColumns = 1, o
   const [showTooltip, setShowTooltip] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const color = event.source_color || '#009688';
+  const color = event.source_color || '#06607C';
   const minHeight = Math.max(height, 22);
   const isCompact = minHeight < 40;
 
@@ -104,7 +104,7 @@ export function EventBlock({ event, top, height, column = 0, totalColumns = 1, o
 
 /** All-day or events with no specific time */
 export function AllDayEvent({ event, onClick }: { event: DiaryEvent; onClick?: (event: DiaryEvent) => void }) {
-  const color = event.source_color || '#009688';
+  const color = event.source_color || '#06607C';
 
   return (
     <div

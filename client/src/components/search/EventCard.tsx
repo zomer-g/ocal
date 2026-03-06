@@ -17,7 +17,7 @@ export function EventCard({ event }: EventCardProps) {
       <div className="flex items-start gap-3">
         <div
           className="w-1 self-stretch rounded-full shrink-0"
-          style={{ backgroundColor: event.source_color || '#009688' }}
+          style={{ backgroundColor: event.source_color || '#06607C' }}
           aria-hidden="true"
         />
         <div className="flex-1 min-w-0">
