@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare } from 'lucide-react';
+import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare, Users, Building2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const NAV_ITEMS = [
   { path: '/admin', label: 'סקירה', icon: Settings, exact: true },
   { path: '/admin/sync', label: 'ייבוא', icon: Download, exact: false },
   { path: '/admin/sources', label: 'מקורות', icon: Database, exact: false },
+  { path: '/admin/people', label: 'אנשים', icon: Users, exact: false },
+  { path: '/admin/organizations', label: 'ארגונות', icon: Building2, exact: false },
   { path: '/admin/content', label: 'תוכן', icon: PenSquare, exact: false },
 ];
 

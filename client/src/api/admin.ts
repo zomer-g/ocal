@@ -161,3 +161,134 @@ export async function updateSource(
   const { data } = await api.patch(`/admin/sources/${sourceId}`, update);
   return data;
 }
+
+// ── People ──
+
+export interface Person {
+  id: string;
+  name: string;
+  wikipedia_link: string | null;
+  notes: string | null;
+  organization_id: string | null;
+  organization_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PersonInput {
+  name: string;
+  wikipedia_link?: string | null;
+  notes?: string | null;
+  organization_id?: string | null;
+}
+
+export async function getPeople(): Promise<{ data: Person[] }> {
+  const { data } = await api.get('/admin/people');
+  return data;
+}
+
+export async function createPerson(input: PersonInput): Promise<Person> {
+  const { data } = await api.post('/admin/people', input);
+  return data;
+}
+
+export async function updatePerson(id: string, input: Partial<PersonInput>): Promise<Person> {
+  const { data } = await api.patch(`/admin/people/${id}`, input);
+  return data;
+}
+
+export async function deletePerson(id: string): Promise<void> {
+  await api.delete(`/admin/people/${id}`);
+}
+
+export async function bulkImportPeople(
+  rows: Array<{ name: string; wikipedia_link?: string; notes?: string; organization_name?: string }>
+): Promise<{ created: number; updated: number; errors: string[] }> {
+  const { data } = await api.post('/admin/people/bulk-import', { rows });
+  return data;
+}
+
+// ── Organizations ──
+
+export interface Organization {
+  id: string;
+  name: string;
+  website: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrganizationInput {
+  name: string;
+  website?: string | null;
+  description?: string | null;
+}
+
+export async function getOrganizations(): Promise<{ data: Organization[] }> {
+  const { data } = await api.get('/admin/organizations');
+  return data;
+}
+
+export async function createOrganization(input: OrganizationInput): Promise<Organization> {
+  const { data } = await api.post('/admin/organizations', input);
+  return data;
+}
+
+export async function updateOrganization(id: string, input: Partial<OrganizationInput>): Promise<Organization> {
+  const { data } = await api.patch(`/admin/organizations/${id}`, input);
+  return data;
+}
+
+export async function deleteOrganization(id: string): Promise<void> {
+  await api.delete(`/admin/organizations/${id}`);
+}
+
+// ── Entity Extraction ──
+
+export interface EntityItem {
+  id: string;
+  event_id: string;
+  event_title: string;
+  event_date: string;
+  entity_type: 'person' | 'organization' | 'place';
+  entity_id: string | null;
+  entity_name: string;
+  role: 'owner' | 'participant' | 'location' | 'mentioned';
+  raw_mention: string | null;
+  confidence: number;
+  extraction_method: 'owner' | 'participant_parse' | 'ai_ner';
+  created_at: string;
+}
+
+export interface EntityStats {
+  total: number;
+  by_type: { person: number; organization: number; place: number };
+  by_method: { owner: number; participant_parse: number; ai_ner: number };
+  matched: number;
+  unmatched: number;
+}
+
+export interface EntityListResponse {
+  data: EntityItem[];
+  total: number;
+  page: number;
+  limit: number;
+  stats: EntityStats;
+}
+
+export async function triggerEntityExtraction(
+  sourceId: string,
+  options: { skip_ai?: boolean; clear_existing?: boolean } = {}
+): Promise<{ source_id: string; message: string }> {
+  const { data } = await api.post(`/admin/sources/${sourceId}/extract-entities`, options);
+  return data;
+}
+
+export async function getSourceEntities(
+  sourceId: string,
+  params: { page?: number; limit?: number; type?: string; role?: string; matched_only?: boolean } = {}
+): Promise<EntityListResponse> {
+  const { data } = await api.get(`/admin/sources/${sourceId}/entities`, { params });
+  return data;
+}

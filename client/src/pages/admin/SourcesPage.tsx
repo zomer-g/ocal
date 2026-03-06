@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAdminSources, deleteSource, resyncSource, updateSource, getSyncStatus, type SyncStatusResponse } from '@/api/admin';
+import {
+  getAdminSources,
+  deleteSource,
+  resyncSource,
+  updateSource,
+  getSyncStatus,
+  triggerEntityExtraction,
+  getSourceEntities,
+  type SyncStatusResponse,
+  type EntityListResponse,
+} from '@/api/admin';
 import type { DiarySource } from '@/api/sources';
 import {
   Database,
@@ -16,6 +26,8 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  Sparkles,
+  Users,
 } from 'lucide-react';
 import { formatDateShort } from '@/lib/formatters';
 
@@ -60,6 +72,10 @@ function SourceCard({ source }: { source: DiarySource }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatusResponse | null>(null);
+  const [showEntities, setShowEntities] = useState(false);
+  const [entityPage, setEntityPage] = useState(1);
+  const [entityType, setEntityType] = useState('');
+  const [extractionMsg, setExtractionMsg] = useState('');
 
   const id = source.id;
   const name = source.name;
@@ -98,9 +114,29 @@ function SourceCard({ source }: { source: DiarySource }) {
     onSuccess: (data) => setSyncStatus(data),
   });
 
+  const extractMut = useMutation({
+    mutationFn: (opts: { skip_ai: boolean; clear_existing?: boolean }) =>
+      triggerEntityExtraction(id, opts),
+    onSuccess: (data) => {
+      setExtractionMsg(data.message);
+      setTimeout(() => setExtractionMsg(''), 4000);
+      // Refresh entity list after a short delay
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['entities', id] }), 2000);
+    },
+  });
+
+  // Entity list query (only runs when showEntities is true)
+  const { data: entitiesData, isLoading: entitiesLoading } = useQuery({
+    queryKey: ['entities', id, entityPage, entityType],
+    queryFn: () => getSourceEntities(id, { page: entityPage, limit: 50, type: entityType || undefined }),
+    enabled: showEntities && expanded,
+    staleTime: 30 * 1000,
+  });
+
   const handleExpand = () => {
     if (!expanded) checkStatusMut.mutate();
     setExpanded(!expanded);
+    if (expanded) setShowEntities(false);
   };
 
   return (
@@ -158,9 +194,9 @@ function SourceCard({ source }: { source: DiarySource }) {
 
       {/* Expanded details */}
       {expanded && (
-        <div className="border-t border-gray-100 px-4 py-3 bg-gray-50/50 text-sm">
+        <div className="border-t border-gray-100 px-4 py-3 bg-gray-50/50 text-sm space-y-4">
           {syncError && (
-            <div className="bg-red-50 text-red-700 rounded p-2 mb-3 text-xs">
+            <div className="bg-red-50 text-red-700 rounded p-2 text-xs">
               <AlertTriangle className="w-3 h-3 inline mr-1" />
               {syncError}
             </div>
@@ -175,19 +211,15 @@ function SourceCard({ source }: { source: DiarySource }) {
 
           {/* ODATA links */}
           {(source.ckan_metadata || source.dataset_url) && (
-            <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="pt-3 border-t border-gray-200">
               <div className="text-xs font-medium text-gray-500 mb-1.5">ODATA:</div>
               <div className="space-y-1.5">
                 {source.ckan_metadata?.datasetTitle && (
                   <div className="flex items-center gap-1.5 text-xs">
                     <span className="text-gray-400">דאטסט:</span>
                     {source.dataset_url ? (
-                      <a
-                        href={source.dataset_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-600 hover:underline flex items-center gap-1 truncate"
-                      >
+                      <a href={source.dataset_url} target="_blank" rel="noopener noreferrer"
+                        className="text-primary-600 hover:underline flex items-center gap-1 truncate">
                         {source.ckan_metadata.datasetTitle}
                         <ExternalLink className="w-3 h-3 shrink-0" />
                       </a>
@@ -200,12 +232,8 @@ function SourceCard({ source }: { source: DiarySource }) {
                   <div className="flex items-center gap-1.5 text-xs">
                     <span className="text-gray-400">משאב:</span>
                     {source.resource_url ? (
-                      <a
-                        href={source.resource_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-600 hover:underline flex items-center gap-1 truncate"
-                      >
+                      <a href={source.resource_url} target="_blank" rel="noopener noreferrer"
+                        className="text-primary-600 hover:underline flex items-center gap-1 truncate">
                         {source.ckan_metadata.resourceName}
                         <ExternalLink className="w-3 h-3 shrink-0" />
                       </a>
@@ -225,7 +253,7 @@ function SourceCard({ source }: { source: DiarySource }) {
           )}
 
           {syncStatus?.latest_sync_log && (
-            <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="pt-3 border-t border-gray-200">
               <div className="text-xs font-medium text-gray-500 mb-1">סנכרון אחרון:</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                 <DetailItem label="רשומות שנקראו" value={String(syncStatus.latest_sync_log.records_fetched)} />
@@ -235,7 +263,217 @@ function SourceCard({ source }: { source: DiarySource }) {
               </div>
             </div>
           )}
+
+          {/* ── Entity extraction section ── */}
+          <div className="pt-3 border-t border-gray-200">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-gray-700 flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                כריית ישויות
+              </span>
+              <button
+                onClick={() => extractMut.mutate({ skip_ai: true })}
+                disabled={extractMut.isPending}
+                className="px-2.5 py-1 text-xs bg-primary-50 text-primary-700 border border-primary-200 rounded-lg hover:bg-primary-100 disabled:opacity-50 flex items-center gap-1"
+                title="כרה ישויות ללא בינה מלאכותית (שלבים 1-2)"
+              >
+                {extractMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Users className="w-3 h-3" />}
+                כרה (ללא AI)
+              </button>
+              <button
+                onClick={() => extractMut.mutate({ skip_ai: false })}
+                disabled={extractMut.isPending}
+                className="px-2.5 py-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 disabled:opacity-50 flex items-center gap-1"
+                title="כרה ישויות כולל AI NER (שלבים 1-3, עלות API)"
+              >
+                {extractMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                כרה עם AI
+              </button>
+              <button
+                onClick={() => { setShowEntities(!showEntities); setEntityPage(1); }}
+                className="px-2.5 py-1 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100 flex items-center gap-1"
+              >
+                {showEntities ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                הצג ישויות
+              </button>
+              {extractionMsg && (
+                <span className="text-xs text-green-600 flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" /> {extractionMsg}
+                </span>
+              )}
+            </div>
+
+            {/* Entity stats bar */}
+            {entitiesData && !entitiesLoading && entitiesData.stats.total > 0 && (
+              <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+                <span>👤 {entitiesData.stats.by_type.person} אנשים</span>
+                <span>🏢 {entitiesData.stats.by_type.organization} ארגונות</span>
+                <span>📍 {entitiesData.stats.by_type.place} מקומות</span>
+                <span className="text-green-600">● {entitiesData.stats.matched} מזוהים</span>
+                <span className="text-gray-400">○ {entitiesData.stats.unmatched} לא מזוהים</span>
+              </div>
+            )}
+
+            {/* Entity list */}
+            {showEntities && (
+              <EntityTable
+                data={entitiesData}
+                isLoading={entitiesLoading}
+                entityType={entityType}
+                onTypeChange={(t) => { setEntityType(t); setEntityPage(1); }}
+                page={entityPage}
+                onPageChange={setEntityPage}
+              />
+            )}
+          </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Entity table sub-component
+// ─────────────────────────────────────────────
+function EntityTable({
+  data,
+  isLoading,
+  entityType,
+  onTypeChange,
+  page,
+  onPageChange,
+}: {
+  data: EntityListResponse | undefined;
+  isLoading: boolean;
+  entityType: string;
+  onTypeChange: (t: string) => void;
+  page: number;
+  onPageChange: (p: number) => void;
+}) {
+  const LIMIT = 50;
+  const totalPages = Math.ceil((data?.total ?? 0) / LIMIT);
+
+  const TYPE_LABELS: Record<string, string> = {
+    '': 'הכל',
+    person: 'אנשים',
+    organization: 'ארגונות',
+    place: 'מקומות',
+  };
+
+  const METHOD_LABELS: Record<string, string> = {
+    owner: 'בעלים',
+    participant_parse: 'משתתף',
+    ai_ner: 'AI',
+  };
+
+  const ROLE_LABELS: Record<string, string> = {
+    owner: 'בעלים',
+    participant: 'משתתף',
+    location: 'מיקום',
+    mentioned: 'הוזכר',
+  };
+
+  return (
+    <div className="mt-2 space-y-2">
+      {/* Type filter */}
+      <div className="flex gap-1">
+        {Object.entries(TYPE_LABELS).map(([val, label]) => (
+          <button
+            key={val}
+            onClick={() => onTypeChange(val)}
+            className={`px-2 py-0.5 text-[10px] rounded-full border transition-colors ${
+              entityType === val
+                ? 'bg-primary-600 text-white border-primary-600'
+                : 'border-gray-200 text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
+        </div>
+      ) : !data || data.data.length === 0 ? (
+        <p className="text-xs text-gray-400 py-2">אין ישויות. לחץ "כרה" להתחיל חילוץ.</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-gray-200 rounded bg-white">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">שם</th>
+                  <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">סוג</th>
+                  <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">תפקיד</th>
+                  <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b hidden sm:table-cell">אירוע</th>
+                  <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">שיטה</th>
+                  <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">ביטחון</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.data.map((entity) => (
+                  <tr key={entity.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <td className="px-2 py-1.5 text-gray-800 font-medium max-w-[120px] truncate">
+                      <span
+                        className={`inline-flex items-center gap-1 ${entity.entity_id ? 'text-green-700' : 'text-gray-600'}`}
+                        title={entity.entity_id ? 'מזוהה ברשומות' : 'לא מזוהה'}
+                      >
+                        <span className="text-[8px]">{entity.entity_id ? '●' : '○'}</span>
+                        {entity.entity_name}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5 text-gray-500">
+                      {entity.entity_type === 'person' ? '👤' : entity.entity_type === 'organization' ? '🏢' : '📍'}
+                    </td>
+                    <td className="px-2 py-1.5 text-gray-500">{ROLE_LABELS[entity.role] ?? entity.role}</td>
+                    <td className="px-2 py-1.5 text-gray-500 max-w-[160px] truncate hidden sm:table-cell">
+                      {entity.event_title}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <span className={`px-1 py-0.5 rounded text-[9px] font-medium ${
+                        entity.extraction_method === 'owner'
+                          ? 'bg-blue-100 text-blue-700'
+                          : entity.extraction_method === 'ai_ner'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {METHOD_LABELS[entity.extraction_method] ?? entity.extraction_method}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5 text-gray-500">
+                      {Math.round(entity.confidence * 100)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between text-[10px] text-gray-500">
+              <span>עמוד {page}/{totalPages} — סה"כ {data.total} ישויות</span>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => onPageChange(page - 1)}
+                  disabled={page <= 1}
+                  className="px-2 py-0.5 border border-gray-200 rounded hover:bg-gray-100 disabled:opacity-40"
+                >
+                  ‹ הקודם
+                </button>
+                <button
+                  onClick={() => onPageChange(page + 1)}
+                  disabled={page >= totalPages}
+                  className="px-2 py-0.5 border border-gray-200 rounded hover:bg-gray-100 disabled:opacity-40"
+                >
+                  הבא ›
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

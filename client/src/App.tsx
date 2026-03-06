@@ -10,6 +10,8 @@ import { DashboardPage } from '@/pages/admin/DashboardPage';
 import { SyncPage } from '@/pages/admin/SyncPage';
 import { SourcesPage } from '@/pages/admin/SourcesPage';
 import { ContentPage } from '@/pages/admin/ContentPage';
+import { PeoplePage } from '@/pages/admin/PeoplePage';
+import { OrgsPage } from '@/pages/admin/OrgsPage';
 
 export default function App() {
   return (
@@ -30,6 +32,8 @@ export default function App() {
         <Route path="sync" element={<SyncPage />} />
         <Route path="sources" element={<SourcesPage />} />
         <Route path="content" element={<ContentPage />} />
+        <Route path="people" element={<PeoplePage />} />
+        <Route path="organizations" element={<OrgsPage />} />
       </Route>
     </Routes>
   );

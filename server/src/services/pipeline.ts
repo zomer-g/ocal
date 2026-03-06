@@ -20,6 +20,7 @@ import { parseDate, parseDateTime } from './dateParser.js';
 import { mapFields, type FieldMapping, type MappingResult } from './fieldMapper.js';
 import * as ckan from './ckan.js';
 import type { CKANResource, CKANPackage, FetchResult } from './ckan.js';
+import { extractEntitiesForSource } from './entityExtractor.js';
 
 // ──────────────────────────────────────────────
 // Types
@@ -472,6 +473,13 @@ export async function processSource(
     });
 
     logger.info({ sourceId, result: { ...result, processingDef: undefined } }, 'Processing complete');
+
+    // ── Step 5: Trigger entity extraction in background (Stages 1 + 2 only, no AI cost) ──
+    // AI NER (Stage 3) is triggered manually from the admin UI.
+    extractEntitiesForSource(sourceId, { skipAI: true, clearExisting: isResync })
+      .then((r) => logger.info({ sourceId, entities: r.entitiesInserted }, 'Entity extraction done'))
+      .catch((err) => logger.warn({ sourceId, err }, 'Entity extraction failed (non-fatal)'));
+
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     result.errors.push(errMsg);
