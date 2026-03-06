@@ -9,6 +9,7 @@ import { adminExceptionsRouter } from './exceptions.js';
 import { adminPeopleRouter } from './people.js';
 import { adminOrgsRouter } from './orgs.js';
 import { adminExportRouter } from './export.js';
+import { adminContentRouter } from './content.js';
 
 export const adminRoutes = Router();
 
@@ -26,3 +27,4 @@ adminRoutes.use('/exceptions', adminExceptionsRouter);
 adminRoutes.use('/people', adminPeopleRouter);
 adminRoutes.use('/organizations', adminOrgsRouter);
 adminRoutes.use('/export', adminExportRouter);
+adminRoutes.use('/content', adminContentRouter);

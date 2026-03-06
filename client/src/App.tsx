@@ -9,6 +9,7 @@ import { LoginPage } from '@/pages/admin/LoginPage';
 import { DashboardPage } from '@/pages/admin/DashboardPage';
 import { SyncPage } from '@/pages/admin/SyncPage';
 import { SourcesPage } from '@/pages/admin/SourcesPage';
+import { ContentPage } from '@/pages/admin/ContentPage';
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="sync" element={<SyncPage />} />
         <Route path="sources" element={<SourcesPage />} />
+        <Route path="content" element={<ContentPage />} />
       </Route>
     </Routes>
   );

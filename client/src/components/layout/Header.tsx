@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Calendar, Search, Menu, X, Info } from 'lucide-react';
+import { useSiteContent } from '@/hooks/useContent';
 
 export function Header() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { data: content } = useSiteContent();
+  const siteName = content?.header?.siteName ?? 'יומן לעם';
 
   const navItems = [
     { path: '/', label: 'חיפוש', icon: Search },
@@ -18,7 +21,7 @@ export function Header() {
         <div className="flex items-center justify-between h-14 sm:h-16">
           <Link to="/" className="flex items-center gap-2">
             <Calendar className="w-7 h-7 sm:w-8 sm:h-8 text-primary-200" />
-            <span className="text-lg sm:text-xl font-bold text-white">יומן לעם</span>
+            <span className="text-lg sm:text-xl font-bold text-white">{siteName}</span>
           </Link>
 
           {/* Desktop nav */}

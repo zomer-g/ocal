@@ -1,7 +1,11 @@
 import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
+import { useSiteContent } from '@/hooks/useContent';
 
 export function PublicLayout() {
+  const { data: content } = useSiteContent();
+  const footer = content?.footer;
+
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#F6F6F6' }}>
       <a href="#main-content" className="skip-link">דלג לתוכן הראשי</a>
@@ -11,9 +15,9 @@ export function PublicLayout() {
       </main>
       <footer className="bg-primary-900 text-primary-100 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm">
-          <p>יומן לעם — פלטפורמה לשקיפות ציבורית</p>
+          <p>{footer?.tagline ?? 'יומן לעם — פלטפורמה לשקיפות ציבורית'}</p>
           <p className="text-primary-300 text-xs mt-1">
-            הנתונים מבוססים על מידע ממאגר הנתונים הפתוח של ישראל
+            {footer?.subtext ?? 'הנתונים מבוססים על מידע ממאגר הנתונים הפתוח של ישראל'}
           </p>
         </div>
       </footer>
