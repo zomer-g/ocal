@@ -254,8 +254,19 @@ async function downloadFile(url: string): Promise<Buffer> {
 }
 
 /** Parse CSV/XLS/XLSX with SheetJS */
-function parseSpreadsheet(buffer: Buffer): { records: Record<string, unknown>[]; fields: string[] } {
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
+function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<string, unknown>[]; fields: string[] } {
+  let workbook: XLSX.WorkBook;
+
+  if (format?.toUpperCase() === 'CSV') {
+    // CSV: decode as UTF-8 string to preserve Hebrew characters.
+    // SheetJS buffer mode doesn't reliably detect UTF-8 for CSV files,
+    // which causes Hebrew text to appear as garbled bytes.
+    let str = buffer.toString('utf-8');
+    if (str.charCodeAt(0) === 0xFEFF) str = str.slice(1); // strip BOM
+    workbook = XLSX.read(str, { type: 'string' });
+  } else {
+    workbook = XLSX.read(buffer, { type: 'buffer', codepage: 65001 });
+  }
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) throw new Error('No sheets found in workbook');
@@ -342,7 +353,7 @@ export async function downloadAndParseFile(
   }
 
   // CSV, XLS, XLSX all handled by SheetJS
-  return parseSpreadsheet(buffer);
+  return parseSpreadsheet(buffer, format);
 }
 
 // ──────────────────────────────────────────────

@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
 } from 'lucide-react';
 
 // ────────────────────────────────────────────
@@ -225,6 +226,16 @@ function DatasetCard({
           {dataset.organization && (
             <span className="text-xs text-gray-400 shrink-0 hidden sm:inline">({dataset.organization})</span>
           )}
+          <a
+            href={dataset.odata_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-gray-400 hover:text-primary-500 shrink-0"
+            title="פתח ב-ODATA"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
           <span className="text-[10px] sm:text-xs bg-gray-200 text-gray-600 px-1 sm:px-1.5 py-0.5 rounded shrink-0">
             {visibleResources.length} משאבים
           </span>
@@ -336,7 +347,29 @@ function InlineImportPanel({
 
   return (
     <div className="bg-blue-50 border-t border-blue-100 px-3 sm:px-4 py-4 space-y-4">
-      {/* ── Profile summary ── */}
+      {/* ── ODATA links + Profile summary ── */}
+      <div className="flex items-center gap-3 text-xs">
+        <a
+          href={activeProfile.odata_dataset_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium"
+        >
+          <ExternalLink className="w-3 h-3" />
+          מאגר ב-ODATA
+        </a>
+        <span className="text-gray-300">|</span>
+        <a
+          href={activeProfile.odata_resource_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium"
+        >
+          <ExternalLink className="w-3 h-3" />
+          משאב ב-ODATA
+        </a>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <InfoCard label="מאגר" value={activeProfile.package.title} />
         <InfoCard label="פורמט" value={activeProfile.format} />

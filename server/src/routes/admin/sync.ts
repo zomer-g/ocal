@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../../config/database.js';
+import { env } from '../../config/env.js';
 import * as ckan from '../../services/ckan.js';
 import { profileSource, registerSource, processSource } from '../../services/pipeline.js';
 import { validate } from '../../middleware/validate.js';
@@ -29,11 +30,14 @@ adminSyncRouter.get('/discover', async (req, res, next) => {
     const syncedIds = new Set(synced.map(s => s.resource_id));
     const exceptedIds = new Set(excepted.map(e => e.resource_id));
 
-    // Annotate each resource with its import status
+    // Annotate each resource with its import status + ODATA links
+    const odataBase = env.CKAN_BASE_URL;
     const datasets = discovery.datasets.map(ds => ({
       ...ds,
+      odata_url: `${odataBase}/dataset/${ds.id}`,
       resources: ds.resources.map(r => ({
         ...r,
+        odata_url: `${odataBase}/dataset/${ds.id}/resource/${r.id}`,
         status: syncedIds.has(r.id)
           ? 'synced' as const
           : exceptedIds.has(r.id)
@@ -66,6 +70,7 @@ adminSyncRouter.post('/profile', validate(profileSchema, 'body'), async (req, re
   try {
     const profile = await profileSource(req.body.resource_id);
 
+    const odataBase = env.CKAN_BASE_URL;
     res.json({
       resource: profile.resource,
       package: profile.pkg,
@@ -81,6 +86,8 @@ adminSyncRouter.post('/profile', validate(profileSchema, 'body'), async (req, re
       suggested_name: profile.suggestedName,
       is_duplicate: profile.isDuplicate,
       existing_source_id: profile.existingSourceId,
+      odata_dataset_url: `${odataBase}/dataset/${profile.pkg.id}`,
+      odata_resource_url: `${odataBase}/dataset/${profile.pkg.id}/resource/${profile.resource.id}`,
     });
   } catch (err) {
     next(err);

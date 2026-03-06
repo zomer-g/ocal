@@ -13,6 +13,7 @@ export interface DiscoveredResource {
   importable: boolean;
   importMethod: 'datastore' | 'file_download';
   status: 'synced' | 'excepted' | 'available';
+  odata_url: string;
 }
 
 export interface DiscoveredDataset {
@@ -20,6 +21,7 @@ export interface DiscoveredDataset {
   title: string;
   organization: string | null;
   resources: DiscoveredResource[];
+  odata_url: string;
 }
 
 export interface DiscoverResponse {
@@ -75,6 +77,8 @@ export interface ProfileResponse {
   suggested_name: string;
   is_duplicate: boolean;
   existing_source_id?: string;
+  odata_dataset_url: string;
+  odata_resource_url: string;
 }
 
 export async function profileResource(resourceId: string): Promise<ProfileResponse> {
