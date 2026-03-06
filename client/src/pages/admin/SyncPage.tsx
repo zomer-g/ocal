@@ -343,7 +343,7 @@ function InlineImportPanel({
   isImporting: boolean;
   importError: Error | null;
 }) {
-  const [showSample, setShowSample] = useState(false);
+  const [showSample, setShowSample] = useState(true);
 
   return (
     <div className="bg-blue-50 border-t border-blue-100 px-3 sm:px-4 py-4 space-y-4">
@@ -424,7 +424,7 @@ function InlineImportPanel({
             <table className="w-full text-xs border border-gray-200 rounded bg-white">
               <thead className="bg-gray-50">
                 <tr>
-                  {activeProfile.fields.slice(0, 8).map((field) => (
+                  {activeProfile.fields.map((field) => (
                     <th key={field} className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">
                       {field}
                     </th>
@@ -434,7 +434,7 @@ function InlineImportPanel({
               <tbody>
                 {activeProfile.sample_records.slice(0, 3).map((record, i) => (
                   <tr key={i} className="border-b last:border-b-0">
-                    {activeProfile.fields.slice(0, 8).map((field) => (
+                    {activeProfile.fields.map((field) => (
                       <td key={field} className="px-2 py-1.5 text-gray-600 max-w-[150px] truncate">
                         {String(record[field] ?? '')}
                       </td>
