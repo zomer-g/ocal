@@ -4,6 +4,7 @@ services:
     name: ocal-api
     runtime: node
     plan: starter
+    numInstances: 1
     buildCommand: npm install && npm run build
     startCommand: npm run migrate && npm run start --workspace=server
     healthCheckPath: /api/health
