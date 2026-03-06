@@ -16,7 +16,7 @@
 import { db } from '../config/database.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
-import { parseDateTime } from './dateParser.js';
+import { parseDate, parseDateTime } from './dateParser.js';
 import { mapFields, type FieldMapping, type MappingResult } from './fieldMapper.js';
 import * as ckan from './ckan.js';
 import type { CKANResource, CKANPackage, FetchResult } from './ckan.js';
@@ -198,19 +198,44 @@ export function transformRecord(
   sourceId: string,
   datasetName: string,
   datasetLink?: string,
+  _diagIndex?: number,  // used for first-N diagnostic logging
 ): NormalizedEvent | null {
   try {
     // Title (required)
     const rawTitle = record[mapping.title];
-    if (!rawTitle || (typeof rawTitle === 'string' && !rawTitle.trim())) return null;
+    if (!rawTitle || (typeof rawTitle === 'string' && !rawTitle.trim())) {
+      if (_diagIndex !== undefined && _diagIndex < 3) {
+        logger.warn({
+          diagIndex: _diagIndex,
+          mappingTitle: mapping.title,
+          recordKeys: Object.keys(record),
+          titleValue: rawTitle,
+        }, 'transformRecord: title field missing or empty');
+      }
+      return null;
+    }
     const title = typeof rawTitle === 'string' ? rawTitle.trim() : String(rawTitle);
 
     // Start time (required): combine date + optional time
+    const rawDate = record[mapping.start_date];
     const startTime = parseDateTime(
-      record[mapping.start_date],
+      rawDate,
       mapping.start_time ? record[mapping.start_time] : undefined
     );
-    if (!startTime) return null;
+    if (!startTime) {
+      if (_diagIndex !== undefined && _diagIndex < 3) {
+        logger.warn({
+          diagIndex: _diagIndex,
+          mappingStartDate: mapping.start_date,
+          mappingStartTime: mapping.start_time,
+          dateValue: rawDate,
+          dateType: typeof rawDate,
+          dateIsDate: rawDate instanceof Date,
+          parsedDate: parseDate(rawDate),
+        }, 'transformRecord: start_date unparseable');
+      }
+      return null;
+    }
 
     // End time (optional)
     const endTime = mapping.end_date
@@ -356,6 +381,19 @@ export async function processSource(
       records: fetchResult.total,
     }, 'Records fetched, transforming...');
 
+    // Log first record's actual fields vs mapping for diagnostics
+    if (fetchResult.records.length > 0) {
+      logger.info({
+        firstRecordKeys: Object.keys(fetchResult.records[0]),
+        fieldMapping,
+        sampleValues: {
+          title: fetchResult.records[0][fieldMapping.title],
+          start_date: fetchResult.records[0][fieldMapping.start_date],
+          start_time: fieldMapping.start_time ? fetchResult.records[0][fieldMapping.start_time] : undefined,
+        },
+      }, 'Field mapping diagnostic — first record');
+    }
+
     // ── Step 2: Transform + Insert in batches ──
     const BATCH_SIZE = 200;
     const totalRecords = fetchResult.records.length;
@@ -365,8 +403,9 @@ export async function processSource(
       const transformed: NormalizedEvent[] = [];
 
       for (const record of batch) {
+        const globalIndex = i + batch.indexOf(record);
         const event = transformRecord(
-          record, fieldMapping, sourceId, source.name, source.dataset_url
+          record, fieldMapping, sourceId, source.name, source.dataset_url, globalIndex
         );
         if (event) {
           transformed.push(event);

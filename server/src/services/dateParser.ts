@@ -45,6 +45,11 @@ function isExcelTimeFraction(value: unknown): value is number {
 export function parseDate(value: unknown): Date | null {
   if (value == null || value === '') return null;
 
+  // JavaScript Date object (returned by SheetJS for XLSX date cells)
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+
   // Excel serial number
   if (isExcelSerial(value)) {
     return excelSerialToDate(value);

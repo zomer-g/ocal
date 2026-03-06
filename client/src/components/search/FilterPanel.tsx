@@ -15,20 +15,25 @@ export function FilterPanel() {
       {/* Date range */}
       <div className="space-y-2">
         <label className="text-xs text-gray-500">טווח תאריכים</label>
-        <div className="flex gap-2 items-center">
-          <HebrewDateInput
-            value={from_date}
-            onChange={(val) => setDateRange(val, to_date)}
-            placeholder="מתאריך"
-            className="flex-1 text-sm border border-gray-300 rounded px-2 py-1.5 text-center"
-          />
-          <span className="text-gray-400">-</span>
-          <HebrewDateInput
-            value={to_date}
-            onChange={(val) => setDateRange(from_date, val)}
-            placeholder="עד תאריך"
-            className="flex-1 text-sm border border-gray-300 rounded px-2 py-1.5 text-center"
-          />
+        <div className="space-y-1.5">
+          <div className="space-y-1">
+            <span className="text-xs text-gray-400">מתאריך</span>
+            <HebrewDateInput
+              value={from_date}
+              onChange={(val) => setDateRange(val, to_date)}
+              placeholder="בחר תאריך התחלה"
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5"
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs text-gray-400">עד תאריך</span>
+            <HebrewDateInput
+              value={to_date}
+              onChange={(val) => setDateRange(from_date, val)}
+              placeholder="בחר תאריך סיום"
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5"
+            />
+          </div>
         </div>
       </div>
 
