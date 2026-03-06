@@ -448,64 +448,82 @@ function InlineImportPanel({
       </div>
 
       {/* ── Import form (name, color, button) ── */}
-      <div className="border-t border-blue-200 pt-4">
-        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-primary-500" />
-          ייבוא
-        </h3>
+      {(() => {
+        const missingRequired: string[] = [];
+        if (!importMapping.title) missingRequired.push('כותרת');
+        if (!importMapping.start_date) missingRequired.push('תאריך התחלה');
+        const canImport = missingRequired.length === 0 && importName.trim().length > 0;
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-          {/* Name */}
-          <div>
-            <label className="text-xs font-medium text-gray-700 block mb-1">שם המקור</label>
-            <input
-              type="text"
-              value={importName}
-              onChange={(e) => onImportNameChange(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
+        return (
+          <div className="border-t border-blue-200 pt-4">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-primary-500" />
+              ייבוא
+            </h3>
 
-          {/* Color */}
-          <div>
-            <label className="text-xs font-medium text-gray-700 block mb-1">צבע</label>
-            <div className="flex gap-1 flex-wrap mt-1">
-              {SOURCE_COLORS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => onImportColorChange(c)}
-                  className={`w-5 h-5 rounded-full transition-transform ${
-                    importColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'
-                  }`}
-                  style={{ backgroundColor: c }}
+            {/* Missing required fields warning */}
+            {missingRequired.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 mb-3 flex items-center gap-2 text-xs text-red-700">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>שדות חובה חסרים במיפוי: <strong>{missingRequired.join(', ')}</strong>. יש לבחור עמודה מתאימה מהרשימה.</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              {/* Name */}
+              <div>
+                <label className="text-xs font-medium text-gray-700 block mb-1">שם המקור</label>
+                <input
+                  type="text"
+                  value={importName}
+                  onChange={(e) => onImportNameChange(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
-              ))}
+              </div>
+
+              {/* Color */}
+              <div>
+                <label className="text-xs font-medium text-gray-700 block mb-1">צבע</label>
+                <div className="flex gap-1 flex-wrap mt-1">
+                  {SOURCE_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => onImportColorChange(c)}
+                      className={`w-5 h-5 rounded-full transition-transform ${
+                        importColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Import button */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onImport}
+                disabled={isImporting || !canImport}
+                className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isImporting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4" />
+                )}
+                ייבוא ({activeProfile.total_records} רשומות)
+              </button>
+
+              {importError && (
+                <span className="text-sm text-red-600 flex items-center gap-1">
+                  <XCircle className="w-4 h-4" />
+                  {importError.message}
+                </span>
+              )}
             </div>
           </div>
-        </div>
-
-        {/* Import button */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onImport}
-            disabled={isImporting || !importName.trim()}
-            className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-          >
-            {isImporting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <CheckCircle className="w-4 h-4" />
-            )}
-            ייבוא ({activeProfile.total_records} רשומות)
-          </button>
-
-          {importError && (
-            <span className="text-sm text-red-600 flex items-center gap-1">
-              <XCircle className="w-4 h-4" />
-              {importError.message}
-            </span>
-          )}
-        </div>
+        );
+      })()}
 
         {/* Import success */}
         {importResult && (
@@ -569,6 +587,8 @@ const FIELD_LABELS: Record<string, string> = {
   notes: 'הערות',
 };
 
+const REQUIRED_FIELDS = new Set(['title', 'start_date']);
+
 function FieldMappingEditor({
   mapping,
   availableFields,
@@ -584,21 +604,34 @@ function FieldMappingEditor({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-      {Object.entries(FIELD_LABELS).map(([key, label]) => (
-        <div key={key} className="flex items-center gap-2">
-          <label className="text-xs text-gray-600 w-28 shrink-0 text-left">{label}</label>
-          <select
-            value={mapping[key as keyof FieldMapping] || ''}
-            onChange={(e) => handleChange(key as keyof FieldMapping, e.target.value)}
-            className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
-          >
-            <option value="">—</option>
-            {availableFields.map((field) => (
-              <option key={field} value={field}>{field}</option>
-            ))}
-          </select>
-        </div>
-      ))}
+      {Object.entries(FIELD_LABELS).map(([key, label]) => {
+        const isRequired = REQUIRED_FIELDS.has(key);
+        const isMissing = isRequired && !mapping[key as keyof FieldMapping];
+
+        return (
+          <div key={key} className="flex items-center gap-2">
+            <label className={`text-xs w-28 shrink-0 text-left ${
+              isMissing ? 'text-red-600 font-semibold' : 'text-gray-600'
+            }`}>
+              {label}
+            </label>
+            <select
+              value={mapping[key as keyof FieldMapping] || ''}
+              onChange={(e) => handleChange(key as keyof FieldMapping, e.target.value)}
+              className={`flex-1 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 ${
+                isMissing
+                  ? 'border-2 border-red-400 bg-red-50'
+                  : 'border border-gray-300'
+              }`}
+            >
+              <option value="">—</option>
+              {availableFields.map((field) => (
+                <option key={field} value={field}>{field}</option>
+              ))}
+            </select>
+          </div>
+        );
+      })}
     </div>
   );
 }
