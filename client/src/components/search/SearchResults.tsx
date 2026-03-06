@@ -10,7 +10,7 @@ interface SearchResultsProps {
 export function SearchResults({ events, total }: SearchResultsProps) {
   if (events.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
+      <div className="text-center py-12 text-gray-500" role="status">
         <p className="text-lg">לא נמצאו תוצאות</p>
         <p className="text-sm mt-1">נסו לשנות את מילות החיפוש או המסננים</p>
       </div>
@@ -26,7 +26,7 @@ export function SearchResults({ events, total }: SearchResultsProps) {
   }
 
   return (
-    <div>
+    <div role="region" aria-label="תוצאות חיפוש" aria-live="polite">
       <p className="text-sm text-gray-500 mb-4">
         נמצאו {total.toLocaleString('he-IL')} תוצאות
       </p>

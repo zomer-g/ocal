@@ -525,19 +525,18 @@ function InlineImportPanel({
         );
       })()}
 
-        {/* Import success */}
-        {importResult && (
-          <div className="mt-3 bg-green-100 border border-green-200 rounded-lg p-2.5">
-            <div className="flex items-center gap-2 text-sm text-green-700">
-              <CheckCircle className="w-4 h-4" />
-              <span className="font-medium">{importResult.message}</span>
-            </div>
-            <div className="text-xs text-green-600 mt-0.5">
-              מזהה מקור: {importResult.sourceId}
-            </div>
+      {/* Import success */}
+      {importResult && (
+        <div className="mt-3 bg-green-100 border border-green-200 rounded-lg p-2.5">
+          <div className="flex items-center gap-2 text-sm text-green-700">
+            <CheckCircle className="w-4 h-4" />
+            <span className="font-medium">{importResult.message}</span>
           </div>
-        )}
-      </div>
+          <div className="text-xs text-green-600 mt-0.5">
+            מזהה מקור: {importResult.sourceId}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

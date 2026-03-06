@@ -96,9 +96,9 @@ export function TimeGrid({ date, view, events, onEventClick }: TimeGridProps) {
   const hasAllDayEvents = days.some(day => (allDayByDay[day]?.length ?? 0) > 0);
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[calc(100vh-160px)] sm:h-[calc(100vh-180px)]">
+    <div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[calc(100vh-160px)] sm:h-[calc(100vh-180px)]" role="grid" aria-label="לוח שנה">
       {/* Day headers */}
-      <div className="flex border-b border-gray-200 shrink-0">
+      <div className="flex border-b border-gray-200 shrink-0" role="row">
         {/* Time gutter */}
         <div className="w-10 sm:w-16 shrink-0" />
 
@@ -108,12 +108,13 @@ export function TimeGrid({ date, view, events, onEventClick }: TimeGridProps) {
           return (
             <div
               key={day}
+              role="columnheader"
               className={`flex-1 text-center py-2 border-r border-gray-100 last:border-r-0 cursor-pointer hover:bg-gray-50 ${
                 today ? 'bg-primary-50' : ''
               }`}
               onClick={() => { setDate(day); setView('day'); }}
             >
-              <div className={`text-[10px] sm:text-xs font-medium ${today ? 'text-primary-600' : 'text-gray-500'}`}>
+              <div className={`text-xs sm:text-sm font-medium ${today ? 'text-primary-600' : 'text-gray-500'}`}>
                 {formatDayHeader(day)}
               </div>
               {today && (
@@ -129,7 +130,7 @@ export function TimeGrid({ date, view, events, onEventClick }: TimeGridProps) {
       {/* All-day events section */}
       {hasAllDayEvents && (
         <div className="flex border-b border-gray-200 shrink-0">
-          <div className="w-10 sm:w-16 shrink-0 text-[9px] sm:text-[10px] text-gray-400 text-center py-1">כל היום</div>
+          <div className="w-10 sm:w-16 shrink-0 text-xs text-gray-400 text-center py-1">כל היום</div>
           {days.map((day) => (
             <div key={day} className="flex-1 border-r border-gray-100 last:border-r-0 p-1 min-h-[28px]">
               {(allDayByDay[day] || []).map((event) => (
@@ -151,7 +152,7 @@ export function TimeGrid({ date, view, events, onEventClick }: TimeGridProps) {
                 className="absolute w-full text-left pr-1 sm:pr-2"
                 style={{ top: `${hour * HOUR_HEIGHT}px` }}
               >
-                <span className="text-[9px] sm:text-[11px] text-gray-400 relative -top-2">
+                <span className="text-[11px] sm:text-xs text-gray-400 relative -top-2">
                   {formatHour(hour)}
                 </span>
               </div>

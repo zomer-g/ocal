@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, Search, Menu, X } from 'lucide-react';
+import { Calendar, Search, Menu, X, Info } from 'lucide-react';
 
 export function Header() {
   const location = useLocation();
@@ -9,30 +9,31 @@ export function Header() {
   const navItems = [
     { path: '/', label: 'חיפוש', icon: Search },
     { path: '/calendar', label: 'לוח שנה', icon: Calendar },
+    { path: '/about', label: 'אודות', icon: Info },
   ];
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <header className="bg-primary-800 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16">
           <Link to="/" className="flex items-center gap-2">
-            <Calendar className="w-7 h-7 sm:w-8 sm:h-8 text-primary-600" />
-            <span className="text-lg sm:text-xl font-bold text-gray-900">Ocal</span>
-            <span className="text-xs sm:text-sm text-gray-500 hidden sm:inline">יומן ציבורי</span>
+            <Calendar className="w-7 h-7 sm:w-8 sm:h-8 text-primary-200" />
+            <span className="text-lg sm:text-xl font-bold text-white">יומן לעם</span>
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden sm:flex items-center gap-1">
+          <nav className="hidden sm:flex items-center gap-1" role="navigation" aria-label="ניווט ראשי">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <Link
                   key={item.path}
                   to={item.path}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-white/15 text-white'
+                      : 'text-primary-100 hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <item.icon className="w-4 h-4" />
@@ -45,7 +46,9 @@ export function Header() {
           {/* Mobile hamburger */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="sm:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100"
+            className="sm:hidden p-2 rounded-lg text-primary-100 hover:bg-white/10 hover:text-white"
+            aria-expanded={mobileOpen}
+            aria-label="תפריט ניווט"
           >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -54,8 +57,8 @@ export function Header() {
 
       {/* Mobile nav dropdown */}
       {mobileOpen && (
-        <div className="sm:hidden border-t border-gray-100 bg-white">
-          <nav className="px-4 py-2 space-y-1">
+        <div className="sm:hidden border-t border-primary-600 bg-primary-700">
+          <nav className="px-4 py-2 space-y-1" role="navigation" aria-label="ניווט ראשי">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
@@ -63,10 +66,11 @@ export function Header() {
                   key={item.path}
                   to={item.path}
                   onClick={() => setMobileOpen(false)}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-50'
+                      ? 'bg-white/15 text-white'
+                      : 'text-primary-100 hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <item.icon className="w-4 h-4" />

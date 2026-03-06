@@ -20,8 +20,8 @@ export function AdminLayout() {
           <div className="flex items-center justify-between h-12 sm:h-14">
             <div className="flex items-center gap-2 sm:gap-3">
               <Link to="/" className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-primary-400" />
-                <span className="text-base sm:text-lg font-bold">Ocal</span>
+                <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-primary-300" />
+                <span className="text-base sm:text-lg font-bold">יומן לעם</span>
               </Link>
               <span className="text-[10px] sm:text-xs bg-yellow-500 text-gray-900 px-1.5 sm:px-2 py-0.5 rounded font-semibold">
                 ניהול

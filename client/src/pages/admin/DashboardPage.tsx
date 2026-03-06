@@ -19,7 +19,7 @@ export function DashboardPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
         </div>
       ) : (
         <>
@@ -30,21 +30,21 @@ export function DashboardPage() {
               label="מקורות"
               value={sources.length}
               sub={`${activeSources} פעילים`}
-              color="bg-blue-500"
+              color="bg-primary-700"
             />
             <StatCard
               icon={Calendar}
               label="אירועים"
               value={totalEvents}
               sub="סה״כ במערכת"
-              color="bg-green-500"
+              color="bg-primary-600"
             />
             <StatCard
               icon={Download}
               label="פורמטים נתמכים"
               value={6}
               sub="CSV, XLS, XLSX, ICS, ICAL, ICA"
-              color="bg-purple-500"
+              color="bg-primary-500"
             />
           </div>
 
@@ -147,7 +147,7 @@ function StatCard({
           <div className="text-xs text-gray-500">{label}</div>
         </div>
       </div>
-      <div className="text-[10px] text-gray-400 mt-2">{sub}</div>
+      <div className="text-xs text-gray-400 mt-2">{sub}</div>
     </div>
   );
 }

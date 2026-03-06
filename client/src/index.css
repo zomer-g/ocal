@@ -5,4 +5,43 @@
 body {
   direction: rtl;
   font-family: 'Rubik', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Skip link — visually hidden until focused */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  right: 0;
+  z-index: 9999;
+  padding: 0.75rem 1.5rem;
+  background: #00796B;
+  color: white;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 0 0 0 0.5rem;
+  transition: top 0.2s;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* Global focus-visible styles for AA keyboard accessibility */
+*:focus-visible {
+  outline: 3px solid #00796B;
+  outline-offset: 2px;
+}
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

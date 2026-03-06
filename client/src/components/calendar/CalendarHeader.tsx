@@ -31,13 +31,13 @@ export function CalendarHeader() {
   })();
 
   return (
-    <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
+    <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2" role="toolbar" aria-label="בקרת לוח שנה">
       {/* Left side: navigation */}
       <div className="flex items-center gap-1 sm:gap-2">
         {/* Today button */}
         <button
           onClick={goToday}
-          className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-gray-700"
+          className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors font-medium text-primary-700"
         >
           היום
         </button>
@@ -47,14 +47,14 @@ export function CalendarHeader() {
           <button
             onClick={() => navigate(1)}
             className="p-1 sm:p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-            title="קדימה"
+            aria-label="תקופה הבאה"
           >
             <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
           </button>
           <button
             onClick={() => navigate(-1)}
             className="p-1 sm:p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-            title="אחורה"
+            aria-label="תקופה קודמת"
           >
             <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
           </button>
@@ -67,14 +67,15 @@ export function CalendarHeader() {
       </div>
 
       {/* Right side: view selector */}
-      <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+      <div className="flex border border-gray-300 rounded-lg overflow-hidden" role="group" aria-label="תצוגת לוח שנה">
         {VIEW_OPTIONS.map((opt) => (
           <button
             key={opt.value}
             onClick={() => setView(opt.value)}
+            aria-pressed={view === opt.value}
             className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium transition-colors ${
               view === opt.value
-                ? 'bg-primary-500 text-white'
+                ? 'bg-primary-700 text-white'
                 : 'text-gray-600 hover:bg-gray-50'
             }`}
           >

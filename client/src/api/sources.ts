@@ -36,3 +36,16 @@ export async function getSource(id: string): Promise<DiarySource> {
   const { data } = await api.get(`/public/sources/${id}`);
   return data;
 }
+
+// ── Public stats ──
+
+export interface PublicStats {
+  total_events: number;
+  total_sources: number;
+  total_organizations: number;
+}
+
+export async function getStats(): Promise<PublicStats> {
+  const { data } = await api.get('/public/stats');
+  return data;
+}

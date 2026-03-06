@@ -60,11 +60,11 @@ export function MonthGrid({ date, events, eventCounts, onDateClick, onEventClick
   }, [events]);
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden" role="grid" aria-label="לוח שנה חודשי">
       {/* Day headers */}
-      <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+      <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50" role="row">
         {DAY_NAMES.map((day) => (
-          <div key={day} className="py-2 text-center text-xs font-semibold text-gray-500">
+          <div key={day} role="columnheader" className="py-2 text-center text-xs font-semibold text-gray-500">
             {day}
           </div>
         ))}
@@ -72,7 +72,7 @@ export function MonthGrid({ date, events, eventCounts, onDateClick, onEventClick
 
       {/* Weeks */}
       {weeks.map((week, wi) => (
-        <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0">
+        <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0" role="row">
           {week.map((dayStr) => {
             const dayDate = new Date(dayStr);
             const dayNum = dayDate.getDate();
@@ -84,15 +84,24 @@ export function MonthGrid({ date, events, eventCounts, onDateClick, onEventClick
             return (
               <div
                 key={dayStr}
+                role="gridcell"
+                aria-label={`${dayNum}, ${count} אירועים`}
                 className={`min-h-[60px] sm:min-h-[100px] border-l border-gray-100 first:border-l-0 p-0.5 sm:p-1 cursor-pointer transition-colors hover:bg-gray-50 ${
                   !isCurrentMonth ? 'bg-gray-50/50' : ''
                 } ${isTodayDate ? 'bg-primary-50/40' : ''}`}
                 onClick={() => onDateClick(dayStr)}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onDateClick(dayStr);
+                  }
+                }}
               >
                 {/* Day number */}
                 <div className="flex items-center justify-end mb-0.5">
                   <span
-                    className={`text-[10px] sm:text-xs w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full ${
+                    className={`text-xs sm:text-sm w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full ${
                       isTodayDate
                         ? 'bg-primary-500 text-white font-bold'
                         : isCurrentMonth
@@ -108,11 +117,11 @@ export function MonthGrid({ date, events, eventCounts, onDateClick, onEventClick
                 <div className="space-y-0.5">
                   {/* Desktop: show up to 3 events */}
                   {dayEvents.slice(0, MAX_EVENTS_DESKTOP).map((event, idx) => {
-                    const color = event.source_color || '#3B82F6';
+                    const color = event.source_color || '#009688';
                     return (
                       <div
                         key={event.id}
-                        className={`text-[9px] sm:text-[10px] leading-tight truncate rounded px-0.5 sm:px-1 py-0.5 cursor-pointer hover:opacity-80 ${
+                        className={`text-[11px] sm:text-xs leading-tight truncate rounded px-0.5 sm:px-1 py-0.5 cursor-pointer hover:opacity-80 ${
                           idx >= MAX_EVENTS_MOBILE ? 'hidden sm:block' : ''
                         }`}
                         style={{
@@ -125,6 +134,16 @@ export function MonthGrid({ date, events, eventCounts, onDateClick, onEventClick
                           onEventClick?.(event);
                         }}
                         title={event.title}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={event.title}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onEventClick?.(event);
+                          }
+                        }}
                       >
                         {event.title}
                       </div>
@@ -132,13 +151,13 @@ export function MonthGrid({ date, events, eventCounts, onDateClick, onEventClick
                   })}
                   {/* Desktop overflow */}
                   {count > MAX_EVENTS_DESKTOP && (
-                    <div className="text-[10px] text-gray-400 pr-1 hidden sm:block">
+                    <div className="text-xs text-gray-400 pr-1 hidden sm:block">
                       +{count - MAX_EVENTS_DESKTOP} עוד
                     </div>
                   )}
                   {/* Mobile overflow */}
                   {count > MAX_EVENTS_MOBILE && (
-                    <div className="text-[9px] text-gray-400 pr-0.5 sm:hidden">
+                    <div className="text-[11px] text-gray-400 pr-0.5 sm:hidden">
                       +{count - MAX_EVENTS_MOBILE}
                     </div>
                   )}

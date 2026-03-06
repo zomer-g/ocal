@@ -5,13 +5,14 @@ interface HebrewDateInputProps {
   onChange: (iso: string) => void;
   placeholder?: string;
   className?: string;
+  id?: string;
 }
 
 /**
  * Date input that displays dd/mm/yyyy (Hebrew convention)
  * but stores value as yyyy-mm-dd (ISO) for API compatibility.
  */
-export function HebrewDateInput({ value, onChange, placeholder = 'dd/mm/yyyy', className = '' }: HebrewDateInputProps) {
+export function HebrewDateInput({ value, onChange, placeholder = 'dd/mm/yyyy', className = '', id }: HebrewDateInputProps) {
   const [displayValue, setDisplayValue] = useState(() => isoToDisplay(value));
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -59,6 +60,7 @@ export function HebrewDateInput({ value, onChange, placeholder = 'dd/mm/yyyy', c
   return (
     <input
       ref={inputRef}
+      id={id}
       type="text"
       inputMode="numeric"
       value={displayValue}

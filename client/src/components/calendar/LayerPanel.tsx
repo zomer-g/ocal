@@ -21,17 +21,17 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden" role="region" aria-label="שכבות תצוגה">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 bg-gray-50/50">
         <div className="flex items-center gap-1.5">
-          <Layers className="w-4 h-4 text-gray-400" />
+          <Layers className="w-4 h-4 text-gray-400" aria-hidden="true" />
           <span className="text-sm font-semibold text-gray-700">שכבות</span>
         </div>
         <button
           onClick={handleToggleAll}
           className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
-          title={allEnabled ? 'הסתר הכל' : 'הצג הכל'}
+          aria-label={allEnabled ? 'הסתר את כל השכבות' : 'הצג את כל השכבות'}
         >
           {allEnabled ? (
             <EyeOff className="w-3.5 h-3.5" />
@@ -66,6 +66,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                   checked={isEnabled}
                   onChange={() => toggleSource(source.id)}
                   className="sr-only"
+                  aria-label={`${source.name} — ${isEnabled ? 'מוצג' : 'מוסתר'}`}
                 />
                 {/* Custom checkbox with source color */}
                 <div
@@ -76,6 +77,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                     borderColor: source.color,
                     backgroundColor: isEnabled ? source.color : undefined,
                   }}
+                  aria-hidden="true"
                 >
                   {isEnabled && (
                     <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -88,11 +90,11 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                 </span>
                 <span className="mr-auto shrink-0">
                   {viewSourceCounts && viewCount > 0 ? (
-                    <span className="text-[10px] font-medium text-white rounded-full px-1.5 py-0.5" style={{ backgroundColor: source.color }}>
+                    <span className="text-xs font-medium text-white rounded-full px-1.5 py-0.5" style={{ backgroundColor: source.color }}>
                       {viewCount}
                     </span>
                   ) : (
-                    <span className="text-[10px] text-gray-300">
+                    <span className="text-xs text-gray-300">
                       {source.total_events}
                     </span>
                   )}
