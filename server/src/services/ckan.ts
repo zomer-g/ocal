@@ -272,13 +272,26 @@ function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<st
   if (!sheet) throw new Error('No sheets found in workbook');
 
   const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
-  const fields = records.length > 0 ? Object.keys(records[0]).map(f => f.trim()) : [];
 
-  // Trim field names in records
+  /**
+   * Normalize a column name from an Excel file.
+   * Israeli government files frequently embed invisible Unicode directional
+   * marks (RTL U+200F, LTR U+200E, BOM U+FEFF, ZWS U+200B, etc.) in
+   * column headers that are visually identical but break string matching.
+   */
+  const normalizeKey = (k: string) =>
+    k.normalize('NFC')
+      .replace(/[\u200B-\u200F\uFEFF\u00AD\u2028\u2029\u202A-\u202E\u2060]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const fields = records.length > 0 ? Object.keys(records[0]).map(normalizeKey) : [];
+
+  // Normalize field names in every record so they match the extracted field list
   const cleaned = records.map(record => {
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(record)) {
-      out[key.trim()] = value;
+      out[normalizeKey(key)] = value;
     }
     return out;
   });

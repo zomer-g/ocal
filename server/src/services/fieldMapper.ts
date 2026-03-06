@@ -122,27 +122,57 @@ const HEURISTIC_PATTERNS: Record<keyof FieldMapping, RegExp[]> = {
     /^comments$/i,
     /הערה/i,               // "הערה" (singular)
     /^remarks$/i,
+    /עילת/i,               // "עילת ההשחרה" — FOI exemption reason
+    /חוק.?חופש.?המידע/i,  // "חוק חופש המידע" — Freedom of Information Law
+    /השחרה/i,              // partial match for FOI columns
+    /סיבה/i,               // "סיבה" (reason)
+    /מדיניות/i,            // "מדיניות" (policy)
+    /ביאור/i,              // "ביאור" (explanation)
+    /פירוט.?נוסף/i,        // "פירוט נוסף" (additional details)
   ],
 };
+
+/**
+ * Normalize a field name for reliable matching.
+ * Israeli government Excel files often embed invisible Unicode directional
+ * marks (RTL U+200F, LTR U+200E), zero-width spaces, and BOM characters
+ * that look identical on screen but break exact regex anchors.
+ * We also keep a mapping from normalized → original name so the returned
+ * mapping contains the original column name as the server expects it.
+ */
+function normalizeFieldName(field: string): string {
+  return field
+    .normalize('NFC')
+    // Strip RTL/LTR marks, zero-width spaces, BOM, soft-hyphen, line/para seps, bidi overrides
+    .replace(/[\u200B-\u200F\uFEFF\u00AD\u2028\u2029\u202A-\u202E\u2060\uFFF0-\uFFFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 /**
  * Try to map fields using heuristic pattern matching.
  */
 export function tryHeuristicMapping(fields: string[]): MappingResult {
   const mapping: Partial<FieldMapping> = {};
-  const mapped = new Set<string>();
+  const mapped = new Set<string>(); // tracks normalized names already claimed
   let matchCount = 0;
 
-  // Clean field names (trim whitespace)
-  const cleanFields = fields.map(f => f.trim());
+  // Build parallel arrays: original names and normalized names
+  const originalFields = fields;
+  const cleanFields = fields.map(normalizeFieldName);
+
+  logger.debug({ cleanFields }, 'Normalized field names for heuristic mapping');
 
   for (const [targetField, patterns] of Object.entries(HEURISTIC_PATTERNS)) {
-    for (const cleanField of cleanFields) {
+    for (let i = 0; i < cleanFields.length; i++) {
+      const cleanField = cleanFields[i];
+      const originalField = originalFields[i];
       if (mapped.has(cleanField)) continue;
 
       for (const pattern of patterns) {
         if (pattern.test(cleanField)) {
-          (mapping as Record<string, string>)[targetField] = cleanField;
+          // Store the ORIGINAL field name — the pipeline uses it to look up data in raw records
+          (mapping as Record<string, string>)[targetField] = originalField;
           mapped.add(cleanField);
           matchCount++;
           break;
@@ -160,7 +190,7 @@ export function tryHeuristicMapping(fields: string[]): MappingResult {
     ? Math.min(1.0, (matchCount / totalPossibleFields) * 1.2) // boost if required fields found
     : matchCount / totalPossibleFields * 0.5;
 
-  const unmappedFields = cleanFields.filter(f => !mapped.has(f));
+  const unmappedFields = originalFields.filter((_f, i) => !mapped.has(cleanFields[i]));
 
   logger.info(
     { matchCount, totalPossibleFields, confidence, mapping, unmappedFields },
@@ -271,23 +301,25 @@ export async function tryLLMMapping(
 
     const llmMapping = JSON.parse(content) as Record<string, string>;
 
-    // Validate: all mapped values must exist in source fields
-    const cleanFields = fields.map(f => f.trim());
+    // Validate: all mapped values must exist in source fields (normalized)
+    const normalizedFields = fields.map(normalizeFieldName);
     const validatedMapping: Partial<FieldMapping> = {};
     const mapped = new Set<string>();
 
     for (const [key, value] of Object.entries(llmMapping)) {
-      const trimmedValue = typeof value === 'string' ? value.trim() : '';
-      if (trimmedValue && cleanFields.includes(trimmedValue) && !mapped.has(trimmedValue)) {
-        (validatedMapping as Record<string, string>)[key] = trimmedValue;
-        mapped.add(trimmedValue);
+      const normalizedValue = typeof value === 'string' ? normalizeFieldName(value) : '';
+      const idx = normalizedFields.indexOf(normalizedValue);
+      if (normalizedValue && idx !== -1 && !mapped.has(normalizedValue)) {
+        // Store the original field name so the pipeline can look up data correctly
+        (validatedMapping as Record<string, string>)[key] = fields[idx];
+        mapped.add(normalizedValue);
       }
     }
 
     const hasRequired = validatedMapping.title && validatedMapping.start_date;
     const matchCount = Object.keys(validatedMapping).length;
     const confidence = hasRequired ? Math.min(0.95, 0.7 + matchCount * 0.05) : 0.3;
-    const unmappedFields = cleanFields.filter(f => !mapped.has(f));
+    const unmappedFields = fields.filter(f => !mapped.has(normalizeFieldName(f)));
 
     logger.info(
       { method: 'llm', provider: llmConfig.model, confidence, mapping: validatedMapping, unmappedFields },
