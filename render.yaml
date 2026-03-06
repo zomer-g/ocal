@@ -5,7 +5,7 @@ services:
     runtime: node
     plan: starter
     numInstances: 1
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm run migrate && npm run start --workspace=server
     healthCheckPath: /api/health
     envVars:
@@ -48,7 +48,7 @@ services:
     name: ocal-worker
     runtime: node
     plan: starter
-    buildCommand: npm install && npm run build --workspace=shared && npm run build --workspace=server
+    buildCommand: npm install --include=dev && npm run build --workspace=shared && npm run build --workspace=server
     startCommand: npm run worker:prod --workspace=server
     envVars:
       - key: NODE_ENV
