@@ -402,7 +402,16 @@ export async function fetchResourceRecords(
   // which breaks field mapping. For spreadsheets, always download the raw file.
   if (resource.datastore_active && !isSpreadsheetFormat(fmt)) {
     logger.info({ resourceId: resource.id }, 'Fetching via datastore API');
-    return datastoreSearchAll(resource.id, onProgress);
+    const datastoreResult = await datastoreSearchAll(resource.id, onProgress);
+    // If the datastore is active but empty (CKAN failed to ingest the file), fall back to
+    // direct file download so we don't silently import 0 records.
+    if (datastoreResult.total === 0 && isSupportedFormat(fmt)) {
+      logger.warn({ resourceId: resource.id, format: fmt }, 'Datastore returned 0 records — falling back to file download');
+      const { records, fields } = await downloadAndParseFile(resource.url, resource.format);
+      onProgress?.(records.length, records.length);
+      return { records, fields, total: records.length, format: fmt, fetchMethod: 'file_download' };
+    }
+    return datastoreResult;
   }
 
   // File download
@@ -444,10 +453,20 @@ export async function previewResource(resourceId: string): Promise<{
   // Spreadsheet datastore columns have mangled Hebrew names.
   if (resource.datastore_active && !isSpreadsheetFormat(fmt)) {
     const result = await datastoreSearch(resourceId, { limit: 10 });
-    sampleRecords = result.records;
-    fields = result.fields.map(f => f.id).filter(f => f !== '_id');
-    totalRecords = result.total;
-    fetchMethod = 'datastore';
+    // If the datastore is active but empty (CKAN failed to ingest), fall back to file download.
+    if (result.total === 0 && isSupportedFormat(fmt)) {
+      logger.warn({ resourceId }, 'Datastore empty — falling back to file download for preview');
+      const { records, fields: parsedFields } = await downloadAndParseFile(resource.url, resource.format);
+      sampleRecords = records.slice(0, 10);
+      fields = parsedFields;
+      totalRecords = records.length;
+      fetchMethod = 'file_download';
+    } else {
+      sampleRecords = result.records;
+      fields = result.fields.map(f => f.id).filter(f => f !== '_id');
+      totalRecords = result.total;
+      fetchMethod = 'datastore';
+    }
   } else {
     const { records, fields: parsedFields } = await downloadAndParseFile(resource.url, resource.format);
     sampleRecords = records.slice(0, 10);
