@@ -49,14 +49,17 @@ adminSourcesRouter.get('/:id', async (req, res, next) => {
   }
 });
 
-// PATCH /api/admin/sources/:id — update source (name, color, enabled)
+// PATCH /api/admin/sources/:id — update source (name, color, enabled, person_id, organization_id)
 adminSourcesRouter.patch('/:id', async (req, res, next) => {
   try {
-    const { name, color, is_enabled } = req.body;
+    const { name, color, is_enabled, person_id, organization_id } = req.body;
     const update: Record<string, unknown> = {};
     if (name !== undefined) update.name = name;
     if (color !== undefined) update.color = color;
     if (is_enabled !== undefined) update.is_enabled = is_enabled;
+    // Allow setting person_id / organization_id to a UUID string or null
+    if (person_id !== undefined) update.person_id = person_id || null;
+    if (organization_id !== undefined) update.organization_id = organization_id || null;
 
     if (Object.keys(update).length === 0) {
       res.status(400).json({ error: 'No fields to update' });
@@ -93,6 +96,50 @@ adminSourcesRouter.delete('/:id', async (req, res, next) => {
     await db('diary_sources').where({ id: req.params.id }).del();
 
     res.json({ deleted: true, events_deleted: deletedEvents });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/sources/:id/deduplicate — remove duplicate events (same title + start_time)
+adminSourcesRouter.post('/:id/deduplicate', async (req, res, next) => {
+  try {
+    const source = await db('diary_sources').where({ id: req.params.id }).first();
+    if (!source) {
+      res.status(404).json({ error: 'Source not found' });
+      return;
+    }
+
+    // Keep the earliest inserted row for each (source_id, title, start_time) duplicate group
+    const result = await db.raw(`
+      DELETE FROM diary_events
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+            ROW_NUMBER() OVER (
+              PARTITION BY source_id, title, start_time
+              ORDER BY created_at ASC
+            ) as rn
+          FROM diary_events
+          WHERE source_id = ?
+        ) sub
+        WHERE rn > 1
+      )
+    `, [req.params.id]);
+
+    const deleted = result.rowCount ?? 0;
+
+    // Refresh total_events count on the source
+    const stats = await db('diary_events')
+      .where({ source_id: req.params.id, is_active: true })
+      .count('id as cnt')
+      .first();
+    await db('diary_sources')
+      .where({ id: req.params.id })
+      .update({ total_events: Number(stats?.cnt ?? 0) });
+
+    logger.info({ sourceId: req.params.id, deleted }, 'Deduplicated events');
+    res.json({ deleted, message: `הוסרו ${deleted} אירועים כפולים` });
   } catch (err) {
     next(err);
   }

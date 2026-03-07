@@ -19,6 +19,8 @@ export interface DiarySource {
   last_event_date: string | null;
   last_sync_at: string | null;
   sync_error: string | null;
+  person_id?: string | null;
+  organization_id?: string | null;
   person_name?: string;
   organization_name?: string;
   sync_status: string;

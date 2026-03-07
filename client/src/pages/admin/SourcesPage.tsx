@@ -5,12 +5,14 @@ import {
   deleteSource,
   resyncSource,
   updateSource,
+  deduplicateSource,
   getSyncStatus,
   triggerEntityExtraction,
   getSourceEntities,
   renameEntity,
   mergeEntities,
   bulkRenameEntity,
+  getPeople,
   type SyncStatusResponse,
   type EntityListResponse,
   type EntityItem,
@@ -36,6 +38,9 @@ import {
   Merge,
   Check,
   X,
+  Copy,
+  UserCircle,
+  Save,
 } from 'lucide-react';
 import { formatDateShort } from '@/lib/formatters';
 
@@ -84,6 +89,9 @@ function SourceCard({ source }: { source: DiarySource }) {
   const [entityPage, setEntityPage] = useState(1);
   const [entityType, setEntityType] = useState('');
   const [extractionMsg, setExtractionMsg] = useState('');
+  const [dedupMsg, setDedupMsg] = useState('');
+  // בעל היומן — person_id editor
+  const [selectedPersonId, setSelectedPersonId] = useState<string>(source.person_id ?? '');
 
   const id = source.id;
   const name = source.name;
@@ -93,6 +101,14 @@ function SourceCard({ source }: { source: DiarySource }) {
   const totalEvents = source.total_events || 0;
   const lastSync = source.last_sync_at;
   const syncError = source.sync_error;
+
+  // Fetch people registry for the person selector
+  const { data: peopleData } = useQuery({
+    queryKey: ['admin-people'],
+    queryFn: getPeople,
+    staleTime: 5 * 60 * 1000,
+  });
+  const people = peopleData?.data ?? [];
 
   const resyncMut = useMutation({
     mutationFn: () => resyncSource(id),
@@ -114,6 +130,26 @@ function SourceCard({ source }: { source: DiarySource }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-sources'] });
       queryClient.invalidateQueries({ queryKey: ['sources'] });
+    },
+  });
+
+  const updatePersonMut = useMutation({
+    mutationFn: (personId: string | null) => updateSource(id, { person_id: personId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-sources'] });
+    },
+  });
+
+  const dedupMut = useMutation({
+    mutationFn: () => deduplicateSource(id),
+    onSuccess: (data) => {
+      setDedupMsg(data.message);
+      setTimeout(() => setDedupMsg(''), 6000);
+      queryClient.invalidateQueries({ queryKey: ['admin-sources'] });
+    },
+    onError: (err: Error) => {
+      setDedupMsg(`שגיאה: ${err.message}`);
+      setTimeout(() => setDedupMsg(''), 6000);
     },
   });
 
@@ -224,6 +260,61 @@ function SourceCard({ source }: { source: DiarySource }) {
             <DetailItem label="סטטוס" value={syncStatusStr} />
             <DetailItem label="אירועים" value={String(totalEvents)} />
             <DetailItem label="מופעל" value={isEnabled ? 'כן' : 'לא'} />
+          </div>
+
+          {/* ── בעל היומן (diary owner) ── */}
+          <div className="pt-3 border-t border-gray-200">
+            <div className="flex items-center gap-1.5 mb-2">
+              <UserCircle className="w-3.5 h-3.5 text-primary-500" />
+              <span className="text-xs font-semibold text-gray-700">בעל היומן</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedPersonId}
+                onChange={(e) => setSelectedPersonId(e.target.value)}
+                className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary-400"
+              >
+                <option value="">— ללא —</option>
+                {people.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}{p.organization_name ? ` (${p.organization_name})` : ''}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => updatePersonMut.mutate(selectedPersonId || null)}
+                disabled={updatePersonMut.isPending || selectedPersonId === (source.person_id ?? '')}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40 transition-colors"
+              >
+                {updatePersonMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                שמור
+              </button>
+            </div>
+          </div>
+
+          {/* ── כפילויות — deduplicate ── */}
+          <div className="pt-3 border-t border-gray-200 flex items-center gap-3 flex-wrap">
+            <span className="text-xs font-semibold text-gray-700 flex items-center gap-1">
+              <Copy className="w-3.5 h-3.5 text-gray-400" />
+              כפילויות
+            </span>
+            <button
+              onClick={() => {
+                if (confirm('הסרת אירועים כפולים (אותו כותרת + שעת התחלה) ממקור זה. להמשיך?')) {
+                  dedupMut.mutate();
+                }
+              }}
+              disabled={dedupMut.isPending}
+              className="px-2.5 py-1 text-xs bg-orange-50 text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-100 disabled:opacity-50 flex items-center gap-1"
+            >
+              {dedupMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
+              הסר כפילויות
+            </button>
+            {dedupMsg && (
+              <span className={`text-xs ${dedupMsg.startsWith('שגיאה') ? 'text-red-600' : 'text-green-600'}`}>
+                {dedupMsg}
+              </span>
+            )}
           </div>
 
           {/* ODATA links */}

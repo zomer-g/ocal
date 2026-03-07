@@ -156,9 +156,14 @@ export async function deleteSource(sourceId: string): Promise<{ deleted: boolean
 
 export async function updateSource(
   sourceId: string,
-  update: { name?: string; color?: string; is_enabled?: boolean }
+  update: { name?: string; color?: string; is_enabled?: boolean; person_id?: string | null; organization_id?: string | null }
 ): Promise<DiarySource> {
   const { data } = await api.patch(`/admin/sources/${sourceId}`, update);
+  return data;
+}
+
+export async function deduplicateSource(sourceId: string): Promise<{ deleted: number; message: string }> {
+  const { data } = await api.post(`/admin/sources/${sourceId}/deduplicate`);
   return data;
 }
 
