@@ -134,8 +134,8 @@ export function FilterPanel() {
 
       {/* ── שנה / חודש ── */}
       {years.length > 0 && (
-        <fieldset className="space-y-1 min-w-0">
-          <legend className="text-xs text-gray-500 font-medium mb-1">שנה / חודש</legend>
+        <div className="space-y-1 min-w-0">
+          <h4 className="text-xs text-gray-500 font-medium mb-1">שנה / חודש</h4>
           <div className="max-h-56 overflow-y-auto space-y-0.5">
             {years.map((year) => {
               const isExpanded = expandedYears.has(year);
@@ -190,7 +190,7 @@ export function FilterPanel() {
               נקה סינון תאריך
             </button>
           )}
-        </fieldset>
+        </div>
       )}
 
       {/* ── Active entity chips ── */}
@@ -252,45 +252,45 @@ export function FilterPanel() {
       {/* ── Entity sections (with loading skeleton) ── */}
       {entitiesLoading && !entitiesData ? (
         <>
-          <fieldset className="space-y-1 min-w-0">
-            <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
+          <div className="space-y-1 min-w-0">
+            <h4 className="text-xs text-gray-500 font-medium">אנשים</h4>
             <SkeletonRows />
-          </fieldset>
-          <fieldset className="space-y-1 min-w-0">
-            <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
+          </div>
+          <div className="space-y-1 min-w-0">
+            <h4 className="text-xs text-gray-500 font-medium">מקומות</h4>
             <SkeletonRows />
-          </fieldset>
+          </div>
         </>
       ) : (
         <>
           {/* ── אנשים ── */}
           {personEntities.length > 0 && (
-            <fieldset className="space-y-1 min-w-0">
-              <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
+            <div className="space-y-1 min-w-0">
+              <h4 className="text-xs text-gray-500 font-medium">אנשים</h4>
               <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                 {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
               </div>
-            </fieldset>
+            </div>
           )}
 
           {/* ── ארגונים ── */}
           {orgEntities.length > 0 && (
-            <fieldset className="space-y-1 min-w-0">
-              <legend className="text-xs text-gray-500 font-medium">ארגונים</legend>
+            <div className="space-y-1 min-w-0">
+              <h4 className="text-xs text-gray-500 font-medium">ארגונים</h4>
               <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                 {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
               </div>
-            </fieldset>
+            </div>
           )}
 
           {/* ── מקומות ── */}
           {placeEntities.length > 0 && (
-            <fieldset className="space-y-1 min-w-0">
-              <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
+            <div className="space-y-1 min-w-0">
+              <h4 className="text-xs text-gray-500 font-medium">מקומות</h4>
               <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                 {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
               </div>
-            </fieldset>
+            </div>
           )}
 
           {/* No entity results message */}
@@ -302,8 +302,8 @@ export function FilterPanel() {
 
       {/* ── שכבות ── */}
       {sources.length > 0 && (
-        <fieldset className="space-y-2 min-w-0">
-          <legend className="text-xs text-gray-500 font-medium">שכבות</legend>
+        <div className="space-y-2 min-w-0">
+          <h4 className="text-xs text-gray-500 font-medium">שכבות</h4>
           <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1">
             {sources.map((source) => (
               <label key={source.id} className="flex items-start gap-2 text-sm cursor-pointer min-w-0">
@@ -329,7 +329,7 @@ export function FilterPanel() {
               </label>
             ))}
           </div>
-        </fieldset>
+        </div>
       )}
     </div>
   );
