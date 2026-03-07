@@ -85,14 +85,8 @@ export function FilterPanel() {
   const orgEntities = entities.filter((e) => e.entity_type === 'organization');
   const placeEntities = entities.filter((e) => e.entity_type === 'place');
 
-  const sortEntities = (list: typeof entities) => {
-    return [...list].sort((a, b) => {
-      const aSelected = entity_names.includes(a.entity_name) ? 1 : 0;
-      const bSelected = entity_names.includes(b.entity_name) ? 1 : 0;
-      if (aSelected !== bSelected) return bSelected - aSelected;
-      return Number(b.event_count) - Number(a.event_count);
-    });
-  };
+  const sortEntities = (list: typeof entities) =>
+    [...list].sort((a, b) => Number(b.event_count) - Number(a.event_count));
 
   const toggleEntity = (name: string) => {
     const next = entity_names.includes(name)
