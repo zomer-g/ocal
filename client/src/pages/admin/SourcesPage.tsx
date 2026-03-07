@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getAdminSources,
@@ -43,6 +43,15 @@ import {
   Save,
 } from 'lucide-react';
 import { formatDateShort } from '@/lib/formatters';
+
+// ── Name similarity helper ──
+function calcNameSimilarity(text: string, personName: string): number {
+  const normalizedText = text.toLowerCase().replace(/[,()[\]]/g, ' ');
+  const nameWords = personName.toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+  if (!nameWords.length) return 0;
+  const matched = nameWords.filter((w) => normalizedText.includes(w));
+  return matched.length / nameWords.length;
+}
 
 export function SourcesPage() {
   const queryClient = useQueryClient();
@@ -109,6 +118,16 @@ function SourceCard({ source }: { source: DiarySource }) {
     staleTime: 5 * 60 * 1000,
   });
   const people = peopleData?.data ?? [];
+
+  // Rank people by name similarity to the source name
+  const scoredPeople = useMemo(
+    () =>
+      people
+        .map((p) => ({ ...p, score: calcNameSimilarity(name, p.name) }))
+        .sort((a, b) => b.score - a.score),
+    [people, name]
+  );
+  const bestMatch = scoredPeople.length > 0 && scoredPeople[0].score >= 0.5 ? scoredPeople[0] : null;
 
   const resyncMut = useMutation({
     mutationFn: () => resyncSource(id),
@@ -268,6 +287,22 @@ function SourceCard({ source }: { source: DiarySource }) {
               <UserCircle className="w-3.5 h-3.5 text-primary-500" />
               <span className="text-xs font-semibold text-gray-700">בעל היומן</span>
             </div>
+
+            {/* Best-match suggestion chip (only when no person is set yet) */}
+            {bestMatch && !source.person_id && (
+              <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg text-xs border bg-amber-50 border-amber-200 text-amber-800">
+                <span className="font-semibold shrink-0">💡 הצעה:</span>
+                <span className="font-medium truncate flex-1">{bestMatch.name}</span>
+                <span className="text-[10px] opacity-60 shrink-0">{Math.round(bestMatch.score * 100)}%</span>
+                <button
+                  onClick={() => setSelectedPersonId(bestMatch.id)}
+                  className="shrink-0 px-1.5 py-0.5 rounded bg-amber-200 hover:bg-amber-300 text-amber-900 font-medium transition-colors"
+                >
+                  בחר
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <select
                 value={selectedPersonId}
@@ -275,9 +310,9 @@ function SourceCard({ source }: { source: DiarySource }) {
                 className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary-400"
               >
                 <option value="">— ללא —</option>
-                {people.map((p) => (
+                {scoredPeople.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name}{p.organization_name ? ` (${p.organization_name})` : ''}
+                    {p.score >= 0.5 ? '★ ' : ''}{p.name}{p.organization_name ? ` (${p.organization_name})` : ''}
                   </option>
                 ))}
               </select>

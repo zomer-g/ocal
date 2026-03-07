@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   discoverDatasets,
@@ -25,6 +25,22 @@ import {
   ChevronUp,
   ExternalLink,
 } from 'lucide-react';
+
+// ────────────────────────────────────────────
+// Name similarity helper — word-overlap score
+// ────────────────────────────────────────────
+
+/**
+ * Returns 0–1 score: fraction of the person's name words that appear in the text.
+ * E.g. "מיכאל מלכיאלי" vs "יומן השר לענייני דת, מיכאל מלכיאלי, לשנת 2025" → 1.0
+ */
+function calcNameSimilarity(text: string, personName: string): number {
+  const normalizedText = text.toLowerCase().replace(/[,()[\]]/g, ' ');
+  const nameWords = personName.toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+  if (!nameWords.length) return 0;
+  const matched = nameWords.filter((w) => normalizedText.includes(w));
+  return matched.length / nameWords.length;
+}
 
 // ────────────────────────────────────────────
 // Color palette for new sources
@@ -398,6 +414,25 @@ function InlineImportPanel({
   const [showSample, setShowSample] = useState(true);
   const unmappedSet = new Set(activeProfile.unmapped_fields);
 
+  // ── Person suggestion: score every person by word-overlap with the dataset title ──
+  const diaryTitle = activeProfile.package.title;
+  const scoredPeople = useMemo(
+    () =>
+      people
+        .map((p) => ({ ...p, score: calcNameSimilarity(diaryTitle, p.name) }))
+        .sort((a, b) => b.score - a.score),
+    [people, diaryTitle]
+  );
+  const bestMatch = scoredPeople.length > 0 && scoredPeople[0].score >= 0.5 ? scoredPeople[0] : null;
+
+  // Auto-select best match when the panel first opens and no person is chosen yet
+  useEffect(() => {
+    if (importPersonId === null && bestMatch) {
+      onImportPersonChange(bestMatch.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bestMatch?.id]);
+
   return (
     <div className="bg-blue-50 border-t border-blue-100 px-3 sm:px-4 py-4 space-y-4">
       {/* ── ODATA links + Profile summary ── */}
@@ -559,14 +594,40 @@ function InlineImportPanel({
               {/* Person (diary owner) */}
               <div>
                 <label className="text-xs font-medium text-gray-700 block mb-1">בעל היומן (אישיות)</label>
+
+                {/* Best-match suggestion chip */}
+                {bestMatch && (
+                  <div className={`flex items-center gap-2 mb-1.5 px-2 py-1.5 rounded-lg text-xs border ${
+                    importPersonId === bestMatch.id
+                      ? 'bg-green-50 border-green-200 text-green-800'
+                      : 'bg-amber-50 border-amber-200 text-amber-800'
+                  }`}>
+                    <span className="font-semibold shrink-0">
+                      {importPersonId === bestMatch.id ? '✓ נבחר:' : '💡 הצעה:'}
+                    </span>
+                    <span className="font-medium truncate flex-1">{bestMatch.name}</span>
+                    <span className="text-[10px] opacity-60 shrink-0">{Math.round(bestMatch.score * 100)}%</span>
+                    {importPersonId !== bestMatch.id && (
+                      <button
+                        onClick={() => onImportPersonChange(bestMatch.id)}
+                        className="shrink-0 px-1.5 py-0.5 rounded bg-amber-200 hover:bg-amber-300 text-amber-900 font-medium transition-colors"
+                      >
+                        בחר
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <select
                   value={importPersonId ?? ''}
                   onChange={(e) => onImportPersonChange(e.target.value || null)}
                   className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">— ללא —</option>
-                  {people.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}{p.organization_name ? ` (${p.organization_name})` : ''}</option>
+                  {scoredPeople.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.score >= 0.5 ? '★ ' : ''}{p.name}{p.organization_name ? ` (${p.organization_name})` : ''}
+                    </option>
                   ))}
                 </select>
               </div>
