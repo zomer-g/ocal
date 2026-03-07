@@ -284,37 +284,54 @@ function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<st
       .trim();
 
   // ── Auto-detect the real header row ────────────────────────────────────────
-  // Many Israeli government files start with merged title / metadata rows before
-  // the actual column headers.  Strategy: try each of the first 10 rows as a
-  // candidate header and pick whichever produces the most *real* column names
-  // (i.e. non-empty, non-__EMPTY strings after normalizeKey).  This avoids
-  // relying on rawRow cell-value analysis that breaks for XLSX files where
-  // SheetJS returns merged-cell values differently than expected.
-  const countRealFields = (rs: Record<string, unknown>[]): number =>
-    rs.length === 0
-      ? 0
-      : Object.keys(rs[0]).map(normalizeKey).filter(k => k && !k.startsWith('__EMPTY')).length;
+  // Many Israeli government XLSX files start with merged title / logo / metadata
+  // rows (sometimes 10+) before the actual column headers.  Instead of repeated
+  // sheet_to_json calls, we directly scan the sheet cells: for each of the first
+  // 20 rows, count how many cells are *string-type* and contain at least one
+  // Hebrew (U+05D0-U+05EA) or Latin letter.  The row with the most such cells is
+  // almost certainly the real column-header row.
+  const sheetRange = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+  let bestHeaderRow = sheetRange.s.r;
+  let bestLetterCellCount = 0;
+
+  for (let r = sheetRange.s.r; r <= Math.min(sheetRange.s.r + 19, sheetRange.e.r); r++) {
+    let letterCells = 0;
+    for (let c = sheetRange.s.c; c <= sheetRange.e.c; c++) {
+      const cell = sheet[XLSX.utils.encode_cell({ r, c })];
+      if (cell && cell.t === 's' && typeof cell.v === 'string' && /[a-zA-Z\u05D0-\u05EA]/.test(cell.v)) {
+        letterCells++;
+      }
+    }
+    if (letterCells > bestLetterCellCount) {
+      bestLetterCellCount = letterCells;
+      bestHeaderRow = r;
+    }
+    if (bestLetterCellCount >= 5) break; // clearly a real header row
+  }
 
   // Use defval:'' so that ALL header columns appear in every record, even when
   // the corresponding data cell is empty.  Without this, SheetJS omits the key
   // entirely for blank cells — so a column like 'נושא' that happens to be empty
   // in the first data row would be absent from Object.keys(records[0]) and
   // therefore invisible to the field-mapping heuristic.
-  let records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
-  let bestFieldCount = countRealFields(records);
-  let bestHeaderRow = 0;
-
-  for (let hr = 1; hr <= 9 && bestFieldCount < 5; hr++) {
-    const candidate = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', range: hr });
-    const count = countRealFields(candidate);
-    if (count > bestFieldCount) {
-      bestFieldCount = count;
-      bestHeaderRow = hr;
-      records = candidate;
+  let records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+    defval: '',
+    ...(bestHeaderRow > sheetRange.s.r ? { range: bestHeaderRow } : {}),
+  });
+  if (bestHeaderRow > sheetRange.s.r) {
+    logger.info({ sheetName, bestHeaderRow, bestLetterCellCount }, 'Auto-detected header row — skipped title rows');
+  } else {
+    // Debug: if we couldn't find a better header row, log the first 15 rows' cell counts
+    const rowScores: Record<number, number> = {};
+    for (let r = sheetRange.s.r; r <= Math.min(sheetRange.s.r + 14, sheetRange.e.r); r++) {
+      let cnt = 0;
+      for (let c = sheetRange.s.c; c <= sheetRange.e.c; c++) {
+        const cell = sheet[XLSX.utils.encode_cell({ r, c })];
+        if (cell && cell.t === 's' && typeof cell.v === 'string' && /[a-zA-Z\u05D0-\u05EA]/.test(cell.v)) cnt++;
+      }
+      rowScores[r] = cnt;
     }
-  }
-  if (bestHeaderRow > 0) {
-    logger.info({ sheetName, bestHeaderRow, bestFieldCount }, 'Auto-detected header row — skipped title rows');
+    logger.warn({ sheetName, sheetRef: sheet['!ref'], rowScores }, 'No better header row found — using row 0');
   }
 
   // Derive fields from the first record.  filter(Boolean) drops empty strings;
