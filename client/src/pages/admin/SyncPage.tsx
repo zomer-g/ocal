@@ -149,56 +149,85 @@ export function SyncPage() {
         </div>
 
         {/* Discovery results */}
-        {discovery && (
-          <div className="mt-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-              <div className="text-xs sm:text-sm text-gray-500">
-                נמצאו {discovery.totalDatasets} מאגרים עם {discovery.totalResources} משאבים
+        {discovery && (() => {
+          // Shared props passed to every DatasetCard
+          const cardProps = {
+            hideConverted,
+            onProfile: (resourceId: string) => profileMutation.mutate(resourceId),
+            isProfileLoading: profileMutation.isPending,
+            profilingResourceId: profileMutation.variables,
+            activeProfile,
+            importName,
+            importColor,
+            importMapping,
+            importResult,
+            importPersonId,
+            importOrgId,
+            people,
+            orgs,
+            onImportNameChange: setImportName,
+            onImportColorChange: setImportColor,
+            onImportMappingChange: setImportMapping,
+            onImportPersonChange: (personId: string | null) => setImportPersonId(personId),
+            onImportOrgChange: setImportOrgId,
+            onImport: () => importMutation.mutate(),
+            isImporting: importMutation.isPending,
+            importError: importMutation.isError ? (importMutation.error as Error) : null,
+          };
+
+          // Group datasets by import status
+          const newDs      = discovery.datasets.filter(d => d.resources.every(r => r.status !== 'synced'));
+          const partialDs  = discovery.datasets.filter(d => d.resources.some(r => r.status === 'synced') && d.resources.some(r => r.status === 'available'));
+          const doneDs     = discovery.datasets.filter(d => d.resources.length > 0 && d.resources.every(r => r.status !== 'available'));
+
+          const SectionDivider = ({ label }: { label: string }) => (
+            <div className="flex items-center gap-3 my-3">
+              <div className="flex-1 border-t border-gray-300" />
+              <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{label}</span>
+              <div className="flex-1 border-t border-gray-300" />
+            </div>
+          );
+
+          return (
+            <div className="mt-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                <div className="text-xs sm:text-sm text-gray-500">
+                  נמצאו {discovery.totalDatasets} מאגרים עם {discovery.totalResources} משאבים
+                </div>
+                <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={hideConverted}
+                    onChange={(e) => setHideConverted(e.target.checked)}
+                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                  />
+                  הסתר קבצי "Converted CSV"
+                </label>
               </div>
-              <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={hideConverted}
-                  onChange={(e) => setHideConverted(e.target.checked)}
-                  className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                />
-                הסתר קבצי "Converted CSV"
-              </label>
+
+              <div className="space-y-2">
+                {/* Group 1: not imported at all */}
+                {newDs.map(d => <DatasetCard key={d.id} dataset={d} {...cardProps} />)}
+
+                {/* Group 2: partially imported */}
+                {partialDs.length > 0 && (
+                  <>
+                    <SectionDivider label={`יובא חלקית (${partialDs.length})`} />
+                    {partialDs.map(d => <DatasetCard key={d.id} dataset={d} {...cardProps} />)}
+                  </>
+                )}
+
+                {/* Group 3: fully imported */}
+                {doneDs.length > 0 && (
+                  <>
+                    <SectionDivider label={`יובא לחלוטין (${doneDs.length})`} />
+                    {doneDs.map(d => <DatasetCard key={d.id} dataset={d} {...cardProps} />)}
+                  </>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              {discovery.datasets.map((dataset) => (
-                <DatasetCard
-                  key={dataset.id}
-                  dataset={dataset}
-                  hideConverted={hideConverted}
-                  onProfile={(resourceId) => profileMutation.mutate(resourceId)}
-                  isProfileLoading={profileMutation.isPending}
-                  profilingResourceId={profileMutation.variables}
-                  // all inline props
-                  activeProfile={activeProfile}
-                  importName={importName}
-                  importColor={importColor}
-                  importMapping={importMapping}
-                  importResult={importResult}
-                  importPersonId={importPersonId}
-                  importOrgId={importOrgId}
-                  people={people}
-                  orgs={orgs}
-                  onImportNameChange={setImportName}
-                  onImportColorChange={setImportColor}
-                  onImportMappingChange={setImportMapping}
-                  onImportPersonChange={(personId) => {
-                    setImportPersonId(personId);
-                  }}
-                  onImportOrgChange={setImportOrgId}
-                  onImport={() => importMutation.mutate()}
-                  isImporting={importMutation.isPending}
-                  importError={importMutation.isError ? (importMutation.error as Error) : null}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
