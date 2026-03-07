@@ -64,7 +64,7 @@ export function SearchPage() {
         >
           <SlidersHorizontal className="w-4 h-4" />
           סינון
-          {(filters.from_date || filters.to_date || filters.source_ids.length > 0 || filters.location || filters.participants) && (
+          {(filters.from_date || filters.to_date || filters.source_ids.length > 0 || filters.location || filters.participants || filters.entity_names.length > 0) && (
             <span className="w-2 h-2 rounded-full bg-primary-600" />
           )}
         </button>

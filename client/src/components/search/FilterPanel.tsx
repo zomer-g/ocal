@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useFilterStore } from '@/stores/filterStore';
 import { useSources } from '@/hooks/useSources';
 import { getPublicEntities } from '@/api/events';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, X } from 'lucide-react';
 
 const HEBREW_MONTHS = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
@@ -20,6 +20,9 @@ export function FilterPanel() {
 
   // ── Year / Month accordion ──
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
+
+  // ── Entity search ──
+  const [entitySearch, setEntitySearch] = useState('');
 
   const minDate = sources.reduce((min, s) => {
     if (!s.first_event_date) return min;
@@ -80,9 +83,17 @@ export function FilterPanel() {
   const byCount = (list: typeof entities) =>
     [...list].sort((a, b) => Number(b.event_count) - Number(a.event_count));
 
-  const personEntities = byCount(entities.filter((e) => e.entity_type === 'person'));
-  const orgEntities    = byCount(entities.filter((e) => e.entity_type === 'organization'));
-  const placeEntities  = byCount(entities.filter((e) => e.entity_type === 'place'));
+  const filterBySearch = (list: typeof entities) =>
+    entitySearch.trim()
+      ? list.filter((e) => e.entity_name.toLowerCase().includes(entitySearch.toLowerCase()))
+      : list;
+
+  const personEntities = filterBySearch(byCount(entities.filter((e) => e.entity_type === 'person')));
+  const orgEntities    = filterBySearch(byCount(entities.filter((e) => e.entity_type === 'organization')));
+  const placeEntities  = filterBySearch(byCount(entities.filter((e) => e.entity_type === 'place')));
+
+  const hasEntitySections = personEntities.length > 0 || orgEntities.length > 0 || placeEntities.length > 0
+    || entities.length > 0; // show search even if filtered results are empty
 
   const toggleEntity = (name: string) => {
     const next = entity_names.includes(name)
@@ -170,6 +181,62 @@ export function FilterPanel() {
         </fieldset>
       )}
 
+      {/* ── Active entity chips ── */}
+      {entity_names.length > 0 && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500 font-medium">ישויות פעילות</span>
+            <button
+              onClick={() => setEntityNames([])}
+              className="text-[10px] text-gray-400 hover:text-gray-600 underline"
+            >
+              נקה הכל
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {entity_names.map((name) => (
+              <span
+                key={name}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-100 text-primary-800 text-xs font-medium"
+              >
+                {name}
+                <button
+                  onClick={() => toggleEntity(name)}
+                  aria-label={`הסר ${name}`}
+                  className="hover:text-primary-600"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Entity search input ── */}
+      {hasEntitySections && (
+        <div className="relative">
+          <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" aria-hidden="true" />
+          <input
+            type="text"
+            value={entitySearch}
+            onChange={(e) => setEntitySearch(e.target.value)}
+            placeholder="חיפוש ישות..."
+            className="w-full text-xs pr-7 pl-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-400 bg-gray-50"
+            aria-label="חיפוש ישות לסינון"
+          />
+          {entitySearch && (
+            <button
+              onClick={() => setEntitySearch('')}
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="נקה חיפוש"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── אנשים ── */}
       {personEntities.length > 0 && (
         <fieldset className="space-y-1">
@@ -198,6 +265,11 @@ export function FilterPanel() {
             {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
           </div>
         </fieldset>
+      )}
+
+      {/* No entity results message */}
+      {entitySearch && personEntities.length === 0 && orgEntities.length === 0 && placeEntities.length === 0 && (
+        <p className="text-xs text-gray-400 text-center py-2">לא נמצאה ישות מתאימה</p>
       )}
 
       {/* ── שכבות ── */}
