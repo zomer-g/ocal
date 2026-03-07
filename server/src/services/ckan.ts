@@ -283,26 +283,41 @@ function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<st
       .replace(/\s+/g, ' ')
       .trim();
 
+  // ── Auto-detect the real header row ────────────────────────────────────────
+  // Many Israeli government files start with 1–4 merged title or metadata rows
+  // before the actual column headers.  Title rows score 0–1 (one merged text
+  // cell, rest empty); numbering rows score 0 (pure numbers); a real header row
+  // scores ≥ 2 (multiple cells containing Hebrew or Latin letters).
+  //
+  // Strategy: scan raw rows (no header assignment) for the first 8 rows, count
+  // cells that contain at least one letter, pick the row with the highest score.
+  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' });
+  const countLetterCells = (row: unknown[]): number =>
+    row.filter(v => typeof v === 'string' && /[a-zA-Z\u05D0-\u05EA]/.test(normalizeKey(v))).length;
+
+  let bestHeaderRow = 0;
+  let bestScore = countLetterCells(rawRows[0] ?? []);
+
+  for (let i = 1; i < Math.min(rawRows.length, 8); i++) {
+    const score = countLetterCells(rawRows[i]);
+    if (score > bestScore) {
+      bestScore = score;
+      bestHeaderRow = i;
+    }
+    if (bestScore >= 5) break; // clearly the real header, stop searching
+  }
+
   // Use defval:'' so that ALL header columns appear in every record, even when
   // the corresponding data cell is empty.  Without this, SheetJS omits the key
   // entirely for blank cells — so a column like 'נושא' that happens to be empty
   // in the first data row would be absent from Object.keys(records[0]) and
   // therefore invisible to the field-mapping heuristic.
-  let records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
-
-  // Some Israeli government files start with one or more merged title rows before
-  // the actual column headers (e.g. "לוז שר רבעון ראשון 2025" spanning all cols).
-  // A title row produces 0–1 real column names; a real header row has ≥ 2.
-  // Scan forward (up to 4 rows) until we find a row with at least 2 named columns.
-  for (let headerRow = 1; headerRow <= 4; headerRow++) {
-    if (records.length === 0) break;
-    // Count AFTER normalizing — invisible Unicode chars (RTL marks, BOM, ZWS) in
-    // a header cell would pass the raw !startsWith('__EMPTY') check but collapse
-    // to an empty string after normalizeKey, so they must not count toward the threshold.
-    const realColumnCount = Object.keys(records[0]).map(normalizeKey).filter(k => k && !k.startsWith('__EMPTY')).length;
-    if (realColumnCount >= 2) break;
-    logger.debug({ sheetName, headerRow, realColumnCount }, 'Too few real columns — scanning for header row');
-    records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', range: headerRow });
+  let records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+    defval: '',
+    ...(bestHeaderRow > 0 ? { range: bestHeaderRow } : {}),
+  });
+  if (bestHeaderRow > 0) {
+    logger.info({ sheetName, bestHeaderRow, bestScore }, 'Auto-detected header row — skipped title rows');
   }
 
   // Derive fields from the first record.  filter(Boolean) drops empty strings;
