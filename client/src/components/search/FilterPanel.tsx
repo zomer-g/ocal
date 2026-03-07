@@ -111,7 +111,7 @@ export function FilterPanel() {
         onChange={() => toggleEntity(name)}
         className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
       />
-      <span className="break-words min-w-0 flex-1">{name}</span>
+      <span className="min-w-0 flex-1" style={{ overflowWrap: 'anywhere' }}>{name}</span>
       <span className="text-gray-400 text-xs shrink-0">({count})</span>
     </label>
   ));
@@ -129,12 +129,12 @@ export function FilterPanel() {
   );
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4" role="region" aria-label="סינון תוצאות">
+    <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4 overflow-hidden" role="region" aria-label="סינון תוצאות">
       <h3 className="text-sm font-semibold text-gray-700">סינון</h3>
 
       {/* ── שנה / חודש ── */}
       {years.length > 0 && (
-        <fieldset className="space-y-1">
+        <fieldset className="space-y-1 min-w-0">
           <legend className="text-xs text-gray-500 font-medium mb-1">שנה / חודש</legend>
           <div className="max-h-56 overflow-y-auto space-y-0.5">
             {years.map((year) => {
@@ -252,11 +252,11 @@ export function FilterPanel() {
       {/* ── Entity sections (with loading skeleton) ── */}
       {entitiesLoading && !entitiesData ? (
         <>
-          <fieldset className="space-y-1">
+          <fieldset className="space-y-1 min-w-0">
             <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
             <SkeletonRows />
           </fieldset>
-          <fieldset className="space-y-1">
+          <fieldset className="space-y-1 min-w-0">
             <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
             <SkeletonRows />
           </fieldset>
@@ -265,7 +265,7 @@ export function FilterPanel() {
         <>
           {/* ── אנשים ── */}
           {personEntities.length > 0 && (
-            <fieldset className="space-y-1">
+            <fieldset className="space-y-1 min-w-0">
               <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
               <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                 {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
@@ -275,7 +275,7 @@ export function FilterPanel() {
 
           {/* ── ארגונים ── */}
           {orgEntities.length > 0 && (
-            <fieldset className="space-y-1">
+            <fieldset className="space-y-1 min-w-0">
               <legend className="text-xs text-gray-500 font-medium">ארגונים</legend>
               <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                 {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
@@ -285,7 +285,7 @@ export function FilterPanel() {
 
           {/* ── מקומות ── */}
           {placeEntities.length > 0 && (
-            <fieldset className="space-y-1">
+            <fieldset className="space-y-1 min-w-0">
               <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
               <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                 {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
@@ -302,7 +302,7 @@ export function FilterPanel() {
 
       {/* ── שכבות ── */}
       {sources.length > 0 && (
-        <fieldset className="space-y-2">
+        <fieldset className="space-y-2 min-w-0">
           <legend className="text-xs text-gray-500 font-medium">שכבות</legend>
           <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1">
             {sources.map((source) => (
@@ -324,7 +324,7 @@ export function FilterPanel() {
                   style={{ backgroundColor: source.color }}
                   aria-hidden="true"
                 />
-                <span className="break-words min-w-0 flex-1">{source.name}</span>
+                <span className="min-w-0 flex-1" style={{ overflowWrap: 'anywhere' }}>{source.name}</span>
                 <span className="text-gray-400 text-xs shrink-0">({source.total_events})</span>
               </label>
             ))}
