@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   discoverDatasets,
@@ -88,17 +88,21 @@ export function SyncPage() {
 
   // ── Step 2: Profile a resource ──
   const profileMutation = useMutation({
-    mutationFn: (resourceId: string) => profileResource(resourceId),
+    mutationFn: (params: { resourceId: string; sheetName?: string }) =>
+      profileResource(params.resourceId, params.sheetName),
     onSuccess: (data) => {
       setActiveProfile(data);
       setImportName(data.suggested_name);
       setImportMapping(data.suggested_mapping);
       setImportColor(SOURCE_COLORS[Math.floor(Math.random() * SOURCE_COLORS.length)]);
       setImportResult(null);
-      setImportPersonId(null);   // clear previous selection so suggestion chip is shown fresh
+      setImportPersonId(null);   // clear previous selection so auto-fill effect can re-trigger
       setImportOrgId(null);
     },
   });
+
+  // Track which sheets have been imported (for multi-sheet workbooks)
+  const [importedSheets, setImportedSheets] = useState<Set<string>>(new Set());
 
   // ── Step 3: Import ──
   const importMutation = useMutation({
@@ -112,10 +116,15 @@ export function SyncPage() {
         field_mapping: importMapping,
         person_id: importPersonId,
         organization_id: importOrgId,
+        sheet_name: activeProfile.sheet_name,
       });
     },
     onSuccess: (data) => {
       setImportResult({ sourceId: data.source_id, message: data.message });
+      // Track imported sheet
+      if (activeProfile?.sheet_name) {
+        setImportedSheets(prev => new Set(prev).add(activeProfile.sheet_name!));
+      }
       queryClient.invalidateQueries({ queryKey: ['sources'] });
       queryClient.invalidateQueries({ queryKey: ['discover'] });
     },
@@ -155,9 +164,13 @@ export function SyncPage() {
           // Shared props passed to every DatasetCard
           const cardProps = {
             hideConverted,
-            onProfile: (resourceId: string) => profileMutation.mutate(resourceId),
+            onProfile: (resourceId: string) => profileMutation.mutate({ resourceId }),
+            onSheetChange: (sheetName: string) => {
+              if (!activeProfile) return;
+              profileMutation.mutate({ resourceId: activeProfile.resource.id, sheetName });
+            },
             isProfileLoading: profileMutation.isPending,
-            profilingResourceId: profileMutation.variables,
+            profilingResourceId: profileMutation.variables?.resourceId,
             activeProfile,
             importName,
             importColor,
@@ -165,6 +178,7 @@ export function SyncPage() {
             importResult,
             importPersonId,
             importOrgId,
+            importedSheets,
             people,
             orgs,
             onImportNameChange: setImportName,
@@ -243,6 +257,7 @@ function DatasetCard({
   dataset,
   hideConverted,
   onProfile,
+  onSheetChange,
   isProfileLoading,
   profilingResourceId,
   activeProfile,
@@ -252,6 +267,7 @@ function DatasetCard({
   importResult,
   importPersonId,
   importOrgId,
+  importedSheets,
   people,
   orgs,
   onImportNameChange,
@@ -266,6 +282,7 @@ function DatasetCard({
   dataset: DiscoveredDataset;
   hideConverted: boolean;
   onProfile: (resourceId: string) => void;
+  onSheetChange: (sheetName: string) => void;
   isProfileLoading: boolean;
   profilingResourceId?: string;
   activeProfile: ProfileResponse | null;
@@ -275,6 +292,7 @@ function DatasetCard({
   importResult: { sourceId: string; message: string } | null;
   importPersonId: string | null;
   importOrgId: string | null;
+  importedSheets: Set<string>;
   people: Person[];
   orgs: Organization[];
   onImportNameChange: (name: string) => void;
@@ -382,6 +400,7 @@ function DatasetCard({
                     importResult={importResult}
                     importPersonId={importPersonId}
                     importOrgId={importOrgId}
+                    importedSheets={importedSheets}
                     people={people}
                     orgs={orgs}
                     onImportNameChange={onImportNameChange}
@@ -389,6 +408,7 @@ function DatasetCard({
                     onImportMappingChange={onImportMappingChange}
                     onImportPersonChange={onImportPersonChange}
                     onImportOrgChange={onImportOrgChange}
+                    onSheetChange={onSheetChange}
                     onImport={onImport}
                     isImporting={isImporting}
                     importError={importError}
@@ -415,6 +435,7 @@ function InlineImportPanel({
   importResult,
   importPersonId,
   importOrgId,
+  importedSheets,
   people,
   orgs,
   onImportNameChange,
@@ -422,6 +443,7 @@ function InlineImportPanel({
   onImportMappingChange,
   onImportPersonChange,
   onImportOrgChange,
+  onSheetChange,
   onImport,
   isImporting,
   importError,
@@ -433,6 +455,7 @@ function InlineImportPanel({
   importResult: { sourceId: string; message: string } | null;
   importPersonId: string | null;
   importOrgId: string | null;
+  importedSheets: Set<string>;
   people: Person[];
   orgs: Organization[];
   onImportNameChange: (name: string) => void;
@@ -440,6 +463,7 @@ function InlineImportPanel({
   onImportMappingChange: (mapping: FieldMapping) => void;
   onImportPersonChange: (personId: string | null) => void;
   onImportOrgChange: (orgId: string | null) => void;
+  onSheetChange: (sheetName: string) => void;
   onImport: () => void;
   isImporting: boolean;
   importError: Error | null;
@@ -498,19 +522,62 @@ function InlineImportPanel({
     </button>
   );
 
-  // ── Person suggestion: score every person by word-overlap with the dataset title ──
-  const diaryTitle = activeProfile.package.title;
-  const scoredPeople = useMemo(
-    () =>
-      people
-        .map((p) => ({ ...p, score: calcNameSimilarity(diaryTitle, p.name) }))
-        .sort((a, b) => b.score - a.score),
-    [people, diaryTitle]
-  );
+  // ── Person matching: check sheet name → resource name → dataset title (first match wins) ──
+  const scoredPeople = useMemo(() => {
+    const sheetName = activeProfile.sheet_name || '';
+    const resourceName = activeProfile.resource.name || '';
+    const datasetTitle = activeProfile.package.title || '';
+    return people
+      .map((p) => {
+        const score = Math.max(
+          sheetName ? calcNameSimilarity(sheetName, p.name) : 0,
+          resourceName ? calcNameSimilarity(resourceName, p.name) : 0,
+          calcNameSimilarity(datasetTitle, p.name),
+        );
+        return { ...p, score };
+      })
+      .sort((a, b) => b.score - a.score);
+  }, [people, activeProfile.sheet_name, activeProfile.resource.name, activeProfile.package.title]);
   const bestMatch = scoredPeople.length > 0 && scoredPeople[0].score >= 0.5 ? scoredPeople[0] : null;
+
+  // ── Auto-fill person when a confident match exists ──
+  useEffect(() => {
+    if (bestMatch && importPersonId === null) {
+      onImportPersonChange(bestMatch.id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bestMatch?.id]);
 
   return (
     <div className="bg-blue-50 border-t border-blue-100 px-3 sm:px-4 py-4 space-y-4">
+      {/* ── Sheet tabs (for multi-sheet workbooks) ── */}
+      {activeProfile.available_sheets && activeProfile.available_sheets.length > 1 && (
+        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+          <span className="text-xs text-gray-500 font-medium shrink-0 ml-1">גיליונות:</span>
+          {activeProfile.available_sheets.map((sheet) => {
+            const isActive = activeProfile.sheet_name === sheet.name;
+            const isImported = importedSheets.has(sheet.name);
+            return (
+              <button
+                key={sheet.name}
+                onClick={() => !isActive && onSheetChange(sheet.name)}
+                className={`px-2 py-1 text-xs rounded-lg border transition-colors flex items-center gap-1 shrink-0 ${
+                  isActive
+                    ? 'bg-white border-primary-300 text-primary-700 font-semibold shadow-sm'
+                    : isImported
+                    ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-white hover:border-gray-300'
+                }`}
+              >
+                {isImported && <CheckCircle className="w-3 h-3 text-green-500" />}
+                <span className="truncate max-w-[120px]">{sheet.name}</span>
+                <span className="text-[10px] opacity-60">({sheet.rows})</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* ── ODATA links + Profile summary ── */}
       <div className="flex items-center gap-3 text-xs">
         <a
@@ -681,26 +748,11 @@ function InlineImportPanel({
               <div>
                 <label className="text-xs font-medium text-gray-700 block mb-1">בעל היומן (אישיות)</label>
 
-                {/* Best-match suggestion chip */}
-                {bestMatch && (
-                  <div className={`flex items-center gap-2 mb-1.5 px-2 py-1.5 rounded-lg text-xs border ${
-                    importPersonId === bestMatch.id
-                      ? 'bg-green-50 border-green-200 text-green-800'
-                      : 'bg-amber-50 border-amber-200 text-amber-800'
-                  }`}>
-                    <span className="font-semibold shrink-0">
-                      {importPersonId === bestMatch.id ? '✓ נבחר:' : '💡 הצעה:'}
-                    </span>
-                    <span className="font-medium truncate flex-1">{bestMatch.name}</span>
+                {/* Auto-detected person indicator */}
+                {bestMatch && importPersonId === bestMatch.id && (
+                  <div className="flex items-center gap-2 mb-1.5 px-2 py-1.5 rounded-lg text-xs border bg-green-50 border-green-200 text-green-800">
+                    <span className="font-semibold shrink-0">✓ זוהה אוטומטית</span>
                     <span className="text-[10px] opacity-60 shrink-0">{Math.round(bestMatch.score * 100)}%</span>
-                    {importPersonId !== bestMatch.id && (
-                      <button
-                        onClick={() => onImportPersonChange(bestMatch.id)}
-                        className="shrink-0 px-1.5 py-0.5 rounded bg-amber-200 hover:bg-amber-300 text-amber-900 font-medium transition-colors"
-                      >
-                        בחר
-                      </button>
-                    )}
                   </div>
                 )}
 

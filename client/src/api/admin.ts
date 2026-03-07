@@ -79,10 +79,15 @@ export interface ProfileResponse {
   existing_source_id?: string;
   odata_dataset_url: string;
   odata_resource_url: string;
+  sheet_name?: string;
+  available_sheets?: Array<{ name: string; columns: number; rows: number }>;
 }
 
-export async function profileResource(resourceId: string): Promise<ProfileResponse> {
-  const { data } = await api.post('/admin/sync/profile', { resource_id: resourceId });
+export async function profileResource(resourceId: string, sheetName?: string): Promise<ProfileResponse> {
+  const { data } = await api.post('/admin/sync/profile', {
+    resource_id: resourceId,
+    ...(sheetName ? { sheet_name: sheetName } : {}),
+  });
   return data;
 }
 
@@ -96,6 +101,7 @@ export interface ImportRequest {
   field_mapping: FieldMapping;
   person_id?: string | null;
   organization_id?: string | null;
+  sheet_name?: string;
 }
 
 export interface ImportResponse {

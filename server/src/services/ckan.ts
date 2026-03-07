@@ -253,25 +253,65 @@ async function downloadFile(url: string): Promise<Buffer> {
   return buffer;
 }
 
-/** Parse CSV/XLS/XLSX with SheetJS */
-function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<string, unknown>[]; fields: string[] } {
-  let workbook: XLSX.WorkBook;
-
+/** Build a SheetJS workbook from a file buffer */
+function readWorkbook(buffer: Buffer, format?: string): XLSX.WorkBook {
   if (format?.toUpperCase() === 'CSV') {
     // CSV: decode as UTF-8 string to preserve Hebrew characters.
     // SheetJS buffer mode doesn't reliably detect UTF-8 for CSV files,
     // which causes Hebrew text to appear as garbled bytes.
     let str = buffer.toString('utf-8');
     if (str.charCodeAt(0) === 0xFEFF) str = str.slice(1); // strip BOM
-    workbook = XLSX.read(str, { type: 'string' });
-  } else {
-    workbook = XLSX.read(buffer, { type: 'buffer', codepage: 65001 });
+    return XLSX.read(str, { type: 'string' });
   }
-  // Pick the sheet with the most columns.  Some government files include a
-  // chart sheet (e.g. "תרשים1") as the first sheet, which has only 1–2 columns
-  // of numeric data.  The real data sheet is the one with the widest column span.
+  return XLSX.read(buffer, { type: 'buffer', codepage: 65001 });
+}
+
+/**
+ * List all "relevant" sheets in a workbook — sheets with ≥3 columns.
+ * Chart/junk sheets (e.g. "תרשים1") typically have only 1–2 columns.
+ */
+export function listRelevantSheets(
+  buffer: Buffer,
+  format?: string,
+): Array<{ name: string; columns: number; rows: number }> {
+  const workbook = readWorkbook(buffer, format);
+  const sheets: Array<{ name: string; columns: number; rows: number }> = [];
+  for (const name of workbook.SheetNames) {
+    const s = workbook.Sheets[name];
+    if (!s?.['!ref']) continue;
+    const r = XLSX.utils.decode_range(s['!ref']);
+    const cols = r.e.c - r.s.c + 1;
+    const rows = r.e.r - r.s.r; // exclude header row
+    if (cols >= 3) {
+      sheets.push({ name, columns: cols, rows: Math.max(0, rows) });
+    }
+  }
+  return sheets;
+}
+
+/**
+ * Parse CSV/XLS/XLSX with SheetJS.
+ * @param targetSheet — optional: parse this specific sheet. If omitted, picks the sheet with the most columns.
+ */
+function parseSpreadsheet(
+  buffer: Buffer,
+  format?: string,
+  targetSheet?: string,
+): { records: Record<string, unknown>[]; fields: string[]; sheetName: string } {
+  const workbook = readWorkbook(buffer, format);
+
+  // Resolve which sheet to parse
   let sheetName = workbook.SheetNames[0];
-  if (workbook.SheetNames.length > 1) {
+  if (targetSheet) {
+    // Caller requested a specific sheet
+    if (!workbook.SheetNames.includes(targetSheet)) {
+      throw new Error(`Sheet "${targetSheet}" not found. Available: ${workbook.SheetNames.join(', ')}`);
+    }
+    sheetName = targetSheet;
+  } else if (workbook.SheetNames.length > 1) {
+    // Pick the sheet with the most columns.  Some government files include a
+    // chart sheet (e.g. "תרשים1") as the first sheet, which has only 1–2 columns
+    // of numeric data.  The real data sheet is the one with the widest column span.
     let bestColCount = 0;
     for (const name of workbook.SheetNames) {
       const s = workbook.Sheets[name];
@@ -373,7 +413,7 @@ function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<st
   });
 
   logger.info({ sheetName, recordCount: cleaned.length, fields }, 'Spreadsheet parsed');
-  return { records: cleaned, fields };
+  return { records: cleaned, fields, sheetName };
 }
 
 /** Parse ICAL/ICS files into flat records */
@@ -432,8 +472,9 @@ async function parseICAL(buffer: Buffer): Promise<{ records: Record<string, unkn
 /** Download and parse any supported file format */
 export async function downloadAndParseFile(
   resourceUrl: string,
-  format: string
-): Promise<{ records: Record<string, unknown>[]; fields: string[] }> {
+  format: string,
+  sheetName?: string,
+): Promise<{ records: Record<string, unknown>[]; fields: string[]; sheetName?: string; availableSheets?: Array<{ name: string; columns: number; rows: number }> }> {
   const buffer = await downloadFile(resourceUrl);
   const fmt = format.toUpperCase();
 
@@ -442,7 +483,14 @@ export async function downloadAndParseFile(
   }
 
   // CSV, XLS, XLSX all handled by SheetJS
-  return parseSpreadsheet(buffer, format);
+  const result = parseSpreadsheet(buffer, format, sheetName);
+
+  // For multi-sheet workbooks, include metadata about all relevant sheets
+  const availableSheets = ['XLS', 'XLSX'].includes(fmt)
+    ? listRelevantSheets(buffer, format)
+    : undefined;
+
+  return { ...result, availableSheets };
 }
 
 // ──────────────────────────────────────────────
@@ -456,7 +504,8 @@ export async function downloadAndParseFile(
  */
 export async function fetchResourceRecords(
   resource: CKANResource,
-  onProgress?: (fetched: number, total: number) => void
+  onProgress?: (fetched: number, total: number) => void,
+  sheetName?: string,
 ): Promise<FetchResult> {
   const fmt = resource.format.toUpperCase();
 
@@ -470,7 +519,7 @@ export async function fetchResourceRecords(
     // direct file download so we don't silently import 0 records.
     if (datastoreResult.total === 0 && isSupportedFormat(fmt)) {
       logger.warn({ resourceId: resource.id, format: fmt }, 'Datastore returned 0 records — falling back to file download');
-      const { records, fields } = await downloadAndParseFile(resource.url, resource.format);
+      const { records, fields } = await downloadAndParseFile(resource.url, resource.format, sheetName);
       onProgress?.(records.length, records.length);
       return { records, fields, total: records.length, format: fmt, fetchMethod: 'file_download' };
     }
@@ -483,7 +532,7 @@ export async function fetchResourceRecords(
   }
 
   logger.info({ resourceId: resource.id, format: fmt, reason: isSpreadsheetFormat(fmt) ? 'spreadsheet-hebrew-fix' : 'no-datastore' }, 'Fetching via file download');
-  const { records, fields } = await downloadAndParseFile(resource.url, resource.format);
+  const { records, fields } = await downloadAndParseFile(resource.url, resource.format, sheetName);
   onProgress?.(records.length, records.length);
 
   return { records, fields, total: records.length, format: fmt, fetchMethod: 'file_download' };
@@ -492,8 +541,9 @@ export async function fetchResourceRecords(
 /**
  * Preview: fetch resource metadata + sample records + fields.
  * Used by the admin UI before starting a full import.
+ * @param sheetName — optional: profile this specific sheet (for multi-sheet workbooks)
  */
-export async function previewResource(resourceId: string): Promise<{
+export async function previewResource(resourceId: string, sheetName?: string): Promise<{
   resource: CKANResource;
   package: CKANPackage;
   sampleRecords: Record<string, unknown>[];
@@ -501,6 +551,8 @@ export async function previewResource(resourceId: string): Promise<{
   totalRecords: number;
   format: string;
   fetchMethod: 'datastore' | 'file_download';
+  sheetName?: string;
+  availableSheets?: Array<{ name: string; columns: number; rows: number }>;
 }> {
   const resource = await getResource(resourceId);
   const pkg = await getPackage(resource.package_id);
@@ -509,6 +561,8 @@ export async function previewResource(resourceId: string): Promise<{
   let fields: string[];
   let totalRecords: number;
   let fetchMethod: 'datastore' | 'file_download';
+  let resolvedSheetName: string | undefined;
+  let availableSheets: Array<{ name: string; columns: number; rows: number }> | undefined;
 
   const fmt = resource.format.toUpperCase();
 
@@ -519,11 +573,13 @@ export async function previewResource(resourceId: string): Promise<{
     // If the datastore is active but empty (CKAN failed to ingest), fall back to file download.
     if (result.total === 0 && isSupportedFormat(fmt)) {
       logger.warn({ resourceId }, 'Datastore empty — falling back to file download for preview');
-      const { records, fields: parsedFields } = await downloadAndParseFile(resource.url, resource.format);
-      sampleRecords = records.slice(0, 10);
-      fields = parsedFields;
-      totalRecords = records.length;
+      const parsed = await downloadAndParseFile(resource.url, resource.format, sheetName);
+      sampleRecords = parsed.records.slice(0, 10);
+      fields = parsed.fields;
+      totalRecords = parsed.records.length;
       fetchMethod = 'file_download';
+      resolvedSheetName = parsed.sheetName;
+      availableSheets = parsed.availableSheets;
     } else {
       sampleRecords = result.records;
       fields = result.fields.map(f => f.id).filter(f => f !== '_id');
@@ -531,11 +587,13 @@ export async function previewResource(resourceId: string): Promise<{
       fetchMethod = 'datastore';
     }
   } else {
-    const { records, fields: parsedFields } = await downloadAndParseFile(resource.url, resource.format);
-    sampleRecords = records.slice(0, 10);
-    fields = parsedFields;
-    totalRecords = records.length;
+    const parsed = await downloadAndParseFile(resource.url, resource.format, sheetName);
+    sampleRecords = parsed.records.slice(0, 10);
+    fields = parsed.fields;
+    totalRecords = parsed.records.length;
     fetchMethod = 'file_download';
+    resolvedSheetName = parsed.sheetName;
+    availableSheets = parsed.availableSheets;
   }
 
   return {
@@ -546,5 +604,7 @@ export async function previewResource(resourceId: string): Promise<{
     totalRecords,
     format: resource.format.toUpperCase(),
     fetchMethod,
+    sheetName: resolvedSheetName,
+    availableSheets: availableSheets && availableSheets.length > 1 ? availableSheets : undefined,
   };
 }

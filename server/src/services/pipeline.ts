@@ -90,8 +90,9 @@ export interface NormalizedEvent {
 /**
  * Profile a CKAN resource: fetch metadata, sample data, and auto-detect
  * the field mapping. Returns everything needed to create a processing definition.
+ * @param sheetName — optional: profile a specific sheet (for multi-sheet workbooks)
  */
-export async function profileSource(resourceId: string): Promise<{
+export async function profileSource(resourceId: string, sheetName?: string): Promise<{
   resource: CKANResource;
   pkg: CKANPackage;
   sampleRecords: Record<string, unknown>[];
@@ -103,9 +104,11 @@ export async function profileSource(resourceId: string): Promise<{
   suggestedName: string;
   isDuplicate: boolean;
   existingSourceId?: string;
+  sheetName?: string;
+  availableSheets?: Array<{ name: string; columns: number; rows: number }>;
 }> {
   // Fetch preview from System 1
-  const preview = await ckan.previewResource(resourceId);
+  const preview = await ckan.previewResource(resourceId, sheetName);
 
   // Auto-detect field mapping
   const suggestedMapping = await mapFields(
@@ -116,7 +119,8 @@ export async function profileSource(resourceId: string): Promise<{
   );
 
   // Generate a suggested name: prefer resource name when dataset has multiple resources
-  // (different persons in same dataset), otherwise use cleaned dataset title
+  // (different persons in same dataset), otherwise use cleaned dataset title.
+  // If we have a sheet name, include it for multi-sheet workbooks.
   const cleanTitle = preview.package.title
     .replace(/רבעון\s+\S+/g, '')
     .replace(/לשנת\s+\d+/g, '')
@@ -127,9 +131,13 @@ export async function profileSource(resourceId: string): Promise<{
     .replace(/\s*\(.*?\)\s*/g, '')
     .trim();
   // If resource name adds info beyond the dataset title, include it
-  const suggestedName = resourceName && resourceName !== cleanTitle
+  let suggestedName = resourceName && resourceName !== cleanTitle
     ? `${cleanTitle} — ${resourceName}`
     : (cleanTitle || resourceName);
+  // For multi-sheet workbooks, append the sheet name to distinguish sources
+  if (preview.availableSheets && preview.sheetName) {
+    suggestedName = `${suggestedName} — ${preview.sheetName}`;
+  }
 
   // Check for duplicates
   const existing = await db('diary_sources').where({ resource_id: resourceId }).first();
@@ -146,6 +154,8 @@ export async function profileSource(resourceId: string): Promise<{
     suggestedName,
     isDuplicate: !!existing,
     existingSourceId: existing?.id,
+    sheetName: preview.sheetName,
+    availableSheets: preview.availableSheets,
   };
 }
 
@@ -381,7 +391,7 @@ export async function processSource(
     // ── Step 1: Fetch via System 1 ──
     const fetchResult = await ckan.fetchResourceRecords(resource, (fetched, total) => {
       onProgress?.('fetching', fetched, total);
-    });
+    }, ckanMeta.sheetName);
     result.recordsFetched = fetchResult.total;
 
     logger.info({

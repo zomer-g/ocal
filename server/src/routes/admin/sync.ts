@@ -64,11 +64,12 @@ adminSyncRouter.get('/discover', async (req, res, next) => {
 // POST /api/admin/sync/profile — Profile a resource (preview + auto-detect mapping)
 const profileSchema = z.object({
   resource_id: z.string().min(1),
+  sheet_name: z.string().optional(),
 });
 
 adminSyncRouter.post('/profile', validate(profileSchema, 'body'), async (req, res, next) => {
   try {
-    const profile = await profileSource(req.body.resource_id);
+    const profile = await profileSource(req.body.resource_id, req.body.sheet_name);
 
     const odataBase = env.CKAN_BASE_URL;
     res.json({
@@ -88,6 +89,8 @@ adminSyncRouter.post('/profile', validate(profileSchema, 'body'), async (req, re
       existing_source_id: profile.existingSourceId,
       odata_dataset_url: `${odataBase}/dataset/${profile.pkg.id}`,
       odata_resource_url: `${odataBase}/dataset/${profile.pkg.id}/resource/${profile.resource.id}`,
+      sheet_name: profile.sheetName,
+      available_sheets: profile.availableSheets,
     });
   } catch (err) {
     next(err);
@@ -117,6 +120,7 @@ const importSchema = z.object({
   }),
   person_id: z.string().uuid().optional().nullable(),
   organization_id: z.string().uuid().optional().nullable(),
+  sheet_name: z.string().optional(),
 });
 
 adminSyncRouter.post('/import', validate(importSchema, 'body'), async (req, res, next) => {
@@ -134,6 +138,7 @@ adminSyncRouter.post('/import', validate(importSchema, 'body'), async (req, res,
       datasetUrl: `https://www.odata.org.il/dataset/${pkg.id}`,
       organization: pkg.organization?.title || null,
       lastModified: resource.last_modified,
+      sheetName: body.sheet_name || undefined,
     };
 
     // If this resource is already registered, update the existing source in-place
