@@ -267,7 +267,26 @@ function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<st
   } else {
     workbook = XLSX.read(buffer, { type: 'buffer', codepage: 65001 });
   }
-  const sheetName = workbook.SheetNames[0];
+  // Pick the sheet with the most columns.  Some government files include a
+  // chart sheet (e.g. "תרשים1") as the first sheet, which has only 1–2 columns
+  // of numeric data.  The real data sheet is the one with the widest column span.
+  let sheetName = workbook.SheetNames[0];
+  if (workbook.SheetNames.length > 1) {
+    let bestColCount = 0;
+    for (const name of workbook.SheetNames) {
+      const s = workbook.Sheets[name];
+      if (!s?.['!ref']) continue;
+      const r = XLSX.utils.decode_range(s['!ref']);
+      const cols = r.e.c - r.s.c + 1;
+      if (cols > bestColCount) {
+        bestColCount = cols;
+        sheetName = name;
+      }
+    }
+    if (sheetName !== workbook.SheetNames[0]) {
+      logger.info({ sheetName, sheets: workbook.SheetNames }, 'Skipped chart/junk sheet — using sheet with most columns');
+    }
+  }
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) throw new Error('No sheets found in workbook');
 
