@@ -11,10 +11,8 @@ export const authRouter = Router();
 const CALLBACK_PATH = '/api/admin/auth/google/callback';
 
 function buildCallbackUrl(req: import('express').Request): string {
-  // Use CORS_ORIGIN in production (it's the public URL), otherwise derive from request
-  if (env.NODE_ENV === 'production' && env.CORS_ORIGIN) {
-    return env.CORS_ORIGIN.replace(/\/$/, '') + CALLBACK_PATH;
-  }
+  // Always derive from the incoming request so the callback URL matches
+  // whatever domain the user is accessing (e.g. ocal.org.il or the render URL).
   const proto = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.get('host');
   return `${proto}://${host}${CALLBACK_PATH}`;
@@ -123,8 +121,12 @@ authRouter.get('/google/callback', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
+    // Redirect to the frontend admin dashboard.
+    // Use CORS_ORIGIN as the base so we always land on the real domain
+    // (ocal.org.il) even if the OAuth callback was served from a different host.
+    const frontendBase = env.CORS_ORIGIN.replace(/\/$/, '');
     logger.info({ email, userId: user.id }, 'Admin login successful');
-    res.redirect('/admin');
+    res.redirect(`${frontendBase}/admin`);
   } catch (err) {
     logger.error({ err }, 'Google OAuth callback failed');
     res.status(500).send('Authentication failed. Please try again.');

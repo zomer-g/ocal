@@ -37,7 +37,7 @@ services:
       - key: CKAN_BASE_URL
         value: https://www.odata.org.il
       - key: CORS_ORIGIN
-        value: https://ocal-api.onrender.com
+        value: https://ocal.org.il
       - key: PORT
         value: "3001"
       - key: LOG_LEVEL
