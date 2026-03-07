@@ -33,6 +33,7 @@ export interface DiaryEvent {
   event_date: string;
   source_name?: string;
   source_color?: string;
+  other_fields?: Record<string, unknown> | null;
 }
 
 export interface EventSearchResponse {
@@ -47,6 +48,21 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
 
 export async function getEvent(id: string): Promise<DiaryEvent> {
   const { data } = await api.get(`/public/events/${id}`);
+  return data;
+}
+
+// ── Event Entities ──
+
+export interface EventEntityDetail {
+  entity_type: 'person' | 'organization' | 'place';
+  entity_name: string;
+  role: 'owner' | 'participant' | 'location' | 'mentioned';
+  confidence: number;
+  extraction_method: string;
+}
+
+export async function getEventEntities(eventId: string): Promise<{ data: EventEntityDetail[] }> {
+  const { data } = await api.get(`/public/events/${eventId}/entities`);
   return data;
 }
 

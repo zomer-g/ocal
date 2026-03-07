@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { DiaryEventModel } from '../../models/DiaryEvent.js';
 import { parsePagination, buildPaginationMeta } from '../../utils/pagination.js';
 import { validate } from '../../middleware/validate.js';
+import { db } from '../../config/database.js';
 
 export const eventsRouter = Router();
 
@@ -63,6 +64,21 @@ eventsRouter.get('/:id', async (req, res, next) => {
       return;
     }
     res.json(event);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/public/events/:id/entities
+eventsRouter.get('/:id/entities', async (req, res, next) => {
+  try {
+    const entities = await db('event_entities')
+      .where({ event_id: req.params.id })
+      .select('entity_type', 'entity_name', 'role', 'confidence', 'extraction_method')
+      .orderBy('confidence', 'desc')
+      .orderBy('entity_type')
+      .orderBy('entity_name');
+    res.json({ data: entities });
   } catch (err) {
     next(err);
   }
