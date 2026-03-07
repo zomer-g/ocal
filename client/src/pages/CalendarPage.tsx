@@ -7,7 +7,7 @@ import { Loader2, Layers, X } from 'lucide-react';
 import type { DiaryEvent } from '@/api/events';
 
 export function CalendarPage() {
-  const { date, view, setDate, setView, enabledSourceIds, setAllSources, sourcesInitialized } = useCalendarStore();
+  const { date, view, setDate, setView, enabledSourceIds, selectedEntityNames, setAllSources, sourcesInitialized } = useCalendarStore();
   const { data: sourcesData } = useSources();
   const sources = sourcesData?.data ?? [];
   const [selectedEvent, setSelectedEvent] = useState<DiaryEvent | null>(null);
@@ -25,10 +25,15 @@ export function CalendarPage() {
     ? Array.from(enabledSourceIds).join(',')
     : undefined;
 
+  const entityNamesParam = selectedEntityNames.length > 0
+    ? selectedEntityNames.join(',')
+    : undefined;
+
   const { data, isLoading } = useCalendar({
     date,
     view,
     source_ids: sourceIdsParam,
+    entity_names: entityNamesParam,
   });
 
   // All events from API (before client-side source filtering)

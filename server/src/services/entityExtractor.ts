@@ -137,6 +137,13 @@ const HONORIFIC_RE = /^(פרופ[׳']?|ד[״"]ר|עו[״"]ד|מנכ[״"]ל|מנ�
 /** Split delimiters for participants field */
 const SPLIT_RE = /[,;\n|\/\\]+/;
 
+/** Detect participant-like keys in other_fields */
+const PARTICIPANT_KEYS_RE = /משתתפ|נוכח|מוזמנ|participant|attendee|invitee/i;
+/** Detect location-like keys in other_fields */
+const LOCATION_KEYS_RE = /מקום|מיקום|location|place|venue|כתובת|address/i;
+/** Regex to extract Hebrew organization-like phrases from text */
+const ORG_PHRASE_RE = /(משרד|ועד[תה]|רשות|עיריי?ת|מועצ[תה]|הסתדרות|בנק|אוניברסיט[תה])\s+([\u0590-\u05FF"'״׳\-]+(?:\s+[\u0590-\u05FF"'״׳\-]+){0,3})/g;
+
 /** Normalize Hebrew text: remove invisible Unicode marks */
 function normalizeText(s: string): string {
   return s
@@ -201,12 +208,10 @@ async function stageParticipantParse(
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
+    // Process ALL events — not just those with participants/location
     const events = await db('diary_events')
       .where({ source_id: sourceId })
-      .where(function () {
-        this.whereNotNull('participants').orWhereNotNull('location');
-      })
-      .select('id', 'participants', 'location')
+      .select('id', 'title', 'participants', 'location', 'other_fields')
       .orderBy('id')
       .limit(BATCH_SIZE)
       .offset(offset);
@@ -215,11 +220,43 @@ async function stageParticipantParse(
     offset += events.length;
 
     const rows: EntityRow[] = [];
+    // Dedup within batch to avoid insert conflicts
+    const seen = new Set<string>();
+    const addRow = (row: EntityRow) => {
+      const key = `${row.event_id}|${row.entity_type}|${row.entity_name}|${row.role}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        rows.push(row);
+      }
+    };
 
     for (const event of events) {
+      // ── Gather text from all sources ──
+      let participantText = event.participants ? String(event.participants) : '';
+      let locationText = event.location ? String(event.location) : '';
+
+      // Check other_fields for unmapped participant/location columns
+      if (event.other_fields) {
+        try {
+          const obj = typeof event.other_fields === 'string'
+            ? JSON.parse(event.other_fields) : event.other_fields;
+          if (obj && typeof obj === 'object') {
+            for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+              if (typeof value !== 'string' || !value.trim()) continue;
+              const keyNorm = normalizeText(key);
+              if (PARTICIPANT_KEYS_RE.test(keyNorm)) {
+                participantText += (participantText ? '\n' : '') + value;
+              } else if (LOCATION_KEYS_RE.test(keyNorm)) {
+                locationText += (locationText ? '\n' : '') + value;
+              }
+            }
+          }
+        } catch { /* ignore malformed JSON */ }
+      }
+
       // ── Participant names ──
-      if (event.participants) {
-        const candidates = String(event.participants)
+      if (participantText) {
+        const candidates = participantText
           .split(SPLIT_RE)
           .map((s: string) => cleanName(s))
           .filter((s: string) => s.length >= 2);
@@ -231,27 +268,19 @@ async function stageParticipantParse(
           // Try people first
           const [pId, pScore] = bestMatch(norm, peopleMap);
           if (pScore >= 0.85) {
-            rows.push({
-              event_id: event.id,
-              entity_type: 'person',
-              entity_id: pId,
+            addRow({
+              event_id: event.id, entity_type: 'person', entity_id: pId,
               entity_name: allPeople.find((p) => p.id === pId)?.name ?? raw,
-              role: 'participant',
-              raw_mention: raw,
-              confidence: 0.9,
+              role: 'participant', raw_mention: raw, confidence: 0.9,
               extraction_method: 'participant_parse',
             });
             continue;
           }
           if (pScore >= 0.6) {
-            rows.push({
-              event_id: event.id,
-              entity_type: 'person',
-              entity_id: pId,
+            addRow({
+              event_id: event.id, entity_type: 'person', entity_id: pId,
               entity_name: allPeople.find((p) => p.id === pId)?.name ?? raw,
-              role: 'participant',
-              raw_mention: raw,
-              confidence: 0.7,
+              role: 'participant', raw_mention: raw, confidence: 0.7,
               extraction_method: 'participant_parse',
             });
             continue;
@@ -260,13 +289,10 @@ async function stageParticipantParse(
           // Try organizations
           const [oId, oScore] = bestMatch(norm, orgMap);
           if (oScore >= 0.6) {
-            rows.push({
-              event_id: event.id,
-              entity_type: 'organization',
-              entity_id: oId,
+            addRow({
+              event_id: event.id, entity_type: 'organization', entity_id: oId,
               entity_name: allOrgs.find((o) => o.id === oId)?.name ?? raw,
-              role: 'participant',
-              raw_mention: raw,
+              role: 'participant', raw_mention: raw,
               confidence: oScore >= 0.85 ? 0.9 : 0.7,
               extraction_method: 'participant_parse',
             });
@@ -274,51 +300,89 @@ async function stageParticipantParse(
           }
 
           // Unknown person from participant list
-          rows.push({
-            event_id: event.id,
-            entity_type: 'person',
-            entity_id: null,
-            entity_name: raw,
-            role: 'participant',
-            raw_mention: raw,
-            confidence: 0.5,
-            extraction_method: 'participant_parse',
+          addRow({
+            event_id: event.id, entity_type: 'person', entity_id: null,
+            entity_name: raw, role: 'participant', raw_mention: raw,
+            confidence: 0.5, extraction_method: 'participant_parse',
           });
         }
       }
 
       // ── Location field ──
-      if (event.location) {
-        const loc = cleanName(String(event.location));
-        if (loc.length >= 2) {
+      if (locationText) {
+        for (const locPart of locationText.split(SPLIT_RE)) {
+          const loc = cleanName(locPart);
+          if (loc.length < 2) continue;
           const norm = normalizeText(loc.toLowerCase());
 
           // Check organizations (government buildings, ministries)
           const [oId, oScore] = bestMatch(norm, orgMap);
           if (oScore >= 0.6) {
-            rows.push({
-              event_id: event.id,
-              entity_type: 'organization',
-              entity_id: oId,
+            addRow({
+              event_id: event.id, entity_type: 'organization', entity_id: oId,
               entity_name: allOrgs.find((o) => o.id === oId)?.name ?? loc,
-              role: 'location',
-              raw_mention: event.location as string,
+              role: 'location', raw_mention: locPart.trim(),
               confidence: oScore >= 0.85 ? 0.9 : 0.7,
               extraction_method: 'participant_parse',
             });
           } else {
             // Store as unmatched place
-            rows.push({
-              event_id: event.id,
-              entity_type: 'place',
-              entity_id: null,
-              entity_name: loc,
-              role: 'location',
-              raw_mention: event.location as string,
-              confidence: 0.9,
+            addRow({
+              event_id: event.id, entity_type: 'place', entity_id: null,
+              entity_name: loc, role: 'location', raw_mention: locPart.trim(),
+              confidence: 0.9, extraction_method: 'participant_parse',
+            });
+          }
+        }
+      }
+
+      // ── Title: match against known registry + extract org patterns ──
+      if (event.title) {
+        const titleClean = normalizeText(String(event.title));
+        const titleLower = titleClean.toLowerCase();
+
+        // Check if known people appear in title
+        for (const person of allPeople) {
+          const pNorm = normalizeText(person.name.toLowerCase());
+          if (pNorm.length >= 3 && titleLower.includes(pNorm)) {
+            addRow({
+              event_id: event.id, entity_type: 'person', entity_id: person.id,
+              entity_name: person.name, role: 'mentioned',
+              raw_mention: person.name, confidence: 0.8,
               extraction_method: 'participant_parse',
             });
           }
+        }
+
+        // Check if known orgs appear in title
+        for (const org of allOrgs) {
+          const oNorm = normalizeText(org.name.toLowerCase());
+          if (oNorm.length >= 3 && titleLower.includes(oNorm)) {
+            addRow({
+              event_id: event.id, entity_type: 'organization', entity_id: org.id,
+              entity_name: org.name, role: 'mentioned',
+              raw_mention: org.name, confidence: 0.8,
+              extraction_method: 'participant_parse',
+            });
+          }
+        }
+
+        // Extract Hebrew org-like phrases even without registry
+        ORG_PHRASE_RE.lastIndex = 0; // reset regex state
+        let match;
+        while ((match = ORG_PHRASE_RE.exec(titleClean)) !== null) {
+          const orgName = cleanName(match[0]);
+          if (orgName.length < 4) continue;
+          const norm = normalizeText(orgName.toLowerCase());
+          const [oId, oScore] = bestMatch(norm, orgMap);
+          addRow({
+            event_id: event.id, entity_type: 'organization',
+            entity_id: oScore >= 0.7 ? oId : null,
+            entity_name: oScore >= 0.7 ? (allOrgs.find((o) => o.id === oId)?.name ?? orgName) : orgName,
+            role: 'mentioned', raw_mention: match[0],
+            confidence: oScore >= 0.7 ? 0.8 : 0.6,
+            extraction_method: 'participant_parse',
+          });
         }
       }
     }

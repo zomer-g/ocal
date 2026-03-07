@@ -9,6 +9,7 @@ const calendarSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   view: z.enum(['month', 'week', '4day', 'day']).default('month'),
   source_ids: z.string().optional(),
+  entity_names: z.string().optional(),
 });
 
 // GET /api/public/calendar
@@ -17,6 +18,7 @@ calendarRouter.get('/', validate(calendarSchema, 'query'), async (req, res, next
     const query = req.query as z.infer<typeof calendarSchema>;
     const date = new Date(query.date);
     const sourceIds = query.source_ids?.split(',').filter(Boolean);
+    const entityNames = query.entity_names?.split(',').filter(Boolean);
 
     let from: string;
     let to: string;
@@ -51,8 +53,8 @@ calendarRouter.get('/', validate(calendarSchema, 'query'), async (req, res, next
     }
 
     const [events, event_counts] = await Promise.all([
-      DiaryEventModel.findByDateRange(from, to, sourceIds),
-      DiaryEventModel.countByDateRange(from, to, sourceIds),
+      DiaryEventModel.findByDateRange(from, to, sourceIds, entityNames),
+      DiaryEventModel.countByDateRange(from, to, sourceIds, entityNames),
     ]);
 
     res.json({

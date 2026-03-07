@@ -6,6 +6,7 @@ interface CalendarState {
   date: string;            // YYYY-MM-DD — the anchor date
   view: CalendarView;
   enabledSourceIds: Set<string>;
+  selectedEntityNames: string[];
   sourcesInitialized: boolean;
 
   setDate: (date: string) => void;
@@ -14,12 +15,14 @@ interface CalendarState {
   navigate: (direction: 1 | -1) => void;
   toggleSource: (id: string) => void;
   setAllSources: (ids: string[], enabled: boolean) => void;
+  setEntityNames: (names: string[]) => void;
 }
 
 export const useCalendarStore = create<CalendarState>((set, get) => ({
   date: new Date().toISOString().split('T')[0],
   view: 'week',
   enabledSourceIds: new Set<string>(),
+  selectedEntityNames: [] as string[],
   sourcesInitialized: false,
 
   setDate: (date) => set({ date }),
@@ -47,4 +50,6 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
 
   setAllSources: (ids, enabled) =>
     set({ enabledSourceIds: new Set(enabled ? ids : []), sourcesInitialized: true }),
+
+  setEntityNames: (names) => set({ selectedEntityNames: names }),
 }));

@@ -101,7 +101,7 @@ export const DiaryEventModel = {
       .first();
   },
 
-  async findByDateRange(from: string, to: string, sourceIds?: string[]) {
+  async findByDateRange(from: string, to: string, sourceIds?: string[], entityNames?: string[]) {
     let query = db(TABLE + ' as e')
       .join('diary_sources as s', 'e.source_id', 's.id')
       .select('e.*', 's.name as source_name', 's.color as source_color')
@@ -114,11 +114,19 @@ export const DiaryEventModel = {
     if (sourceIds?.length) {
       query = query.whereIn('e.source_id', sourceIds);
     }
+    if (entityNames?.length) {
+      query = query.whereExists(function () {
+        this.select(db.raw('1'))
+          .from('event_entities as ee')
+          .whereRaw('ee.event_id = e.id')
+          .whereIn('ee.entity_name', entityNames);
+      });
+    }
 
     return query;
   },
 
-  async countByDateRange(from: string, to: string, sourceIds?: string[]) {
+  async countByDateRange(from: string, to: string, sourceIds?: string[], entityNames?: string[]) {
     let query = db(TABLE + ' as e')
       .join('diary_sources as s', 'e.source_id', 's.id')
       .where('e.is_active', true)
@@ -131,6 +139,14 @@ export const DiaryEventModel = {
 
     if (sourceIds?.length) {
       query = query.whereIn('e.source_id', sourceIds);
+    }
+    if (entityNames?.length) {
+      query = query.whereExists(function () {
+        this.select(db.raw('1'))
+          .from('event_entities as ee')
+          .whereRaw('ee.event_id = e.id')
+          .whereIn('ee.entity_name', entityNames);
+      });
     }
 
     const rows = await query;
