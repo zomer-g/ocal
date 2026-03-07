@@ -296,7 +296,10 @@ function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<st
   // Scan forward (up to 4 rows) until we find a row with at least 2 named columns.
   for (let headerRow = 1; headerRow <= 4; headerRow++) {
     if (records.length === 0) break;
-    const realColumnCount = Object.keys(records[0]).filter(k => !k.startsWith('__EMPTY')).length;
+    // Count AFTER normalizing — invisible Unicode chars (RTL marks, BOM, ZWS) in
+    // a header cell would pass the raw !startsWith('__EMPTY') check but collapse
+    // to an empty string after normalizeKey, so they must not count toward the threshold.
+    const realColumnCount = Object.keys(records[0]).map(normalizeKey).filter(k => k && !k.startsWith('__EMPTY')).length;
     if (realColumnCount >= 2) break;
     logger.debug({ sheetName, headerRow, realColumnCount }, 'Too few real columns — scanning for header row');
     records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', range: headerRow });
