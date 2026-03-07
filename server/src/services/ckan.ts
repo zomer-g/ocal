@@ -288,7 +288,18 @@ function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<st
   // entirely for blank cells — so a column like 'נושא' that happens to be empty
   // in the first data row would be absent from Object.keys(records[0]) and
   // therefore invisible to the field-mapping heuristic.
-  const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+  let records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+
+  // Some Israeli government files start with a merged title row before the actual
+  // column headers. When row 0 is a title, all SheetJS column keys are __EMPTY_N
+  // placeholders. Scan forward (up to 4 rows) to find the real header row.
+  for (let headerRow = 1; headerRow <= 4; headerRow++) {
+    if (records.length === 0) break;
+    const hasRealHeader = Object.keys(records[0]).some(k => !k.startsWith('__EMPTY'));
+    if (hasRealHeader) break;
+    logger.debug({ sheetName, headerRow }, 'Row 0 has no column names — scanning for header row');
+    records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', range: headerRow });
+  }
 
   // Derive fields from the first record.  filter(Boolean) drops empty strings;
   // the __EMPTY* check drops SheetJS placeholder keys generated for blank
