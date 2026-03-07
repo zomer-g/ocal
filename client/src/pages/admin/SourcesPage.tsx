@@ -313,8 +313,16 @@ function SourceCard({ source }: { source: DiarySource }) {
                 הצג ישויות
               </button>
               {extractionMsg && (
-                <span className={`text-xs flex items-center gap-1 ${extractionMsg.startsWith('שגיאה') ? 'text-red-600' : 'text-green-600'}`}>
-                  {extractionMsg.startsWith('שגיאה') ? <XCircle className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
+                <span className={`text-xs flex items-start gap-1 whitespace-pre-line ${
+                  extractionMsg.startsWith('שגיאה') || extractionMsg.includes('API')
+                    ? 'text-red-600' : extractionMsg.startsWith('לא נמצאו')
+                    ? 'text-amber-600' : 'text-green-600'
+                }`}>
+                  {extractionMsg.startsWith('שגיאה') || extractionMsg.includes('API')
+                    ? <XCircle className="w-3 h-3 mt-0.5 shrink-0" />
+                    : extractionMsg.startsWith('לא נמצאו')
+                    ? <XCircle className="w-3 h-3 mt-0.5 shrink-0" />
+                    : <CheckCircle className="w-3 h-3 mt-0.5 shrink-0" />}
                   {extractionMsg}
                 </span>
               )}

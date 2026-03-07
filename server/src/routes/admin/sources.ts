@@ -119,14 +119,19 @@ adminSourcesRouter.post('/:id/extract-entities', async (req, res, next) => {
     const result = await extractEntitiesForSource(req.params.id, { skipAI, clearExisting });
     logger.info({ sourceId: req.params.id, result }, 'Entity extraction completed');
 
+    let message = result.entitiesInserted > 0
+      ? `נחלצו ${result.entitiesInserted} ישויות מתוך ${result.eventsProcessed} אירועים`
+      : `לא נמצאו ישויות ב-${result.eventsProcessed} אירועים`;
+    if (result.errors.length > 0) {
+      message += `\n${result.errors.join('\n')}`;
+    }
+
     res.json({
       source_id: req.params.id,
       events_processed: result.eventsProcessed,
       entities_inserted: result.entitiesInserted,
       errors: result.errors,
-      message: result.entitiesInserted > 0
-        ? `נחלצו ${result.entitiesInserted} ישויות מתוך ${result.eventsProcessed} אירועים`
-        : `לא נמצאו ישויות ב-${result.eventsProcessed} אירועים`,
+      message,
     });
   } catch (err) {
     next(err);

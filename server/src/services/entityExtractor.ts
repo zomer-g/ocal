@@ -87,9 +87,14 @@ export async function extractEntitiesForSource(
 
     // Stage 3: AI NER (optional)
     if (!skipAI) {
-      const aiInserted = await stageAiNer(sourceId, result.errors);
-      result.entitiesInserted += aiInserted;
-      logger.info({ sourceId, inserted: aiInserted }, 'Entity extraction Stage 3 (AI NER) done');
+      const llmAvailable = !!(env.DEEPSEEK_API_KEY || env.OPENAI_API_KEY);
+      if (!llmAvailable) {
+        result.errors.push('שלב AI דורש מפתח API — הגדר DEEPSEEK_API_KEY או OPENAI_API_KEY בקובץ .env');
+      } else {
+        const aiInserted = await stageAiNer(sourceId, result.errors);
+        result.entitiesInserted += aiInserted;
+        logger.info({ sourceId, inserted: aiInserted }, 'Entity extraction Stage 3 (AI NER) done');
+      }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
