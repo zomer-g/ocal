@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useFilterStore } from '@/stores/filterStore';
 import { useSources } from '@/hooks/useSources';
 import { getPublicEntities } from '@/api/events';
-import { ChevronDown, ChevronRight, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, X, Loader2 } from 'lucide-react';
 
 const HEBREW_MONTHS = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
@@ -73,7 +73,7 @@ export function FilterPanel() {
   })();
 
   // ── Entities ──
-  const { data: entitiesData } = useQuery({
+  const { data: entitiesData, isLoading: entitiesLoading } = useQuery({
     queryKey: ['public-entities', source_ids],
     queryFn: () => getPublicEntities(source_ids.length ? source_ids : undefined),
     staleTime: 60 * 1000,
@@ -103,17 +103,29 @@ export function FilterPanel() {
   };
 
   // Shared entity row renderer
-  const EntityRow = ({ name, count }: { name: string; count: number }) => (
-    <label className="flex items-start gap-2 text-sm cursor-pointer">
+  const EntityRow = memo(({ name, count }: { name: string; count: number }) => (
+    <label className="flex items-start gap-2 text-sm cursor-pointer min-w-0">
       <input
         type="checkbox"
         checked={entity_names.includes(name)}
         onChange={() => toggleEntity(name)}
         className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
       />
-      <span className="break-words min-w-0">{name}</span>
-      <span className="text-gray-400 mr-auto text-xs shrink-0">({count})</span>
+      <span className="break-words min-w-0 flex-1">{name}</span>
+      <span className="text-gray-400 text-xs shrink-0">({count})</span>
     </label>
+  ));
+
+  // Skeleton rows while loading
+  const SkeletonRows = () => (
+    <div className="space-y-2 animate-pulse">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-gray-200 rounded shrink-0" />
+          <div className="h-3 bg-gray-200 rounded flex-1" style={{ width: `${50 + i * 10}%` }} />
+        </div>
+      ))}
+    </div>
   );
 
   return (
@@ -237,48 +249,64 @@ export function FilterPanel() {
         </div>
       )}
 
-      {/* ── אנשים ── */}
-      {personEntities.length > 0 && (
-        <fieldset className="space-y-1">
-          <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
-          <div className="max-h-48 overflow-y-auto space-y-1">
-            {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-          </div>
-        </fieldset>
-      )}
+      {/* ── Entity sections (with loading skeleton) ── */}
+      {entitiesLoading && !entitiesData ? (
+        <>
+          <fieldset className="space-y-1">
+            <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
+            <SkeletonRows />
+          </fieldset>
+          <fieldset className="space-y-1">
+            <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
+            <SkeletonRows />
+          </fieldset>
+        </>
+      ) : (
+        <>
+          {/* ── אנשים ── */}
+          {personEntities.length > 0 && (
+            <fieldset className="space-y-1">
+              <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
+              <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
+                {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+              </div>
+            </fieldset>
+          )}
 
-      {/* ── ארגונים ── */}
-      {orgEntities.length > 0 && (
-        <fieldset className="space-y-1">
-          <legend className="text-xs text-gray-500 font-medium">ארגונים</legend>
-          <div className="max-h-48 overflow-y-auto space-y-1">
-            {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-          </div>
-        </fieldset>
-      )}
+          {/* ── ארגונים ── */}
+          {orgEntities.length > 0 && (
+            <fieldset className="space-y-1">
+              <legend className="text-xs text-gray-500 font-medium">ארגונים</legend>
+              <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
+                {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+              </div>
+            </fieldset>
+          )}
 
-      {/* ── מקומות ── */}
-      {placeEntities.length > 0 && (
-        <fieldset className="space-y-1">
-          <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
-          <div className="max-h-48 overflow-y-auto space-y-1">
-            {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-          </div>
-        </fieldset>
-      )}
+          {/* ── מקומות ── */}
+          {placeEntities.length > 0 && (
+            <fieldset className="space-y-1">
+              <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
+              <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
+                {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+              </div>
+            </fieldset>
+          )}
 
-      {/* No entity results message */}
-      {entitySearch && personEntities.length === 0 && orgEntities.length === 0 && placeEntities.length === 0 && (
-        <p className="text-xs text-gray-400 text-center py-2">לא נמצאה ישות מתאימה</p>
+          {/* No entity results message */}
+          {entitySearch && personEntities.length === 0 && orgEntities.length === 0 && placeEntities.length === 0 && (
+            <p className="text-xs text-gray-400 text-center py-2">לא נמצאה ישות מתאימה</p>
+          )}
+        </>
       )}
 
       {/* ── שכבות ── */}
       {sources.length > 0 && (
         <fieldset className="space-y-2">
           <legend className="text-xs text-gray-500 font-medium">שכבות</legend>
-          <div className="max-h-40 overflow-y-auto space-y-1">
+          <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1">
             {sources.map((source) => (
-              <label key={source.id} className="flex items-start gap-2 text-sm cursor-pointer">
+              <label key={source.id} className="flex items-start gap-2 text-sm cursor-pointer min-w-0">
                 <input
                   type="checkbox"
                   checked={source_ids.includes(source.id)}
@@ -296,8 +324,8 @@ export function FilterPanel() {
                   style={{ backgroundColor: source.color }}
                   aria-hidden="true"
                 />
-                <span className="break-words min-w-0">{source.name}</span>
-                <span className="text-gray-400 mr-auto text-xs shrink-0">({source.total_events})</span>
+                <span className="break-words min-w-0 flex-1">{source.name}</span>
+                <span className="text-gray-400 text-xs shrink-0">({source.total_events})</span>
               </label>
             ))}
           </div>

@@ -116,6 +116,11 @@ export function CalendarPage() {
       )}
 
       <div className="flex gap-4">
+        {/* Desktop layer panel sidebar — on the right (first in RTL) like search page */}
+        <aside className="w-64 shrink-0 hidden lg:block">
+          <LayerPanel sources={sources} viewSourceCounts={viewSourceCounts} />
+        </aside>
+
         {/* Main calendar area */}
         <div className="flex-1 min-w-0">
           {isLoading && !data ? (
@@ -139,11 +144,6 @@ export function CalendarPage() {
             />
           )}
         </div>
-
-        {/* Desktop layer panel sidebar */}
-        <aside className="w-56 shrink-0 hidden lg:block">
-          <LayerPanel sources={sources} viewSourceCounts={viewSourceCounts} />
-        </aside>
       </div>
 
       {/* Event detail modal */}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useCalendarStore } from '@/stores/calendarStore';
 import { getPublicEntities } from '@/api/events';
@@ -62,7 +62,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
 
   // ── Entities ──
   const sourceIdsArray = Array.from(enabledSourceIds);
-  const { data: entitiesData } = useQuery({
+  const { data: entitiesData, isLoading: entitiesLoading } = useQuery({
     queryKey: ['public-entities', sourceIdsArray],
     queryFn: () => getPublicEntities(sourceIdsArray.length ? sourceIdsArray : undefined),
     staleTime: 60 * 1000,
@@ -96,17 +96,29 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
   };
 
   // Shared entity row renderer
-  const EntityRow = ({ name, count }: { name: string; count: number }) => (
-    <label className="flex items-start gap-2 text-sm cursor-pointer">
+  const EntityRow = memo(({ name, count }: { name: string; count: number }) => (
+    <label className="flex items-start gap-2 text-sm cursor-pointer min-w-0">
       <input
         type="checkbox"
         checked={selectedEntityNames.includes(name)}
         onChange={() => toggleEntity(name)}
         className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
       />
-      <span className="break-words min-w-0">{name}</span>
-      <span className="text-gray-400 mr-auto text-xs shrink-0">({count})</span>
+      <span className="break-words min-w-0 flex-1">{name}</span>
+      <span className="text-gray-400 text-xs shrink-0">({count})</span>
     </label>
+  ));
+
+  // Skeleton rows while loading
+  const SkeletonRows = () => (
+    <div className="space-y-2 animate-pulse">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-gray-200 rounded shrink-0" />
+          <div className="h-3 bg-gray-200 rounded flex-1" style={{ width: `${50 + i * 10}%` }} />
+        </div>
+      ))}
+    </div>
   );
 
   return (
@@ -222,39 +234,55 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
         </div>
       )}
 
-      {/* ── אנשים ── */}
-      {personEntities.length > 0 && (
-        <fieldset className="space-y-1">
-          <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
-          <div className="max-h-48 overflow-y-auto space-y-1">
-            {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-          </div>
-        </fieldset>
-      )}
+      {/* ── Entity sections (with loading skeleton) ── */}
+      {entitiesLoading && !entitiesData ? (
+        <>
+          <fieldset className="space-y-1">
+            <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
+            <SkeletonRows />
+          </fieldset>
+          <fieldset className="space-y-1">
+            <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
+            <SkeletonRows />
+          </fieldset>
+        </>
+      ) : (
+        <>
+          {/* ── אנשים ── */}
+          {personEntities.length > 0 && (
+            <fieldset className="space-y-1">
+              <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
+              <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
+                {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+              </div>
+            </fieldset>
+          )}
 
-      {/* ── ארגונים ── */}
-      {orgEntities.length > 0 && (
-        <fieldset className="space-y-1">
-          <legend className="text-xs text-gray-500 font-medium">ארגונים</legend>
-          <div className="max-h-48 overflow-y-auto space-y-1">
-            {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-          </div>
-        </fieldset>
-      )}
+          {/* ── ארגונים ── */}
+          {orgEntities.length > 0 && (
+            <fieldset className="space-y-1">
+              <legend className="text-xs text-gray-500 font-medium">ארגונים</legend>
+              <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
+                {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+              </div>
+            </fieldset>
+          )}
 
-      {/* ── מקומות ── */}
-      {placeEntities.length > 0 && (
-        <fieldset className="space-y-1">
-          <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
-          <div className="max-h-48 overflow-y-auto space-y-1">
-            {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-          </div>
-        </fieldset>
-      )}
+          {/* ── מקומות ── */}
+          {placeEntities.length > 0 && (
+            <fieldset className="space-y-1">
+              <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
+              <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
+                {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+              </div>
+            </fieldset>
+          )}
 
-      {/* No entity results message */}
-      {entitySearch && personEntities.length === 0 && orgEntities.length === 0 && placeEntities.length === 0 && (
-        <p className="text-xs text-gray-400 text-center py-2">לא נמצאה ישות מתאימה</p>
+          {/* No entity results message */}
+          {entitySearch && personEntities.length === 0 && orgEntities.length === 0 && placeEntities.length === 0 && (
+            <p className="text-xs text-gray-400 text-center py-2">לא נמצאה ישות מתאימה</p>
+          )}
+        </>
       )}
 
       {/* ── שכבות ── */}
@@ -270,7 +298,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
               {allEnabled ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
             </button>
           </div>
-          <div className="max-h-40 overflow-y-auto space-y-1">
+          <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1">
             {sources.map((source) => {
               const isEnabled = enabledSourceIds.has(source.id);
               const viewCount = viewSourceCounts?.[source.id] ?? 0;
@@ -278,7 +306,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
               return (
                 <label
                   key={source.id}
-                  className={`flex items-start gap-2 text-sm cursor-pointer transition-opacity ${
+                  className={`flex items-start gap-2 text-sm cursor-pointer transition-opacity min-w-0 ${
                     isEnabled ? (hasEventsInView ? '' : 'opacity-40') : 'opacity-30'
                   }`}
                 >
@@ -300,8 +328,8 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                       </svg>
                     )}
                   </div>
-                  <span className="break-words min-w-0">{source.name}</span>
-                  <span className="text-gray-400 mr-auto text-xs shrink-0">
+                  <span className="break-words min-w-0 flex-1">{source.name}</span>
+                  <span className="text-gray-400 text-xs shrink-0">
                     ({viewSourceCounts && viewCount > 0 ? viewCount : source.total_events})
                   </span>
                 </label>
