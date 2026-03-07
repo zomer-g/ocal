@@ -4,9 +4,13 @@ import {
   discoverDatasets,
   profileResource,
   importResource,
+  getPeople,
+  getOrganizations,
   type DiscoveredDataset,
   type ProfileResponse,
   type FieldMapping,
+  type Person,
+  type Organization,
 } from '@/api/admin';
 import {
   Search,
@@ -39,7 +43,15 @@ export function SyncPage() {
   const [importColor, setImportColor] = useState(SOURCE_COLORS[0]);
   const [importMapping, setImportMapping] = useState<FieldMapping | null>(null);
   const [importResult, setImportResult] = useState<{ sourceId: string; message: string } | null>(null);
+  const [importPersonId, setImportPersonId] = useState<string | null>(null);
+  const [importOrgId, setImportOrgId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
+  // Fetch people & orgs for the selector
+  const { data: peopleData } = useQuery({ queryKey: ['admin-people'], queryFn: getPeople });
+  const { data: orgsData } = useQuery({ queryKey: ['admin-orgs'], queryFn: getOrganizations });
+  const people = peopleData?.data ?? [];
+  const orgs = orgsData?.data ?? [];
 
   // ── Step 1: Discover datasets ──
   const {
@@ -78,6 +90,8 @@ export function SyncPage() {
         name: importName,
         color: importColor,
         field_mapping: importMapping,
+        person_id: importPersonId,
+        organization_id: importOrgId,
       });
     },
     onSuccess: (data) => {
@@ -148,9 +162,21 @@ export function SyncPage() {
                   importColor={importColor}
                   importMapping={importMapping}
                   importResult={importResult}
+                  importPersonId={importPersonId}
+                  importOrgId={importOrgId}
+                  people={people}
+                  orgs={orgs}
                   onImportNameChange={setImportName}
                   onImportColorChange={setImportColor}
                   onImportMappingChange={setImportMapping}
+                  onImportPersonChange={(personId) => {
+                    setImportPersonId(personId);
+                    if (personId) {
+                      const person = people.find((p) => p.id === personId);
+                      if (person) setImportName(person.name);
+                    }
+                  }}
+                  onImportOrgChange={setImportOrgId}
                   onImport={() => importMutation.mutate()}
                   isImporting={importMutation.isPending}
                   importError={importMutation.isError ? (importMutation.error as Error) : null}
@@ -179,9 +205,15 @@ function DatasetCard({
   importColor,
   importMapping,
   importResult,
+  importPersonId,
+  importOrgId,
+  people,
+  orgs,
   onImportNameChange,
   onImportColorChange,
   onImportMappingChange,
+  onImportPersonChange,
+  onImportOrgChange,
   onImport,
   isImporting,
   importError,
@@ -196,9 +228,15 @@ function DatasetCard({
   importColor: string;
   importMapping: FieldMapping | null;
   importResult: { sourceId: string; message: string } | null;
+  importPersonId: string | null;
+  importOrgId: string | null;
+  people: Person[];
+  orgs: Organization[];
   onImportNameChange: (name: string) => void;
   onImportColorChange: (color: string) => void;
   onImportMappingChange: (mapping: FieldMapping) => void;
+  onImportPersonChange: (personId: string | null) => void;
+  onImportOrgChange: (orgId: string | null) => void;
   onImport: () => void;
   isImporting: boolean;
   importError: Error | null;
@@ -297,9 +335,15 @@ function DatasetCard({
                     importColor={importColor}
                     importMapping={importMapping}
                     importResult={importResult}
+                    importPersonId={importPersonId}
+                    importOrgId={importOrgId}
+                    people={people}
+                    orgs={orgs}
                     onImportNameChange={onImportNameChange}
                     onImportColorChange={onImportColorChange}
                     onImportMappingChange={onImportMappingChange}
+                    onImportPersonChange={onImportPersonChange}
+                    onImportOrgChange={onImportOrgChange}
                     onImport={onImport}
                     isImporting={isImporting}
                     importError={importError}
@@ -324,9 +368,15 @@ function InlineImportPanel({
   importColor,
   importMapping,
   importResult,
+  importPersonId,
+  importOrgId,
+  people,
+  orgs,
   onImportNameChange,
   onImportColorChange,
   onImportMappingChange,
+  onImportPersonChange,
+  onImportOrgChange,
   onImport,
   isImporting,
   importError,
@@ -336,9 +386,15 @@ function InlineImportPanel({
   importColor: string;
   importMapping: FieldMapping;
   importResult: { sourceId: string; message: string } | null;
+  importPersonId: string | null;
+  importOrgId: string | null;
+  people: Person[];
+  orgs: Organization[];
   onImportNameChange: (name: string) => void;
   onImportColorChange: (color: string) => void;
   onImportMappingChange: (mapping: FieldMapping) => void;
+  onImportPersonChange: (personId: string | null) => void;
+  onImportOrgChange: (orgId: string | null) => void;
   onImport: () => void;
   isImporting: boolean;
   importError: Error | null;
@@ -504,6 +560,36 @@ function InlineImportPanel({
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              {/* Person (diary owner) */}
+              <div>
+                <label className="text-xs font-medium text-gray-700 block mb-1">בעל היומן (אישיות)</label>
+                <select
+                  value={importPersonId ?? ''}
+                  onChange={(e) => onImportPersonChange(e.target.value || null)}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">— ללא —</option>
+                  {people.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}{p.organization_name ? ` (${p.organization_name})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Organization */}
+              <div>
+                <label className="text-xs font-medium text-gray-700 block mb-1">ארגון</label>
+                <select
+                  value={importOrgId ?? ''}
+                  onChange={(e) => onImportOrgChange(e.target.value || null)}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">— ללא —</option>
+                  {orgs.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              </div>
+
               {/* Name */}
               <div>
                 <label className="text-xs font-medium text-gray-700 block mb-1">שם המקור</label>

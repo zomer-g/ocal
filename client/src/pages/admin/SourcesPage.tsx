@@ -8,8 +8,12 @@ import {
   getSyncStatus,
   triggerEntityExtraction,
   getSourceEntities,
+  renameEntity,
+  mergeEntities,
+  bulkRenameEntity,
   type SyncStatusResponse,
   type EntityListResponse,
+  type EntityItem,
 } from '@/api/admin';
 import type { DiarySource } from '@/api/sources';
 import {
@@ -28,6 +32,10 @@ import {
   ExternalLink,
   Sparkles,
   Users,
+  Pencil,
+  Merge,
+  Check,
+  X,
 } from 'lucide-react';
 import { formatDateShort } from '@/lib/formatters';
 
@@ -119,9 +127,12 @@ function SourceCard({ source }: { source: DiarySource }) {
       triggerEntityExtraction(id, opts),
     onSuccess: (data) => {
       setExtractionMsg(data.message);
-      setTimeout(() => setExtractionMsg(''), 4000);
-      // Refresh entity list after a short delay
-      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['entities', id] }), 2000);
+      setTimeout(() => setExtractionMsg(''), 8000);
+      queryClient.invalidateQueries({ queryKey: ['entities', id] });
+    },
+    onError: (err: Error) => {
+      setExtractionMsg(`שגיאה: ${err.message}`);
+      setTimeout(() => setExtractionMsg(''), 8000);
     },
   });
 
@@ -146,6 +157,11 @@ function SourceCard({ source }: { source: DiarySource }) {
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
           <span className="text-xs sm:text-sm font-medium text-gray-800 truncate">{name}</span>
+          {source.person_name && (
+            <span className="text-[10px] sm:text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded hidden sm:inline">
+              {source.person_name}
+            </span>
+          )}
           <SyncStatusBadge status={syncStatusStr} />
           <span className="text-[10px] sm:text-xs text-gray-400 hidden sm:inline">{totalEvents} אירועים</span>
         </div>
@@ -297,8 +313,9 @@ function SourceCard({ source }: { source: DiarySource }) {
                 הצג ישויות
               </button>
               {extractionMsg && (
-                <span className="text-xs text-green-600 flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3" /> {extractionMsg}
+                <span className={`text-xs flex items-center gap-1 ${extractionMsg.startsWith('שגיאה') ? 'text-red-600' : 'text-green-600'}`}>
+                  {extractionMsg.startsWith('שגיאה') ? <XCircle className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
+                  {extractionMsg}
                 </span>
               )}
             </div>
@@ -317,6 +334,7 @@ function SourceCard({ source }: { source: DiarySource }) {
             {/* Entity list */}
             {showEntities && (
               <EntityTable
+                sourceId={id}
                 data={entitiesData}
                 isLoading={entitiesLoading}
                 entityType={entityType}
@@ -336,6 +354,7 @@ function SourceCard({ source }: { source: DiarySource }) {
 // Entity table sub-component
 // ─────────────────────────────────────────────
 function EntityTable({
+  sourceId,
   data,
   isLoading,
   entityType,
@@ -343,6 +362,7 @@ function EntityTable({
   page,
   onPageChange,
 }: {
+  sourceId: string;
   data: EntityListResponse | undefined;
   isLoading: boolean;
   entityType: string;
@@ -350,8 +370,14 @@ function EntityTable({
   page: number;
   onPageChange: (p: number) => void;
 }) {
+  const queryClient = useQueryClient();
   const LIMIT = 50;
   const totalPages = Math.ceil((data?.total ?? 0) / LIMIT);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [mergeSelection, setMergeSelection] = useState<Set<string>>(new Set());
+  const [mergeMode, setMergeMode] = useState(false);
+  const [mergeName, setMergeName] = useState('');
 
   const TYPE_LABELS: Record<string, string> = {
     '': 'הכל',
@@ -373,24 +399,98 @@ function EntityTable({
     mentioned: 'הוזכר',
   };
 
+  const renameMut = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => renameEntity(id, name),
+    onSuccess: () => {
+      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: ['entities', sourceId] });
+    },
+  });
+
+  const bulkRenameMut = useMutation({
+    mutationFn: ({ oldName, newName, type }: { oldName: string; newName: string; type?: string }) =>
+      bulkRenameEntity(oldName, newName, type),
+    onSuccess: () => {
+      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: ['entities', sourceId] });
+    },
+  });
+
+  const mergeMut = useMutation({
+    mutationFn: ({ ids, name }: { ids: string[]; name: string }) => mergeEntities(ids, name),
+    onSuccess: () => {
+      setMergeMode(false);
+      setMergeSelection(new Set());
+      setMergeName('');
+      queryClient.invalidateQueries({ queryKey: ['entities', sourceId] });
+    },
+  });
+
+  const startEdit = (entity: EntityItem) => {
+    setEditingId(entity.id);
+    setEditName(entity.entity_name);
+  };
+
+  const toggleMergeSelect = (id: string) => {
+    setMergeSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div className="mt-2 space-y-2">
-      {/* Type filter */}
-      <div className="flex gap-1">
-        {Object.entries(TYPE_LABELS).map(([val, label]) => (
-          <button
-            key={val}
-            onClick={() => onTypeChange(val)}
-            className={`px-2 py-0.5 text-[10px] rounded-full border transition-colors ${
-              entityType === val
-                ? 'bg-primary-600 text-white border-primary-600'
-                : 'border-gray-200 text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      {/* Type filter + merge toggle */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex gap-1">
+          {Object.entries(TYPE_LABELS).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => onTypeChange(val)}
+              className={`px-2 py-0.5 text-[10px] rounded-full border transition-colors ${
+                entityType === val
+                  ? 'bg-primary-600 text-white border-primary-600'
+                  : 'border-gray-200 text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => { setMergeMode(!mergeMode); setMergeSelection(new Set()); }}
+          className={`px-2 py-0.5 text-[10px] rounded-full border transition-colors flex items-center gap-1 ${
+            mergeMode ? 'bg-amber-500 text-white border-amber-500' : 'border-gray-200 text-gray-500 hover:bg-gray-100'
+          }`}
+        >
+          <Merge className="w-3 h-3" />
+          {mergeMode ? 'ביטול מיזוג' : 'מיזוג'}
+        </button>
       </div>
+
+      {/* Merge bar */}
+      {mergeMode && mergeSelection.size >= 2 && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded p-2">
+          <span className="text-xs text-amber-700">{mergeSelection.size} נבחרו</span>
+          <input
+            type="text"
+            value={mergeName}
+            onChange={(e) => setMergeName(e.target.value)}
+            placeholder="שם יעד"
+            className="flex-1 border border-amber-300 rounded px-2 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+          <button
+            onClick={() => mergeMut.mutate({ ids: Array.from(mergeSelection), name: mergeName })}
+            disabled={!mergeName.trim() || mergeMut.isPending}
+            className="px-2 py-0.5 text-xs bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50 flex items-center gap-1"
+          >
+            {mergeMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Merge className="w-3 h-3" />}
+            מזג
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-4">
@@ -404,25 +504,63 @@ function EntityTable({
             <table className="w-full text-xs border border-gray-200 rounded bg-white">
               <thead className="bg-gray-50">
                 <tr>
+                  {mergeMode && <th className="px-1 py-1.5 border-b w-6" />}
                   <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">שם</th>
                   <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">סוג</th>
                   <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">תפקיד</th>
                   <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b hidden sm:table-cell">אירוע</th>
                   <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">שיטה</th>
                   <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">ביטחון</th>
+                  <th className="px-2 py-1.5 border-b w-8" />
                 </tr>
               </thead>
               <tbody>
                 {data.data.map((entity) => (
-                  <tr key={entity.id} className="border-b last:border-b-0 hover:bg-gray-50">
-                    <td className="px-2 py-1.5 text-gray-800 font-medium max-w-[120px] truncate">
-                      <span
-                        className={`inline-flex items-center gap-1 ${entity.entity_id ? 'text-green-700' : 'text-gray-600'}`}
-                        title={entity.entity_id ? 'מזוהה ברשומות' : 'לא מזוהה'}
-                      >
-                        <span className="text-[8px]">{entity.entity_id ? '●' : '○'}</span>
-                        {entity.entity_name}
-                      </span>
+                  <tr key={entity.id} className={`border-b last:border-b-0 hover:bg-gray-50 ${mergeSelection.has(entity.id) ? 'bg-amber-50' : ''}`}>
+                    {mergeMode && (
+                      <td className="px-1 py-1.5">
+                        <input
+                          type="checkbox"
+                          checked={mergeSelection.has(entity.id)}
+                          onChange={() => toggleMergeSelect(entity.id)}
+                          className="rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                      </td>
+                    )}
+                    <td className="px-2 py-1.5 text-gray-800 font-medium max-w-[160px]">
+                      {editingId === entity.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="flex-1 border border-primary-300 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') renameMut.mutate({ id: entity.id, name: editName });
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                          />
+                          <button
+                            onClick={() => renameMut.mutate({ id: entity.id, name: editName })}
+                            disabled={renameMut.isPending}
+                            className="p-0.5 text-green-600 hover:text-green-800"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                          <button onClick={() => setEditingId(null)} className="p-0.5 text-gray-400 hover:text-gray-600">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1 truncate ${entity.entity_id ? 'text-green-700' : 'text-gray-600'}`}
+                          title={entity.entity_id ? 'מזוהה ברשומות' : 'לא מזוהה'}
+                        >
+                          <span className="text-[8px]">{entity.entity_id ? '●' : '○'}</span>
+                          {entity.entity_name}
+                        </span>
+                      )}
                     </td>
                     <td className="px-2 py-1.5 text-gray-500">
                       {entity.entity_type === 'person' ? '👤' : entity.entity_type === 'organization' ? '🏢' : '📍'}
@@ -444,6 +582,17 @@ function EntityTable({
                     </td>
                     <td className="px-2 py-1.5 text-gray-500">
                       {Math.round(entity.confidence * 100)}%
+                    </td>
+                    <td className="px-2 py-1.5">
+                      {editingId !== entity.id && (
+                        <button
+                          onClick={() => startEdit(entity)}
+                          className="p-0.5 text-gray-400 hover:text-primary-600"
+                          title="שנה שם"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

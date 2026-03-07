@@ -280,7 +280,7 @@ export interface EntityListResponse {
 export async function triggerEntityExtraction(
   sourceId: string,
   options: { skip_ai?: boolean; clear_existing?: boolean } = {}
-): Promise<{ source_id: string; message: string }> {
+): Promise<{ source_id: string; message: string; events_processed: number; entities_inserted: number; errors: string[] }> {
   const { data } = await api.post(`/admin/sources/${sourceId}/extract-entities`, options);
   return data;
 }
@@ -290,5 +290,38 @@ export async function getSourceEntities(
   params: { page?: number; limit?: number; type?: string; role?: string; matched_only?: boolean } = {}
 ): Promise<EntityListResponse> {
   const { data } = await api.get(`/admin/sources/${sourceId}/entities`, { params });
+  return data;
+}
+
+// ── Entity Rename & Merge ──
+
+export async function renameEntity(entityId: string, newName: string): Promise<EntityItem> {
+  const { data } = await api.patch(`/admin/sources/entities/${entityId}/rename`, { new_name: newName });
+  return data;
+}
+
+export async function mergeEntities(
+  sourceEntityIds: string[],
+  targetName: string,
+  targetEntityId?: string | null
+): Promise<{ message: string; updated: number; duplicates_removed: number }> {
+  const { data } = await api.post('/admin/sources/entities/merge', {
+    source_entity_ids: sourceEntityIds,
+    target_name: targetName,
+    target_entity_id: targetEntityId,
+  });
+  return data;
+}
+
+export async function bulkRenameEntity(
+  oldName: string,
+  newName: string,
+  entityType?: string
+): Promise<{ message: string; updated: number }> {
+  const { data } = await api.post('/admin/sources/entities/bulk-rename', {
+    old_name: oldName,
+    new_name: newName,
+    entity_type: entityType,
+  });
   return data;
 }

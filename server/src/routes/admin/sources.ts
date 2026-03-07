@@ -104,6 +104,7 @@ adminSourcesRouter.delete('/:id', async (req, res, next) => {
 
 // POST /api/admin/sources/:id/extract-entities
 // Body: { skip_ai?: boolean, clear_existing?: boolean }
+// Synchronous: waits for extraction to complete and returns the result.
 adminSourcesRouter.post('/:id/extract-entities', async (req, res, next) => {
   try {
     const source = await db('diary_sources').where({ id: req.params.id }).first();
@@ -115,16 +116,18 @@ adminSourcesRouter.post('/:id/extract-entities', async (req, res, next) => {
     const skipAI = req.body.skip_ai !== false; // default: skip AI (Stage 1+2 only)
     const clearExisting = req.body.clear_existing === true;
 
-    // Fire-and-forget: respond immediately, extraction runs in background
-    res.status(202).json({ source_id: req.params.id, message: 'Entity extraction started' });
+    const result = await extractEntitiesForSource(req.params.id, { skipAI, clearExisting });
+    logger.info({ sourceId: req.params.id, result }, 'Entity extraction completed');
 
-    extractEntitiesForSource(req.params.id, { skipAI, clearExisting })
-      .then((r) => {
-        logger.info({ sourceId: req.params.id, result: r }, 'Entity extraction completed');
-      })
-      .catch((err) => {
-        logger.warn({ sourceId: req.params.id, err }, 'Entity extraction failed');
-      });
+    res.json({
+      source_id: req.params.id,
+      events_processed: result.eventsProcessed,
+      entities_inserted: result.entitiesInserted,
+      errors: result.errors,
+      message: result.entitiesInserted > 0
+        ? `נחלצו ${result.entitiesInserted} ישויות מתוך ${result.eventsProcessed} אירועים`
+        : `לא נמצאו ישויות ב-${result.eventsProcessed} אירועים`,
+    });
   } catch (err) {
     next(err);
   }
@@ -209,6 +212,143 @@ adminSourcesRouter.get('/:id/entities', async (req, res, next) => {
         matched: Number(stats?.matched_count ?? 0),
         unmatched: Number(stats?.total ?? 0) - Number(stats?.matched_count ?? 0),
       },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────
+// Entity rename & merge routes
+// ─────────────────────────────────────────────
+
+// PATCH /api/admin/sources/entities/:entityId/rename
+// Body: { new_name: string }
+adminSourcesRouter.patch('/entities/:entityId/rename', async (req, res, next) => {
+  try {
+    const { entityId } = req.params;
+    const { new_name } = req.body;
+
+    if (!new_name || typeof new_name !== 'string' || !new_name.trim()) {
+      res.status(400).json({ error: 'new_name is required' });
+      return;
+    }
+
+    const entity = await db('event_entities').where({ id: entityId }).first();
+    if (!entity) {
+      res.status(404).json({ error: 'Entity not found' });
+      return;
+    }
+
+    const [updated] = await db('event_entities')
+      .where({ id: entityId })
+      .update({ entity_name: new_name.trim() })
+      .returning('*');
+
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/sources/entities/merge
+// Body: { source_entity_ids: string[], target_name: string, target_entity_id?: string }
+// Merges multiple entity rows: updates entity_name to target_name, optionally sets entity_id,
+// then removes duplicates (same event_id + entity_type + entity_name + role).
+adminSourcesRouter.post('/entities/merge', async (req, res, next) => {
+  try {
+    const { source_entity_ids, target_name, target_entity_id } = req.body;
+
+    if (!Array.isArray(source_entity_ids) || source_entity_ids.length < 2) {
+      res.status(400).json({ error: 'source_entity_ids must contain at least 2 IDs' });
+      return;
+    }
+    if (!target_name || typeof target_name !== 'string' || !target_name.trim()) {
+      res.status(400).json({ error: 'target_name is required' });
+      return;
+    }
+
+    const result = await db.transaction(async (trx) => {
+      const updatePayload: Record<string, unknown> = { entity_name: target_name.trim() };
+      if (target_entity_id !== undefined) {
+        updatePayload.entity_id = target_entity_id || null;
+      }
+
+      await trx('event_entities')
+        .whereIn('id', source_entity_ids)
+        .update(updatePayload);
+
+      // Remove duplicates: keep the one with highest confidence per unique combo
+      const dupes = await trx.raw(`
+        DELETE FROM event_entities
+        WHERE id IN (
+          SELECT id FROM (
+            SELECT id,
+              ROW_NUMBER() OVER (
+                PARTITION BY event_id, entity_type, entity_name, role
+                ORDER BY confidence DESC, created_at ASC
+              ) as rn
+            FROM event_entities
+            WHERE id = ANY(?)
+          ) sub
+          WHERE rn > 1
+        )
+        RETURNING id
+      `, [source_entity_ids]);
+
+      return {
+        updated: source_entity_ids.length,
+        duplicates_removed: dupes.rows?.length ?? 0,
+      };
+    });
+
+    logger.info({ source_entity_ids, target_name, result }, 'Entity merge completed');
+    res.json({
+      message: `מוזגו ${result.updated} ישויות ל-"${target_name.trim()}"`,
+      ...result,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/sources/entities/bulk-rename
+// Body: { old_name: string, new_name: string, entity_type?: string }
+// Renames all occurrences of an entity name across all sources.
+adminSourcesRouter.post('/entities/bulk-rename', async (req, res, next) => {
+  try {
+    const { old_name, new_name, entity_type } = req.body;
+
+    if (!old_name || !new_name || !old_name.trim() || !new_name.trim()) {
+      res.status(400).json({ error: 'old_name and new_name are required' });
+      return;
+    }
+
+    let query = db('event_entities').where({ entity_name: old_name.trim() });
+    if (entity_type) query = query.where({ entity_type });
+
+    const updated = await query.update({ entity_name: new_name.trim() });
+
+    // Remove any duplicates created by the rename
+    await db.raw(`
+      DELETE FROM event_entities
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+            ROW_NUMBER() OVER (
+              PARTITION BY event_id, entity_type, entity_name, role
+              ORDER BY confidence DESC, created_at ASC
+            ) as rn
+          FROM event_entities
+          WHERE entity_name = ?
+        ) sub
+        WHERE rn > 1
+      )
+    `, [new_name.trim()]);
+
+    res.json({
+      message: `שונו ${updated} רשומות מ-"${old_name}" ל-"${new_name.trim()}"`,
+      updated,
     });
   } catch (err) {
     next(err);
