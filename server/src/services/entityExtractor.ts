@@ -318,6 +318,8 @@ async function stageParticipantParse(
         for (const locPart of locationText.split(SPLIT_RE)) {
           const loc = cleanName(locPart);
           if (loc.length < 2) continue;
+          // Skip URL fragments, emails, numeric-only values
+          if (/^https?:?$/i.test(loc) || /^www\./i.test(loc) || /@/.test(loc) || /^\d+$/.test(loc)) continue;
           const norm = normalizeText(loc.toLowerCase());
 
           // Check organizations (government buildings, ministries)

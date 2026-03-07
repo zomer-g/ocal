@@ -21,10 +21,10 @@ entitiesRouter.get('/', async (req, res, next) => {
       .select(
         'ee.entity_name',
         'ee.entity_type',
-        'ee.entity_id',
+        db.raw('MAX(ee.entity_id::text)::uuid as entity_id'),
         db.raw('COUNT(DISTINCT de.id) as event_count'),
       )
-      .groupBy('ee.entity_name', 'ee.entity_type', 'ee.entity_id');
+      .groupBy('ee.entity_name', 'ee.entity_type');
 
     if (sourceIds && sourceIds.length > 0) {
       query = query.whereIn('de.source_id', sourceIds);
@@ -32,9 +32,6 @@ entitiesRouter.get('/', async (req, res, next) => {
     if (typeFilter) {
       query = query.where('ee.entity_type', typeFilter);
     }
-
-    // Exclude owner role (diary owner appears in every event — not a useful filter)
-    query = query.where('ee.role', '!=', 'owner');
 
     const entities = await query.orderBy('event_count', 'desc').limit(200);
 

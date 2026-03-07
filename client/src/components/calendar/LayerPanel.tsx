@@ -22,6 +22,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
   });
   const entities = entitiesData?.data ?? [];
   const personEntities = entities.filter((e) => e.entity_type === 'person');
+  const orgEntities = entities.filter((e) => e.entity_type === 'organization');
   const placeEntities = entities.filter((e) => e.entity_type === 'place');
 
   // Sort: selected entities first, then by event count
@@ -59,15 +60,15 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
           </div>
           <div className="p-2 space-y-0.5 max-h-40 overflow-y-auto">
             {sortEntities(personEntities).map((entity) => (
-              <label key={entity.entity_name} className="flex items-center gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded">
+              <label key={entity.entity_name} className="flex items-start gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded">
                 <input
                   type="checkbox"
                   checked={selectedEntityNames.includes(entity.entity_name)}
                   onChange={() => toggleEntity(entity.entity_name)}
-                  className="rounded border-gray-300 text-primary-500"
+                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
                 />
-                <span className="truncate">{entity.entity_name}</span>
-                <span className="text-gray-400 mr-auto text-xs">({entity.event_count})</span>
+                <span className="break-words min-w-0">{entity.entity_name}</span>
+                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
               </label>
             ))}
           </div>
@@ -82,15 +83,38 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
           </div>
           <div className="p-2 space-y-0.5 max-h-32 overflow-y-auto">
             {sortEntities(placeEntities).map((entity) => (
-              <label key={entity.entity_name} className="flex items-center gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded">
+              <label key={entity.entity_name} className="flex items-start gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded">
                 <input
                   type="checkbox"
                   checked={selectedEntityNames.includes(entity.entity_name)}
                   onChange={() => toggleEntity(entity.entity_name)}
-                  className="rounded border-gray-300 text-primary-500"
+                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
                 />
-                <span className="truncate">{entity.entity_name}</span>
-                <span className="text-gray-400 mr-auto text-xs">({entity.event_count})</span>
+                <span className="break-words min-w-0">{entity.entity_name}</span>
+                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Organization entities ── */}
+      {orgEntities.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="px-3 py-2 border-b border-gray-100 bg-gray-50/50">
+            <span className="text-xs font-semibold text-gray-600">ארגונים</span>
+          </div>
+          <div className="p-2 space-y-0.5 max-h-32 overflow-y-auto">
+            {sortEntities(orgEntities).map((entity) => (
+              <label key={entity.entity_name} className="flex items-start gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded">
+                <input
+                  type="checkbox"
+                  checked={selectedEntityNames.includes(entity.entity_name)}
+                  onChange={() => toggleEntity(entity.entity_name)}
+                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
+                />
+                <span className="break-words min-w-0">{entity.entity_name}</span>
+                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
               </label>
             ))}
           </div>

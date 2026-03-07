@@ -20,6 +20,7 @@ export function FilterPanel() {
   });
   const entities = entitiesData?.data ?? [];
   const personEntities = entities.filter((e) => e.entity_type === 'person');
+  const orgEntities = entities.filter((e) => e.entity_type === 'organization');
   const placeEntities = entities.filter((e) => e.entity_type === 'place');
 
   // Sort: selected entities first, then by event count
@@ -76,15 +77,36 @@ export function FilterPanel() {
           <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
           <div className="max-h-40 overflow-y-auto space-y-1">
             {sortEntities(personEntities).map((entity) => (
-              <label key={entity.entity_name} className="flex items-center gap-2 text-sm cursor-pointer">
+              <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
                   checked={entity_names.includes(entity.entity_name)}
                   onChange={() => toggleEntity(entity.entity_name)}
-                  className="rounded border-gray-300 text-primary-500"
+                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
                 />
-                <span className="truncate">{entity.entity_name}</span>
-                <span className="text-gray-400 mr-auto text-xs">({entity.event_count})</span>
+                <span className="break-words min-w-0">{entity.entity_name}</span>
+                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      {/* Organizations */}
+      {orgEntities.length > 0 && (
+        <fieldset className="space-y-2">
+          <legend className="text-xs text-gray-500 font-medium">ארגונים</legend>
+          <div className="max-h-32 overflow-y-auto space-y-1">
+            {sortEntities(orgEntities).map((entity) => (
+              <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={entity_names.includes(entity.entity_name)}
+                  onChange={() => toggleEntity(entity.entity_name)}
+                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
+                />
+                <span className="break-words min-w-0">{entity.entity_name}</span>
+                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
               </label>
             ))}
           </div>
@@ -97,15 +119,15 @@ export function FilterPanel() {
           <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
           <div className="max-h-32 overflow-y-auto space-y-1">
             {sortEntities(placeEntities).map((entity) => (
-              <label key={entity.entity_name} className="flex items-center gap-2 text-sm cursor-pointer">
+              <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
                   checked={entity_names.includes(entity.entity_name)}
                   onChange={() => toggleEntity(entity.entity_name)}
-                  className="rounded border-gray-300 text-primary-500"
+                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
                 />
-                <span className="truncate">{entity.entity_name}</span>
-                <span className="text-gray-400 mr-auto text-xs">({entity.event_count})</span>
+                <span className="break-words min-w-0">{entity.entity_name}</span>
+                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
               </label>
             ))}
           </div>
@@ -118,7 +140,7 @@ export function FilterPanel() {
           <legend className="text-xs text-gray-500 font-medium">שכבות</legend>
           <div className="max-h-40 overflow-y-auto space-y-1">
             {sources.map((source) => (
-              <label key={source.id} className="flex items-center gap-2 text-sm cursor-pointer">
+              <label key={source.id} className="flex items-start gap-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
                   checked={source_ids.includes(source.id)}
@@ -128,16 +150,16 @@ export function FilterPanel() {
                       : [...source_ids, source.id];
                     setSourceIds(next);
                   }}
-                  className="rounded border-gray-300"
+                  className="rounded border-gray-300 mt-0.5 shrink-0"
                   aria-label={source.name}
                 />
                 <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
                   style={{ backgroundColor: source.color }}
                   aria-hidden="true"
                 />
-                <span className="truncate">{source.name}</span>
-                <span className="text-gray-400 mr-auto text-xs">({source.total_events})</span>
+                <span className="break-words min-w-0">{source.name}</span>
+                <span className="text-gray-400 mr-auto text-xs shrink-0">({source.total_events})</span>
               </label>
             ))}
           </div>

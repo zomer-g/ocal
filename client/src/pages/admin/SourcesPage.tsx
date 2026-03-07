@@ -128,6 +128,7 @@ function SourceCard({ source }: { source: DiarySource }) {
     onSuccess: (data) => {
       setExtractionMsg(data.message);
       setTimeout(() => setExtractionMsg(''), 8000);
+      setShowEntities(true); // auto-open entity list after extraction
       queryClient.invalidateQueries({ queryKey: ['entities', id] });
     },
     onError: (err: Error) => {
