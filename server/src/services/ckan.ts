@@ -290,14 +290,15 @@ function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<st
   // therefore invisible to the field-mapping heuristic.
   let records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
 
-  // Some Israeli government files start with a merged title row before the actual
-  // column headers. When row 0 is a title, all SheetJS column keys are __EMPTY_N
-  // placeholders. Scan forward (up to 4 rows) to find the real header row.
+  // Some Israeli government files start with one or more merged title rows before
+  // the actual column headers (e.g. "לוז שר רבעון ראשון 2025" spanning all cols).
+  // A title row produces 0–1 real column names; a real header row has ≥ 2.
+  // Scan forward (up to 4 rows) until we find a row with at least 2 named columns.
   for (let headerRow = 1; headerRow <= 4; headerRow++) {
     if (records.length === 0) break;
-    const hasRealHeader = Object.keys(records[0]).some(k => !k.startsWith('__EMPTY'));
-    if (hasRealHeader) break;
-    logger.debug({ sheetName, headerRow }, 'Row 0 has no column names — scanning for header row');
+    const realColumnCount = Object.keys(records[0]).filter(k => !k.startsWith('__EMPTY')).length;
+    if (realColumnCount >= 2) break;
+    logger.debug({ sheetName, headerRow, realColumnCount }, 'Too few real columns — scanning for header row');
     records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', range: headerRow });
   }
 
