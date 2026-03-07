@@ -52,71 +52,75 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
 
   return (
     <div className="space-y-3" role="region" aria-label="סינון תצוגה">
-      {/* ── Person entities ── */}
-      {personEntities.length > 0 && (
+      {/* ── Entities (ישויות) ── */}
+      {(personEntities.length > 0 || orgEntities.length > 0 || placeEntities.length > 0) && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="px-3 py-2 border-b border-gray-100 bg-gray-50/50">
-            <span className="text-xs font-semibold text-gray-600">אנשים</span>
+            <span className="text-xs font-semibold text-gray-600">ישויות</span>
           </div>
-          <div className="p-2 space-y-0.5 max-h-40 overflow-y-auto">
-            {sortEntities(personEntities).map((entity) => (
-              <label key={entity.entity_name} className="flex items-start gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded">
-                <input
-                  type="checkbox"
-                  checked={selectedEntityNames.includes(entity.entity_name)}
-                  onChange={() => toggleEntity(entity.entity_name)}
-                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
-                />
-                <span className="break-words min-w-0">{entity.entity_name}</span>
-                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
+          <div className="p-2 space-y-2 max-h-[300px] overflow-y-auto">
+            {/* אנשים */}
+            {personEntities.length > 0 && (
+              <div>
+                <div className="text-[10px] font-medium text-gray-400 px-2 mb-0.5">אנשים</div>
+                <div className="space-y-0.5">
+                  {sortEntities(personEntities).map((entity) => (
+                    <label key={entity.entity_name} className="flex items-start gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded">
+                      <input
+                        type="checkbox"
+                        checked={selectedEntityNames.includes(entity.entity_name)}
+                        onChange={() => toggleEntity(entity.entity_name)}
+                        className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
+                      />
+                      <span className="break-words min-w-0">{entity.entity_name}</span>
+                      <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
-      {/* ── Place entities ── */}
-      {placeEntities.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="px-3 py-2 border-b border-gray-100 bg-gray-50/50">
-            <span className="text-xs font-semibold text-gray-600">מקומות</span>
-          </div>
-          <div className="p-2 space-y-0.5 max-h-32 overflow-y-auto">
-            {sortEntities(placeEntities).map((entity) => (
-              <label key={entity.entity_name} className="flex items-start gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded">
-                <input
-                  type="checkbox"
-                  checked={selectedEntityNames.includes(entity.entity_name)}
-                  onChange={() => toggleEntity(entity.entity_name)}
-                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
-                />
-                <span className="break-words min-w-0">{entity.entity_name}</span>
-                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
+            {/* ארגונים */}
+            {orgEntities.length > 0 && (
+              <div>
+                <div className="text-[10px] font-medium text-gray-400 px-2 mb-0.5">ארגונים</div>
+                <div className="space-y-0.5">
+                  {sortEntities(orgEntities).map((entity) => (
+                    <label key={entity.entity_name} className="flex items-start gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded">
+                      <input
+                        type="checkbox"
+                        checked={selectedEntityNames.includes(entity.entity_name)}
+                        onChange={() => toggleEntity(entity.entity_name)}
+                        className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
+                      />
+                      <span className="break-words min-w-0">{entity.entity_name}</span>
+                      <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
-      {/* ── Organization entities ── */}
-      {orgEntities.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="px-3 py-2 border-b border-gray-100 bg-gray-50/50">
-            <span className="text-xs font-semibold text-gray-600">ארגונים</span>
-          </div>
-          <div className="p-2 space-y-0.5 max-h-32 overflow-y-auto">
-            {sortEntities(orgEntities).map((entity) => (
-              <label key={entity.entity_name} className="flex items-start gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded">
-                <input
-                  type="checkbox"
-                  checked={selectedEntityNames.includes(entity.entity_name)}
-                  onChange={() => toggleEntity(entity.entity_name)}
-                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
-                />
-                <span className="break-words min-w-0">{entity.entity_name}</span>
-                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
-              </label>
-            ))}
+            {/* מקומות */}
+            {placeEntities.length > 0 && (
+              <div>
+                <div className="text-[10px] font-medium text-gray-400 px-2 mb-0.5">מקומות</div>
+                <div className="space-y-0.5">
+                  {sortEntities(placeEntities).map((entity) => (
+                    <label key={entity.entity_name} className="flex items-start gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded">
+                      <input
+                        type="checkbox"
+                        checked={selectedEntityNames.includes(entity.entity_name)}
+                        onChange={() => toggleEntity(entity.entity_name)}
+                        className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
+                      />
+                      <span className="break-words min-w-0">{entity.entity_name}</span>
+                      <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

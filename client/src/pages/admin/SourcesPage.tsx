@@ -80,7 +80,7 @@ function SourceCard({ source }: { source: DiarySource }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatusResponse | null>(null);
-  const [showEntities, setShowEntities] = useState(false);
+  const [showEntities, setShowEntities] = useState(true);
   const [entityPage, setEntityPage] = useState(1);
   const [entityType, setEntityType] = useState('');
   const [extractionMsg, setExtractionMsg] = useState('');

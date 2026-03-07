@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { RequireAuth } from '@/components/admin/RequireAuth';
@@ -10,8 +10,7 @@ import { DashboardPage } from '@/pages/admin/DashboardPage';
 import { SyncPage } from '@/pages/admin/SyncPage';
 import { SourcesPage } from '@/pages/admin/SourcesPage';
 import { ContentPage } from '@/pages/admin/ContentPage';
-import { PeoplePage } from '@/pages/admin/PeoplePage';
-import { OrgsPage } from '@/pages/admin/OrgsPage';
+import { EntitiesPage } from '@/pages/admin/EntitiesPage';
 
 export default function App() {
   return (
@@ -31,9 +30,11 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="sync" element={<SyncPage />} />
         <Route path="sources" element={<SourcesPage />} />
+        <Route path="entities" element={<EntitiesPage />} />
         <Route path="content" element={<ContentPage />} />
-        <Route path="people" element={<PeoplePage />} />
-        <Route path="organizations" element={<OrgsPage />} />
+        {/* Redirects from old routes */}
+        <Route path="people" element={<Navigate to="/admin/entities" replace />} />
+        <Route path="organizations" element={<Navigate to="/admin/entities" replace />} />
       </Route>
     </Routes>
   );

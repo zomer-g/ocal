@@ -325,3 +325,71 @@ export async function bulkRenameEntity(
   });
   return data;
 }
+
+// ── Global Entity Management ──
+
+export interface GlobalEntity {
+  entity_name: string;
+  entity_type: 'person' | 'organization' | 'place';
+  entity_id: string | null;
+  event_count: number;
+  source_count: number;
+  max_confidence: number;
+  methods: string;
+}
+
+export interface GlobalEntityStats {
+  total_unique: number;
+  person: number;
+  organization: number;
+  place: number;
+}
+
+export interface GlobalEntityListResponse {
+  data: GlobalEntity[];
+  total: number;
+  page: number;
+  limit: number;
+  stats: GlobalEntityStats;
+}
+
+export async function getGlobalEntities(
+  params: { type?: string; search?: string; page?: number; limit?: number } = {}
+): Promise<GlobalEntityListResponse> {
+  const { data } = await api.get('/admin/entities', { params });
+  return data;
+}
+
+export async function deleteEntityByName(
+  entityName: string,
+  entityType: string
+): Promise<{ message: string; deleted: number }> {
+  const { data } = await api.delete('/admin/entities/by-name', {
+    data: { entity_name: entityName, entity_type: entityType },
+  });
+  return data;
+}
+
+export async function globalBulkRenameEntity(
+  oldName: string,
+  newName: string,
+  entityType?: string
+): Promise<{ message: string; updated: number }> {
+  const { data } = await api.post('/admin/entities/bulk-rename', {
+    old_name: oldName,
+    new_name: newName,
+    entity_type: entityType,
+  });
+  return data;
+}
+
+export async function globalMergeEntities(
+  sourceNames: Array<{ name: string; type: string }>,
+  targetName: string
+): Promise<{ message: string; updated: number; duplicates_removed: number }> {
+  const { data } = await api.post('/admin/entities/merge', {
+    source_names: sourceNames,
+    target_name: targetName,
+  });
+  return data;
+}

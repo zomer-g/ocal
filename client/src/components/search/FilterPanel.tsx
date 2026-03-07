@@ -71,65 +71,73 @@ export function FilterPanel() {
         </div>
       </fieldset>
 
-      {/* Persons */}
-      {personEntities.length > 0 && (
+      {/* Entities (ישויות) */}
+      {(personEntities.length > 0 || orgEntities.length > 0 || placeEntities.length > 0) && (
         <fieldset className="space-y-2">
-          <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
-          <div className="max-h-40 overflow-y-auto space-y-1">
-            {sortEntities(personEntities).map((entity) => (
-              <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={entity_names.includes(entity.entity_name)}
-                  onChange={() => toggleEntity(entity.entity_name)}
-                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
-                />
-                <span className="break-words min-w-0">{entity.entity_name}</span>
-                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      )}
+          <legend className="text-xs text-gray-500 font-medium">ישויות</legend>
+          <div className="max-h-64 overflow-y-auto space-y-3">
+            {/* אנשים */}
+            {personEntities.length > 0 && (
+              <div>
+                <div className="text-[10px] font-medium text-gray-400 mb-0.5">אנשים</div>
+                <div className="space-y-1">
+                  {sortEntities(personEntities).map((entity) => (
+                    <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={entity_names.includes(entity.entity_name)}
+                        onChange={() => toggleEntity(entity.entity_name)}
+                        className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
+                      />
+                      <span className="break-words min-w-0">{entity.entity_name}</span>
+                      <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
-      {/* Organizations */}
-      {orgEntities.length > 0 && (
-        <fieldset className="space-y-2">
-          <legend className="text-xs text-gray-500 font-medium">ארגונים</legend>
-          <div className="max-h-32 overflow-y-auto space-y-1">
-            {sortEntities(orgEntities).map((entity) => (
-              <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={entity_names.includes(entity.entity_name)}
-                  onChange={() => toggleEntity(entity.entity_name)}
-                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
-                />
-                <span className="break-words min-w-0">{entity.entity_name}</span>
-                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      )}
+            {/* ארגונים */}
+            {orgEntities.length > 0 && (
+              <div>
+                <div className="text-[10px] font-medium text-gray-400 mb-0.5">ארגונים</div>
+                <div className="space-y-1">
+                  {sortEntities(orgEntities).map((entity) => (
+                    <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={entity_names.includes(entity.entity_name)}
+                        onChange={() => toggleEntity(entity.entity_name)}
+                        className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
+                      />
+                      <span className="break-words min-w-0">{entity.entity_name}</span>
+                      <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
-      {/* Places */}
-      {placeEntities.length > 0 && (
-        <fieldset className="space-y-2">
-          <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
-          <div className="max-h-32 overflow-y-auto space-y-1">
-            {sortEntities(placeEntities).map((entity) => (
-              <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={entity_names.includes(entity.entity_name)}
-                  onChange={() => toggleEntity(entity.entity_name)}
-                  className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
-                />
-                <span className="break-words min-w-0">{entity.entity_name}</span>
-                <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
-              </label>
-            ))}
+            {/* מקומות */}
+            {placeEntities.length > 0 && (
+              <div>
+                <div className="text-[10px] font-medium text-gray-400 mb-0.5">מקומות</div>
+                <div className="space-y-1">
+                  {sortEntities(placeEntities).map((entity) => (
+                    <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={entity_names.includes(entity.entity_name)}
+                        onChange={() => toggleEntity(entity.entity_name)}
+                        className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
+                      />
+                      <span className="break-words min-w-0">{entity.entity_name}</span>
+                      <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </fieldset>
       )}
