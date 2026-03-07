@@ -59,9 +59,12 @@ export interface DiaryEvent {
   event_date: string;
   created_at: string;
   updated_at: string;
+  // Match group
+  match_group_id?: string | null;
   // Populated fields
   source_name?: string;
   source_color?: string;
+  match_count?: number | null;
 }
 
 export interface DiaryException {

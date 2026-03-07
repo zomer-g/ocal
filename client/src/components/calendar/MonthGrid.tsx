@@ -145,7 +145,16 @@ export function MonthGrid({ date, events, eventCounts, onDateClick, onEventClick
                           }
                         }}
                       >
-                        {event.title}
+                        <span className="flex items-center gap-0.5">
+                          {(event.match_count ?? 0) > 1 && (
+                            <span
+                              className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"
+                              title={`מופיע ב-${event.match_count} יומנים`}
+                              aria-label={`מופיע ב-${event.match_count} יומנים`}
+                            />
+                          )}
+                          <span className="truncate">{event.title}</span>
+                        </span>
                       </div>
                     );
                   })}

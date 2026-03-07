@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, MapPin, Users, CalendarDays, ChevronDown, ChevronUp, ExternalLink, Tag } from 'lucide-react';
+import { Clock, MapPin, Users, CalendarDays, ChevronDown, ChevronUp, ExternalLink, Tag, BookOpen } from 'lucide-react';
 import type { DiaryEvent } from '@/api/events';
-import { getEventEntities } from '@/api/events';
+import { getEventEntities, getEventMatches } from '@/api/events';
 import { formatTime } from '@/lib/formatters';
 import { useCalendarStore } from '@/stores/calendarStore';
 import { useFilterStore } from '@/stores/filterStore';
@@ -38,6 +38,15 @@ export function EventCard({ event }: EventCardProps) {
     staleTime: 5 * 60 * 1000,
   });
   const entities = entitiesData?.data ?? [];
+
+  // Fetch matches only when expanded and match_group_id exists
+  const { data: matchesData } = useQuery({
+    queryKey: ['event-matches', event.id],
+    queryFn: () => getEventMatches(event.id),
+    enabled: expanded && !!event.match_group_id,
+    staleTime: 5 * 60 * 1000,
+  });
+  const matchedEvents = matchesData?.matched_events ?? [];
 
   const personEntities = entities.filter((e) => e.entity_type === 'person');
   const orgEntities = entities.filter((e) => e.entity_type === 'organization');
@@ -115,7 +124,14 @@ export function EventCard({ event }: EventCardProps) {
               )}
             </div>
 
-            <div className="mt-2 text-sm text-gray-500">{event.source_name || event.dataset_name}</div>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-sm text-gray-500">{event.source_name || event.dataset_name}</span>
+              {(event.match_count ?? 0) > 1 && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
+                  {event.match_count} יומנים
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -177,6 +193,36 @@ export function EventCard({ event }: EventCardProps) {
                     </div>
                   ) : null
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Matched events from other diaries */}
+          {matchedEvents.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <BookOpen className="w-3.5 h-3.5 text-amber-500" aria-hidden="true" />
+                <span className="text-xs font-semibold text-amber-700">
+                  מופיע גם ב-{matchedEvents.length} יומנים נוספים
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {matchedEvents.map((me) => (
+                  <div key={me.id} className="flex items-start gap-2 text-sm">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
+                      style={{ backgroundColor: me.source_color || '#06607C' }}
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-gray-700 font-medium text-xs">{me.source_name}</div>
+                      <div className="text-gray-500 text-xs truncate">{me.title}</div>
+                      {me.location && (
+                        <div className="text-gray-400 text-xs truncate">{me.location}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

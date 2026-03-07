@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatTime, formatHebrewDate } from '@/lib/formatters';
-import { X, MapPin, Users, Clock, ExternalLink, Calendar, Tag } from 'lucide-react';
+import { X, MapPin, Users, Clock, ExternalLink, Calendar, Tag, BookOpen } from 'lucide-react';
 import type { DiaryEvent } from '@/api/events';
-import { getEventEntities } from '@/api/events';
+import { getEventEntities, getEventMatches } from '@/api/events';
 import { useCalendarStore } from '@/stores/calendarStore';
 
 interface EventDetailModalProps {
@@ -37,6 +37,15 @@ export function EventDetailModal({ event, onClose }: EventDetailModalProps) {
     staleTime: 5 * 60 * 1000,
   });
   const entities = entitiesData?.data ?? [];
+
+  // Fetch matches only when match_group_id exists
+  const { data: matchesData } = useQuery({
+    queryKey: ['event-matches', event.id],
+    queryFn: () => getEventMatches(event.id),
+    enabled: !!event.match_group_id,
+    staleTime: 5 * 60 * 1000,
+  });
+  const matchedEvents = matchesData?.matched_events ?? [];
 
   // Group entities by type
   const personEntities = entities.filter((e) => e.entity_type === 'person');
@@ -110,7 +119,14 @@ export function EventDetailModal({ event, onClose }: EventDetailModalProps) {
         {/* Header */}
         <div className="flex items-start justify-between p-4 pb-2">
           <div className="flex-1 min-w-0">
-            <h2 id="event-modal-title" className="text-lg font-bold text-gray-900 leading-tight">{event.title}</h2>
+            <div className="flex items-center gap-2">
+              <h2 id="event-modal-title" className="text-lg font-bold text-gray-900 leading-tight">{event.title}</h2>
+              {(event.match_count ?? 0) > 1 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium shrink-0">
+                  {event.match_count} יומנים
+                </span>
+              )}
+            </div>
           </div>
           <button
             ref={closeRef}
@@ -206,6 +222,36 @@ export function EventDetailModal({ event, onClose }: EventDetailModalProps) {
                     </div>
                   ) : null
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Matched events from other diaries */}
+          {matchedEvents.length > 0 && (
+            <div className="border-t pt-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <BookOpen className="w-3.5 h-3.5 text-amber-500" aria-hidden="true" />
+                <span className="text-xs font-semibold text-amber-700">
+                  מופיע גם ב-{matchedEvents.length} יומנים נוספים
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {matchedEvents.map((me) => (
+                  <div key={me.id} className="flex items-start gap-2 text-sm">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
+                      style={{ backgroundColor: me.source_color || '#06607C' }}
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-gray-700 font-medium text-xs">{me.source_name}</div>
+                      <div className="text-gray-500 text-xs truncate">{me.title}</div>
+                      {me.location && (
+                        <div className="text-gray-400 text-xs truncate">{me.location}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

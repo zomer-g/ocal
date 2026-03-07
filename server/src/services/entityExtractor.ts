@@ -164,7 +164,7 @@ function cleanName(s: string): string {
 }
 
 /** Word-level Jaccard similarity (0–1) */
-function jaccard(a: string, b: string): number {
+export function jaccard(a: string, b: string): number {
   const setA = new Set(a.split(/\s+/));
   const setB = new Set(b.split(/\s+/));
   if (setA.size === 0 && setB.size === 0) return 1;

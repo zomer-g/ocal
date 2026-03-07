@@ -51,6 +51,17 @@ export function EventBlock({ event, top, height, column = 0, totalColumns = 1, o
       aria-label={`${event.title}, ${formatTime(event.start_time)}`}
       onKeyDown={handleKeyDown}
     >
+      {/* Match count badge */}
+      {(event.match_count ?? 0) > 1 && (
+        <div
+          className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center z-10 shadow-sm"
+          title={`מופיע ב-${event.match_count} יומנים`}
+          aria-label={`מופיע ב-${event.match_count} יומנים`}
+        >
+          {event.match_count}
+        </div>
+      )}
+
       {isCompact ? (
         <div className="text-xs font-medium truncate leading-tight" style={{ color }}>
           {formatTime(event.start_time)} {event.title}
@@ -88,6 +99,11 @@ export function EventBlock({ event, top, height, column = 0, totalColumns = 1, o
               )}
               {event.participants && (
                 <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">{event.participants}</div>
+              )}
+              {(event.match_count ?? 0) > 1 && (
+                <div className="text-xs text-amber-600 mt-0.5 font-medium">
+                  מופיע ב-{event.match_count} יומנים
+                </div>
               )}
               {event.source_name && (
                 <div className="text-xs text-gray-400 mt-1.5 border-t pt-1">

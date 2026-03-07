@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../config/database.js';
 import { extractEntitiesForSource } from '../../services/entityExtractor.js';
+import { findMatchesForSource } from '../../services/eventMatcher.js';
 import { logger } from '../../utils/logger.js';
 
 export const adminSourcesRouter = Router();
@@ -140,6 +141,34 @@ adminSourcesRouter.post('/:id/deduplicate', async (req, res, next) => {
 
     logger.info({ sourceId: req.params.id, deleted }, 'Deduplicated events');
     res.json({ deleted, message: `הוסרו ${deleted} אירועים כפולים` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─────────────────────────────────────────────
+// Event matching routes
+// ─────────────────────────────────────────────
+
+// POST /api/admin/sources/:id/find-matches
+adminSourcesRouter.post('/:id/find-matches', async (req, res, next) => {
+  try {
+    const source = await db('diary_sources').where({ id: req.params.id }).first();
+    if (!source) {
+      res.status(404).json({ error: 'Source not found' });
+      return;
+    }
+
+    const result = await findMatchesForSource(req.params.id, { isResync: true });
+    logger.info({ sourceId: req.params.id, result }, 'Manual event matching completed');
+
+    res.json({
+      source_id: req.params.id,
+      matches_found: result.matchesFound,
+      groups_created: result.groupsCreated,
+      groups_updated: result.groupsUpdated,
+      message: `נמצאו ${result.matchesFound} התאמות בין יומנים`,
+    });
   } catch (err) {
     next(err);
   }

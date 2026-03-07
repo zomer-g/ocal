@@ -31,8 +31,10 @@ export interface DiaryEvent {
   dataset_name: string;
   dataset_link: string | null;
   event_date: string;
+  match_group_id?: string | null;
   source_name?: string;
   source_color?: string;
+  match_count?: number | null;
   other_fields?: Record<string, unknown> | null;
 }
 
@@ -79,5 +81,34 @@ export async function getPublicEntities(sourceIds?: string[]): Promise<{ data: P
   const params: Record<string, string> = {};
   if (sourceIds?.length) params.source_ids = sourceIds.join(',');
   const { data } = await api.get('/public/entities', { params });
+  return data;
+}
+
+// ── Event Matches ──
+
+export interface MatchedEvent {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string | null;
+  location: string | null;
+  participants: string | null;
+  event_date: string;
+  source_name: string;
+  source_color: string;
+}
+
+export interface EventMatchesResponse {
+  match_group: {
+    id: string;
+    event_date: string;
+    common_title: string;
+    total_events: number;
+  } | null;
+  matched_events: MatchedEvent[];
+}
+
+export async function getEventMatches(eventId: string): Promise<EventMatchesResponse> {
+  const { data } = await api.get(`/public/events/${eventId}/matches`);
   return data;
 }

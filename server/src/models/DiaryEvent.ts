@@ -22,10 +22,11 @@ export const DiaryEventModel = {
       .where('e.is_active', true)
       .where('s.is_enabled', true);
 
-    const selectCols = [
+    const selectCols: (string | ReturnType<typeof db.raw>)[] = [
       'e.*',
       's.name as source_name',
       's.color as source_color',
+      db.raw('(SELECT total_events FROM similar_events WHERE id = e.match_group_id) as match_count'),
     ];
 
     // Full-text search
@@ -104,7 +105,12 @@ export const DiaryEventModel = {
   async findByDateRange(from: string, to: string, sourceIds?: string[], entityNames?: string[]) {
     let query = db(TABLE + ' as e')
       .join('diary_sources as s', 'e.source_id', 's.id')
-      .select('e.*', 's.name as source_name', 's.color as source_color')
+      .select(
+        'e.*',
+        's.name as source_name',
+        's.color as source_color',
+        db.raw('(SELECT total_events FROM similar_events WHERE id = e.match_group_id) as match_count'),
+      )
       .where('e.is_active', true)
       .where('s.is_enabled', true)
       .where('e.event_date', '>=', from)

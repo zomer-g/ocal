@@ -489,6 +489,14 @@ export async function processSource(
       .then((r) => logger.info({ sourceId, entities: r.entitiesInserted }, 'Entity extraction done'))
       .catch((err) => logger.warn({ sourceId, err }, 'Entity extraction failed (non-fatal)'));
 
+    // ── Step 6: Find cross-diary event matches in background ──
+    import('./eventMatcher.js')
+      .then(({ findMatchesForSource }) =>
+        findMatchesForSource(sourceId, { isResync })
+      )
+      .then((r) => logger.info({ sourceId, matches: r.matchesFound }, 'Event matching done'))
+      .catch((err) => logger.warn({ sourceId, err }, 'Event matching failed (non-fatal)'));
+
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     result.errors.push(errMsg);

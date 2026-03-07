@@ -83,3 +83,47 @@ eventsRouter.get('/:id/entities', async (req, res, next) => {
     next(err);
   }
 });
+
+// GET /api/public/events/:id/matches
+eventsRouter.get('/:id/matches', async (req, res, next) => {
+  try {
+    const event = await db('diary_events').where({ id: req.params.id }).first();
+    if (!event || !event.match_group_id) {
+      res.json({ match_group: null, matched_events: [] });
+      return;
+    }
+
+    const matchGroup = await db('similar_events')
+      .where({ id: event.match_group_id })
+      .first();
+    if (!matchGroup) {
+      res.json({ match_group: null, matched_events: [] });
+      return;
+    }
+
+    const matchedEvents = await db('diary_events as e')
+      .join('diary_sources as s', 'e.source_id', 's.id')
+      .where('e.match_group_id', matchGroup.id)
+      .whereNot('e.id', req.params.id)
+      .where('e.is_active', true)
+      .where('s.is_enabled', true)
+      .select(
+        'e.id', 'e.title', 'e.start_time', 'e.end_time',
+        'e.location', 'e.participants', 'e.event_date',
+        's.name as source_name', 's.color as source_color',
+      )
+      .orderBy('s.name');
+
+    res.json({
+      match_group: {
+        id: matchGroup.id,
+        event_date: matchGroup.event_date,
+        common_title: matchGroup.common_title,
+        total_events: matchGroup.total_events,
+      },
+      matched_events: matchedEvents,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
