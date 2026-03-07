@@ -1,8 +1,15 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useFilterStore } from '@/stores/filterStore';
 import { useSources } from '@/hooks/useSources';
 import { HebrewDateInput } from '@/components/shared/HebrewDateInput';
 import { getPublicEntities } from '@/api/events';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+
+const HEBREW_MONTHS = [
+  'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+  'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
+];
 
 export function FilterPanel() {
   const {
@@ -11,6 +18,61 @@ export function FilterPanel() {
   } = useFilterStore();
   const { data: sourcesData } = useSources();
   const sources = sourcesData?.data ?? [];
+
+  // ── Year/month accordion state ──
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
+
+  // Derive available year range from sources
+  const minDate = sources.reduce((min, s) => {
+    if (!s.first_event_date) return min;
+    return !min || s.first_event_date < min ? s.first_event_date : min;
+  }, '');
+  const maxDate = sources.reduce((max, s) => {
+    if (!s.last_event_date) return max;
+    return !max || s.last_event_date > max ? s.last_event_date : max;
+  }, '');
+
+  const minYear = minDate ? new Date(minDate + 'T12:00:00').getFullYear() : new Date().getFullYear();
+  const maxYear = maxDate ? new Date(maxDate + 'T12:00:00').getFullYear() : new Date().getFullYear();
+  const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => maxYear - i);
+
+  const selectYear = (year: number) => {
+    setDateRange(`${year}-01-01`, `${year}-12-31`);
+  };
+
+  const selectMonth = (year: number, month: number) => {
+    const firstDay = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).toISOString().split('T')[0];
+    setDateRange(firstDay, lastDay);
+  };
+
+  const toggleYear = (year: number) => {
+    setExpandedYears((prev) => {
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year);
+      else next.add(year);
+      return next;
+    });
+  };
+
+  // Detect currently selected year / month
+  const activeYear = (() => {
+    if (!from_date || !to_date) return null;
+    const y = new Date(from_date + 'T12:00:00').getFullYear();
+    if (from_date === `${y}-01-01` && to_date === `${y}-12-31`) return y;
+    return null;
+  })();
+
+  const activeMonth = (() => {
+    if (!from_date || !to_date) return null;
+    const d = new Date(from_date + 'T12:00:00');
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const firstDay = `${y}-${String(m).padStart(2, '0')}-01`;
+    const lastDay = new Date(y, m, 0).toISOString().split('T')[0];
+    if (from_date === firstDay && to_date === lastDay) return { year: y, month: m };
+    return null;
+  })();
 
   // Fetch entities for current source selection
   const { data: entitiesData } = useQuery({
@@ -23,7 +85,6 @@ export function FilterPanel() {
   const orgEntities = entities.filter((e) => e.entity_type === 'organization');
   const placeEntities = entities.filter((e) => e.entity_type === 'place');
 
-  // Sort: selected entities first, then by event count
   const sortEntities = (list: typeof entities) => {
     return [...list].sort((a, b) => {
       const aSelected = entity_names.includes(a.entity_name) ? 1 : 0;
@@ -44,9 +105,77 @@ export function FilterPanel() {
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4" role="region" aria-label="סינון תוצאות">
       <h3 className="text-sm font-semibold text-gray-700">סינון</h3>
 
-      {/* Date range */}
+      {/* ── Year / Month quick filter ── */}
+      {years.length > 0 && (
+        <fieldset className="space-y-1">
+          <legend className="text-xs text-gray-500 font-medium mb-1">שנה / חודש</legend>
+          <div className="max-h-56 overflow-y-auto space-y-0.5">
+            {years.map((year) => {
+              const isExpanded = expandedYears.has(year);
+              const isActiveYear = activeYear === year;
+              return (
+                <div key={year}>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => toggleYear(year)}
+                      className="p-0.5 text-gray-400 hover:text-gray-600 shrink-0"
+                      aria-label={isExpanded ? `כווץ ${year}` : `הרחב ${year}`}
+                    >
+                      {isExpanded
+                        ? <ChevronDown className="w-3 h-3" />
+                        : <ChevronRight className="w-3 h-3" />}
+                    </button>
+                    <button
+                      onClick={() => selectYear(year)}
+                      className={`text-xs px-2 py-0.5 rounded transition-colors flex-1 text-right ${
+                        isActiveYear
+                          ? 'bg-primary-100 text-primary-700 font-semibold'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      {year}
+                    </button>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="mr-5 grid grid-cols-3 gap-0.5 mt-0.5">
+                      {HEBREW_MONTHS.map((monthName, idx) => {
+                        const m = idx + 1;
+                        const isActiveM = activeMonth?.year === year && activeMonth.month === m;
+                        return (
+                          <button
+                            key={m}
+                            onClick={() => selectMonth(year, m)}
+                            className={`text-xs px-1.5 py-1 rounded transition-colors text-center ${
+                              isActiveM
+                                ? 'bg-primary-100 text-primary-700 font-medium'
+                                : 'text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            {monthName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {(from_date || to_date) && (
+            <button
+              onClick={() => setDateRange('', '')}
+              className="text-[10px] text-gray-400 hover:text-gray-600 underline mt-0.5"
+            >
+              נקה סינון תאריך
+            </button>
+          )}
+        </fieldset>
+      )}
+
+      {/* Date range (custom) */}
       <fieldset className="space-y-2">
-        <legend className="text-xs text-gray-500 font-medium">טווח תאריכים</legend>
+        <legend className="text-xs text-gray-500 font-medium">טווח תאריכים מותאם</legend>
         <div className="space-y-1.5">
           <div className="space-y-1">
             <label htmlFor="filter-from-date" className="text-xs text-gray-600">מתאריך</label>
@@ -76,7 +205,6 @@ export function FilterPanel() {
         <fieldset className="space-y-2">
           <legend className="text-xs text-gray-500 font-medium">ישויות</legend>
           <div className="max-h-64 overflow-y-auto space-y-3">
-            {/* אנשים */}
             {personEntities.length > 0 && (
               <div>
                 <div className="text-[10px] font-medium text-gray-400 mb-0.5">אנשים</div>
@@ -96,8 +224,6 @@ export function FilterPanel() {
                 </div>
               </div>
             )}
-
-            {/* ארגונים */}
             {orgEntities.length > 0 && (
               <div>
                 <div className="text-[10px] font-medium text-gray-400 mb-0.5">ארגונים</div>
@@ -117,8 +243,6 @@ export function FilterPanel() {
                 </div>
               </div>
             )}
-
-            {/* מקומות */}
             {placeEntities.length > 0 && (
               <div>
                 <div className="text-[10px] font-medium text-gray-400 mb-0.5">מקומות</div>
