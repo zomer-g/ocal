@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   discoverDatasets,
@@ -93,6 +93,8 @@ export function SyncPage() {
       setImportMapping(data.suggested_mapping);
       setImportColor(SOURCE_COLORS[Math.floor(Math.random() * SOURCE_COLORS.length)]);
       setImportResult(null);
+      setImportPersonId(null);   // clear previous selection so suggestion chip is shown fresh
+      setImportOrgId(null);
     },
   });
 
@@ -424,14 +426,6 @@ function InlineImportPanel({
     [people, diaryTitle]
   );
   const bestMatch = scoredPeople.length > 0 && scoredPeople[0].score >= 0.5 ? scoredPeople[0] : null;
-
-  // Auto-select best match when the panel first opens and no person is chosen yet
-  useEffect(() => {
-    if (importPersonId === null && bestMatch) {
-      onImportPersonChange(bestMatch.id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bestMatch?.id]);
 
   return (
     <div className="bg-blue-50 border-t border-blue-100 px-3 sm:px-4 py-4 space-y-4">
