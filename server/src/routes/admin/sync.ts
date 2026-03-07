@@ -127,33 +127,57 @@ adminSyncRouter.post('/import', validate(importSchema, 'body'), async (req, res,
     const resource = await ckan.getResource(body.resource_id);
     const pkg = await ckan.getPackage(resource.package_id);
 
-    // Register the source via System 2
-    const sourceId = await registerSource({
-      resourceId: body.resource_id,
-      datasetId: body.dataset_id,
-      name: body.name,
-      color: body.color,
-      fieldMapping: body.field_mapping,
-      mappingMethod: 'manual',
-      mappingConfidence: 1.0,
-      format: resource.format.toUpperCase(),
-      fetchMethod: resource.datastore_active ? 'datastore' : 'file_download',
-      personId: body.person_id || undefined,
-      organizationId: body.organization_id || undefined,
-      ckanMetadata: {
-        datasetTitle: pkg.title,
-        resourceName: resource.name,
-        resourceUrl: resource.url,
-        datasetUrl: `${ckan.SUPPORTED_FORMATS ? '' : ''}https://www.odata.org.il/dataset/${pkg.id}`,
-        organization: pkg.organization?.title || null,
-        lastModified: resource.last_modified,
-      },
-    });
+    const ckanMetadata = {
+      datasetTitle: pkg.title,
+      resourceName: resource.name,
+      resourceUrl: resource.url,
+      datasetUrl: `https://www.odata.org.il/dataset/${pkg.id}`,
+      organization: pkg.organization?.title || null,
+      lastModified: resource.last_modified,
+    };
 
-    logger.info({ sourceId, resourceId: body.resource_id }, 'Source registered, starting processing');
+    // If this resource is already registered, update the existing source in-place
+    // (user confirmed re-import via the "already imported" warning in the UI).
+    const existing = await db('diary_sources').where({ resource_id: body.resource_id }).first();
+
+    let sourceId: string;
+    let isResync = false;
+
+    if (existing) {
+      await db('diary_sources').where({ id: existing.id }).update({
+        name: body.name,
+        color: body.color,
+        field_mapping: JSON.stringify(body.field_mapping),
+        person_id: body.person_id || null,
+        organization_id: body.organization_id || null,
+        sync_status: 'pending',
+        sync_error: null,
+        ckan_metadata: JSON.stringify(ckanMetadata),
+      });
+      sourceId = existing.id;
+      isResync = true;
+      logger.info({ sourceId, resourceId: body.resource_id }, 'Source updated, starting re-sync');
+    } else {
+      sourceId = await registerSource({
+        resourceId: body.resource_id,
+        datasetId: body.dataset_id,
+        name: body.name,
+        color: body.color,
+        fieldMapping: body.field_mapping,
+        mappingMethod: 'manual',
+        mappingConfidence: 1.0,
+        format: resource.format.toUpperCase(),
+        fetchMethod: resource.datastore_active && !['XLS', 'XLSX'].includes(resource.format.toUpperCase())
+          ? 'datastore' : 'file_download',
+        personId: body.person_id || undefined,
+        organizationId: body.organization_id || undefined,
+        ckanMetadata,
+      });
+      logger.info({ sourceId, resourceId: body.resource_id }, 'Source registered, starting processing');
+    }
 
     // Start processing in background (don't await)
-    processSource(sourceId)
+    processSource(sourceId, { isResync })
       .then(result => {
         logger.info({ sourceId, created: result.recordsCreated, fetched: result.recordsFetched }, 'Import complete');
       })
@@ -163,7 +187,7 @@ adminSyncRouter.post('/import', validate(importSchema, 'body'), async (req, res,
 
     res.status(202).json({
       source_id: sourceId,
-      message: 'Import started — processing in background',
+      message: isResync ? 'Re-import started — replacing existing data' : 'Import started — processing in background',
     });
   } catch (err) {
     next(err);

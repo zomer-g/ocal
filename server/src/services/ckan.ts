@@ -290,7 +290,12 @@ function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<st
   // therefore invisible to the field-mapping heuristic.
   const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
 
-  const fields = records.length > 0 ? Object.keys(records[0]).map(normalizeKey).filter(Boolean) : [];
+  // Derive fields from the first record.  filter(Boolean) drops empty strings;
+  // the __EMPTY* check drops SheetJS placeholder keys generated for blank
+  // header cells (trailing formatting-only columns, etc.).
+  const fields = records.length > 0
+    ? Object.keys(records[0]).map(normalizeKey).filter(k => k && !k.startsWith('__EMPTY'))
+    : [];
 
   // Normalize field names in every record so they match the extracted field list.
   // Also skip SheetJS placeholder keys (__EMPTY, __EMPTY_1, …) that appear when
