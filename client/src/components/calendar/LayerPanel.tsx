@@ -66,13 +66,12 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
   });
   const entities = entitiesData?.data ?? [];
 
-  // Sort purely by event_count descending
   const byCount = (list: typeof entities) =>
     [...list].sort((a, b) => Number(b.event_count) - Number(a.event_count));
 
   const personEntities = byCount(entities.filter((e) => e.entity_type === 'person'));
-  const orgEntities = byCount(entities.filter((e) => e.entity_type === 'organization'));
-  const placeEntities = byCount(entities.filter((e) => e.entity_type === 'place'));
+  const orgEntities    = byCount(entities.filter((e) => e.entity_type === 'organization'));
+  const placeEntities  = byCount(entities.filter((e) => e.entity_type === 'place'));
 
   const toggleEntity = (name: string) => {
     const next = selectedEntityNames.includes(name)
@@ -82,18 +81,29 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
   };
 
   const handleToggleAll = () => {
-    if (allEnabled) {
-      setAllSources([], false);
-    } else {
-      setAllSources(sources.map((s) => s.id), true);
-    }
+    if (allEnabled) setAllSources([], false);
+    else setAllSources(sources.map((s) => s.id), true);
   };
+
+  // Shared entity row renderer
+  const EntityRow = ({ name, count }: { name: string; count: number }) => (
+    <label className="flex items-start gap-2 text-sm cursor-pointer">
+      <input
+        type="checkbox"
+        checked={selectedEntityNames.includes(name)}
+        onChange={() => toggleEntity(name)}
+        className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
+      />
+      <span className="break-words min-w-0">{name}</span>
+      <span className="text-gray-400 mr-auto text-xs shrink-0">({count})</span>
+    </label>
+  );
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4" role="region" aria-label="סינון תצוגה">
       <h3 className="text-sm font-semibold text-gray-700">סינון</h3>
 
-      {/* ── Year / Month ── */}
+      {/* ── שנה / חודש ── */}
       {years.length > 0 && (
         <fieldset className="space-y-1">
           <legend className="text-xs text-gray-500 font-medium mb-1">שנה / חודש</legend>
@@ -109,22 +119,17 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                       className="p-0.5 text-gray-400 hover:text-gray-600 shrink-0"
                       aria-label={isExpanded ? `כווץ ${year}` : `הרחב ${year}`}
                     >
-                      {isExpanded
-                        ? <ChevronDown className="w-3 h-3" />
-                        : <ChevronRight className="w-3 h-3" />}
+                      {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                     </button>
                     <button
                       onClick={() => selectYear(year)}
                       className={`text-xs px-2 py-0.5 rounded transition-colors flex-1 text-right ${
-                        isActiveYear
-                          ? 'bg-primary-100 text-primary-700 font-semibold'
-                          : 'text-gray-700 hover:bg-gray-100'
+                        isActiveYear ? 'bg-primary-100 text-primary-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'
                       }`}
                     >
                       {year}
                     </button>
                   </div>
-
                   {isExpanded && (
                     <div className="mr-5 grid grid-cols-3 gap-0.5 mt-0.5">
                       {HEBREW_MONTHS.map((monthName, idx) => {
@@ -135,9 +140,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                             key={m}
                             onClick={() => selectMonth(year, m)}
                             className={`text-xs px-1.5 py-1 rounded transition-colors text-center ${
-                              isActiveM
-                                ? 'bg-primary-100 text-primary-700 font-medium'
-                                : 'text-gray-600 hover:bg-gray-100'
+                              isActiveM ? 'bg-primary-100 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
                             }`}
                           >
                             {monthName}
@@ -153,79 +156,37 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
         </fieldset>
       )}
 
-      {/* ── Entities ── */}
-      {(personEntities.length > 0 || orgEntities.length > 0 || placeEntities.length > 0) && (
-        <fieldset className="space-y-2">
-          <legend className="text-xs text-gray-500 font-medium">ישויות</legend>
-          <div className="max-h-64 overflow-y-auto space-y-3">
-
-            {/* אנשים */}
-            {personEntities.length > 0 && (
-              <div>
-                <div className="text-[10px] font-medium text-gray-400 mb-0.5">אנשים</div>
-                <div className="space-y-1">
-                  {personEntities.map((entity) => (
-                    <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedEntityNames.includes(entity.entity_name)}
-                        onChange={() => toggleEntity(entity.entity_name)}
-                        className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
-                      />
-                      <span className="break-words min-w-0">{entity.entity_name}</span>
-                      <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ארגונים */}
-            {orgEntities.length > 0 && (
-              <div>
-                <div className="text-[10px] font-medium text-gray-400 mb-0.5">ארגונים</div>
-                <div className="space-y-1">
-                  {orgEntities.map((entity) => (
-                    <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedEntityNames.includes(entity.entity_name)}
-                        onChange={() => toggleEntity(entity.entity_name)}
-                        className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
-                      />
-                      <span className="break-words min-w-0">{entity.entity_name}</span>
-                      <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* מקומות */}
-            {placeEntities.length > 0 && (
-              <div>
-                <div className="text-[10px] font-medium text-gray-400 mb-0.5">מקומות</div>
-                <div className="space-y-1">
-                  {placeEntities.map((entity) => (
-                    <label key={entity.entity_name} className="flex items-start gap-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedEntityNames.includes(entity.entity_name)}
-                        onChange={() => toggleEntity(entity.entity_name)}
-                        className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
-                      />
-                      <span className="break-words min-w-0">{entity.entity_name}</span>
-                      <span className="text-gray-400 mr-auto text-xs shrink-0">({entity.event_count})</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
+      {/* ── אנשים ── */}
+      {personEntities.length > 0 && (
+        <fieldset className="space-y-1">
+          <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
           </div>
         </fieldset>
       )}
 
-      {/* ── Sources / Layers ── */}
+      {/* ── ארגונים ── */}
+      {orgEntities.length > 0 && (
+        <fieldset className="space-y-1">
+          <legend className="text-xs text-gray-500 font-medium">ארגונים</legend>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+          </div>
+        </fieldset>
+      )}
+
+      {/* ── מקומות ── */}
+      {placeEntities.length > 0 && (
+        <fieldset className="space-y-1">
+          <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+          </div>
+        </fieldset>
+      )}
+
+      {/* ── שכבות ── */}
       {sources.length > 0 && (
         <fieldset className="space-y-2">
           <div className="flex items-center justify-between">
@@ -247,9 +208,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                 <label
                   key={source.id}
                   className={`flex items-start gap-2 text-sm cursor-pointer transition-opacity ${
-                    isEnabled
-                      ? hasEventsInView ? '' : 'opacity-40'
-                      : 'opacity-30'
+                    isEnabled ? (hasEventsInView ? '' : 'opacity-40') : 'opacity-30'
                   }`}
                 >
                   <input
@@ -259,13 +218,9 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                     className="sr-only"
                     aria-label={`${source.name} — ${isEnabled ? 'מוצג' : 'מוסתר'}`}
                   />
-                  {/* Colored square checkbox */}
                   <div
                     className="w-3.5 h-3.5 mt-0.5 rounded-sm border-2 shrink-0 flex items-center justify-center"
-                    style={{
-                      borderColor: source.color,
-                      backgroundColor: isEnabled ? source.color : undefined,
-                    }}
+                    style={{ borderColor: source.color, backgroundColor: isEnabled ? source.color : undefined }}
                     aria-hidden="true"
                   >
                     {isEnabled && (
@@ -276,9 +231,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                   </div>
                   <span className="break-words min-w-0">{source.name}</span>
                   <span className="text-gray-400 mr-auto text-xs shrink-0">
-                    {viewSourceCounts && viewCount > 0
-                      ? `(${viewCount})`
-                      : `(${source.total_events})`}
+                    ({viewSourceCounts && viewCount > 0 ? viewCount : source.total_events})
                   </span>
                 </label>
               );
