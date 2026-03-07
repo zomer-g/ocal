@@ -171,10 +171,6 @@ export function SyncPage() {
                   onImportMappingChange={setImportMapping}
                   onImportPersonChange={(personId) => {
                     setImportPersonId(personId);
-                    if (personId) {
-                      const person = people.find((p) => p.id === personId);
-                      if (person) setImportName(person.name);
-                    }
                   }}
                   onImportOrgChange={setImportOrgId}
                   onImport={() => importMutation.mutate()}

@@ -203,7 +203,9 @@ async function stageParticipantParse(
   while (true) {
     const events = await db('diary_events')
       .where({ source_id: sourceId })
-      .whereNotNull('participants')
+      .where(function () {
+        this.whereNotNull('participants').orWhereNotNull('location');
+      })
       .select('id', 'participants', 'location')
       .orderBy('id')
       .limit(BATCH_SIZE)

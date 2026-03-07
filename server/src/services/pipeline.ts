@@ -115,12 +115,21 @@ export async function profileSource(resourceId: string): Promise<{
     env.DEEPSEEK_API_KEY || undefined,
   );
 
-  // Generate a suggested name from the dataset title
-  const suggestedName = preview.package.title
+  // Generate a suggested name: prefer resource name when dataset has multiple resources
+  // (different persons in same dataset), otherwise use cleaned dataset title
+  const cleanTitle = preview.package.title
     .replace(/רבעון\s+\S+/g, '')
     .replace(/לשנת\s+\d+/g, '')
     .replace(/\s*\(.*?\)\s*/g, '')
-    .trim() || preview.resource.name;
+    .trim();
+  const resourceName = preview.resource.name
+    .replace(/\.(csv|xlsx?|ics|ical)$/i, '')
+    .replace(/\s*\(.*?\)\s*/g, '')
+    .trim();
+  // If resource name adds info beyond the dataset title, include it
+  const suggestedName = resourceName && resourceName !== cleanTitle
+    ? `${cleanTitle} — ${resourceName}`
+    : (cleanTitle || resourceName);
 
   // Check for duplicates
   const existing = await db('diary_sources').where({ resource_id: resourceId }).first();

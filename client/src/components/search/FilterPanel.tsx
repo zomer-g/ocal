@@ -1,12 +1,43 @@
+import { useQuery } from '@tanstack/react-query';
 import { useFilterStore } from '@/stores/filterStore';
 import { useSources } from '@/hooks/useSources';
 import { HebrewDateInput } from '@/components/shared/HebrewDateInput';
+import { getPublicEntities } from '@/api/events';
 
 export function FilterPanel() {
-  const { from_date, to_date, source_ids, location, participants, setDateRange, setSourceIds, setLocation, setParticipants } =
-    useFilterStore();
+  const {
+    from_date, to_date, source_ids, entity_names, location, participants,
+    setDateRange, setSourceIds, setEntityNames, setLocation, setParticipants,
+  } = useFilterStore();
   const { data: sourcesData } = useSources();
   const sources = sourcesData?.data ?? [];
+
+  // Fetch entities for current source selection
+  const { data: entitiesData } = useQuery({
+    queryKey: ['public-entities', source_ids],
+    queryFn: () => getPublicEntities(source_ids.length ? source_ids : undefined),
+    staleTime: 60 * 1000,
+  });
+  const entities = entitiesData?.data ?? [];
+  const personEntities = entities.filter((e) => e.entity_type === 'person');
+  const placeEntities = entities.filter((e) => e.entity_type === 'place');
+
+  // Sort: selected entities first, then by event count
+  const sortEntities = (list: typeof entities) => {
+    return [...list].sort((a, b) => {
+      const aSelected = entity_names.includes(a.entity_name) ? 1 : 0;
+      const bSelected = entity_names.includes(b.entity_name) ? 1 : 0;
+      if (aSelected !== bSelected) return bSelected - aSelected;
+      return Number(b.event_count) - Number(a.event_count);
+    });
+  };
+
+  const toggleEntity = (name: string) => {
+    const next = entity_names.includes(name)
+      ? entity_names.filter((n) => n !== name)
+      : [...entity_names, name];
+    setEntityNames(next);
+  };
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4" role="region" aria-label="סינון תוצאות">
@@ -39,10 +70,52 @@ export function FilterPanel() {
         </div>
       </fieldset>
 
+      {/* Persons */}
+      {personEntities.length > 0 && (
+        <fieldset className="space-y-2">
+          <legend className="text-xs text-gray-500 font-medium">אנשים</legend>
+          <div className="max-h-40 overflow-y-auto space-y-1">
+            {sortEntities(personEntities).map((entity) => (
+              <label key={entity.entity_name} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={entity_names.includes(entity.entity_name)}
+                  onChange={() => toggleEntity(entity.entity_name)}
+                  className="rounded border-gray-300 text-primary-500"
+                />
+                <span className="truncate">{entity.entity_name}</span>
+                <span className="text-gray-400 mr-auto text-xs">({entity.event_count})</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      {/* Places */}
+      {placeEntities.length > 0 && (
+        <fieldset className="space-y-2">
+          <legend className="text-xs text-gray-500 font-medium">מקומות</legend>
+          <div className="max-h-32 overflow-y-auto space-y-1">
+            {sortEntities(placeEntities).map((entity) => (
+              <label key={entity.entity_name} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={entity_names.includes(entity.entity_name)}
+                  onChange={() => toggleEntity(entity.entity_name)}
+                  className="rounded border-gray-300 text-primary-500"
+                />
+                <span className="truncate">{entity.entity_name}</span>
+                <span className="text-gray-400 mr-auto text-xs">({entity.event_count})</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
       {/* Sources */}
       {sources.length > 0 && (
         <fieldset className="space-y-2">
-          <legend className="text-xs text-gray-500 font-medium">מקורות</legend>
+          <legend className="text-xs text-gray-500 font-medium">שכבות</legend>
           <div className="max-h-40 overflow-y-auto space-y-1">
             {sources.map((source) => (
               <label key={source.id} className="flex items-center gap-2 text-sm cursor-pointer">

@@ -13,6 +13,7 @@ const searchSchema = z.object({
   source_ids: z.string().optional(),
   location: z.string().optional(),
   participants: z.string().optional(),
+  entity_names: z.string().optional(),
   page: z.coerce.number().optional(),
   per_page: z.coerce.number().optional(),
   sort: z.enum(['date_asc', 'date_desc', 'relevance']).optional(),
@@ -27,6 +28,9 @@ eventsRouter.get('/', validate(searchSchema, 'query'), async (req, res, next) =>
     const sourceIds = query.source_ids
       ? query.source_ids.split(',').filter(Boolean)
       : undefined;
+    const entityNames = query.entity_names
+      ? query.entity_names.split(',').filter(Boolean)
+      : undefined;
 
     const { rows, total } = await DiaryEventModel.search({
       q: query.q,
@@ -35,6 +39,7 @@ eventsRouter.get('/', validate(searchSchema, 'query'), async (req, res, next) =>
       source_ids: sourceIds,
       location: query.location,
       participants: query.participants,
+      entity_names: entityNames,
       sort: query.sort ?? (query.q ? 'relevance' : 'date_desc'),
       offset,
       limit: per_page,

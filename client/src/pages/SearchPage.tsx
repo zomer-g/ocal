@@ -17,6 +17,7 @@ export function SearchPage() {
     from_date: filters.from_date || undefined,
     to_date: filters.to_date || undefined,
     source_ids: filters.source_ids.length ? filters.source_ids.join(',') : undefined,
+    entity_names: filters.entity_names.length ? filters.entity_names.join(',') : undefined,
     location: filters.location || undefined,
     participants: filters.participants || undefined,
     sort: filters.q ? 'relevance' : filters.sort,

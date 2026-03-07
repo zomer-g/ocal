@@ -5,6 +5,7 @@ export interface EventSearchParams {
   from_date?: string;
   to_date?: string;
   source_ids?: string;
+  entity_names?: string;
   location?: string;
   participants?: string;
   page?: number;
@@ -46,5 +47,21 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
 
 export async function getEvent(id: string): Promise<DiaryEvent> {
   const { data } = await api.get(`/public/events/${id}`);
+  return data;
+}
+
+// ── Public Entities ──
+
+export interface PublicEntity {
+  entity_name: string;
+  entity_type: 'person' | 'organization' | 'place';
+  entity_id: string | null;
+  event_count: number;
+}
+
+export async function getPublicEntities(sourceIds?: string[]): Promise<{ data: PublicEntity[] }> {
+  const params: Record<string, string> = {};
+  if (sourceIds?.length) params.source_ids = sourceIds.join(',');
+  const { data } = await api.get('/public/entities', { params });
   return data;
 }

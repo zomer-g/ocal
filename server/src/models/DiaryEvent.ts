@@ -9,6 +9,7 @@ export interface EventSearchParams {
   source_ids?: string[];
   location?: string;
   participants?: string;
+  entity_names?: string[];
   sort?: 'date_asc' | 'date_desc' | 'relevance';
   offset: number;
   limit: number;
@@ -60,6 +61,14 @@ export const DiaryEventModel = {
     }
     if (params.participants) {
       query = query.whereRaw('e.participants ILIKE ?', [`%${params.participants}%`]);
+    }
+    if (params.entity_names?.length) {
+      query = query.whereExists(function () {
+        this.select(db.raw('1'))
+          .from('event_entities as ee')
+          .whereRaw('ee.event_id = e.id')
+          .whereIn('ee.entity_name', params.entity_names!);
+      });
     }
 
     // Count total
