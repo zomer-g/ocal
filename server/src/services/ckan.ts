@@ -271,8 +271,6 @@ function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<st
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) throw new Error('No sheets found in workbook');
 
-  const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
-
   /**
    * Normalize a column name from an Excel file.
    * Israeli government files frequently embed invisible Unicode directional
@@ -285,13 +283,23 @@ function parseSpreadsheet(buffer: Buffer, format?: string): { records: Record<st
       .replace(/\s+/g, ' ')
       .trim();
 
-  const fields = records.length > 0 ? Object.keys(records[0]).map(normalizeKey) : [];
+  // Use defval:'' so that ALL header columns appear in every record, even when
+  // the corresponding data cell is empty.  Without this, SheetJS omits the key
+  // entirely for blank cells — so a column like 'נושא' that happens to be empty
+  // in the first data row would be absent from Object.keys(records[0]) and
+  // therefore invisible to the field-mapping heuristic.
+  const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
 
-  // Normalize field names in every record so they match the extracted field list
+  const fields = records.length > 0 ? Object.keys(records[0]).map(normalizeKey).filter(Boolean) : [];
+
+  // Normalize field names in every record so they match the extracted field list.
+  // Also skip SheetJS placeholder keys (__EMPTY, __EMPTY_1, …) that appear when
+  // a header cell has no text — these are artefacts of blank trailing columns.
   const cleaned = records.map(record => {
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(record)) {
-      out[normalizeKey(key)] = value;
+      const k = normalizeKey(key);
+      if (k && !k.startsWith('__EMPTY')) out[k] = value;
     }
     return out;
   });
