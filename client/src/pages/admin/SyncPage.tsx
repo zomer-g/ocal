@@ -24,6 +24,8 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  Clipboard,
+  ClipboardCheck,
 } from 'lucide-react';
 
 // ────────────────────────────────────────────
@@ -443,7 +445,58 @@ function InlineImportPanel({
   importError: Error | null;
 }) {
   const [showSample, setShowSample] = useState(true);
+  const [copied, setCopied] = useState(false);
   const unmappedSet = new Set(activeProfile.unmapped_fields);
+
+  // ── Copy-to-clipboard brief for debugging ──
+  const copyBrief = (errorText: string) => {
+    const fieldLabels: Record<string, string> = {
+      title: 'כותרת', start_date: 'תאריך התחלה', start_time: 'שעת התחלה',
+      end_date: 'תאריך סיום', end_time: 'שעת סיום', location: 'מיקום',
+      participants: 'משתתפים', organizer: 'מארגן', notes: 'הערות',
+    };
+    const mappingLines = Object.entries(fieldLabels)
+      .map(([k, label]) => `  ${label}: ${importMapping[k as keyof FieldMapping] || '—'}`)
+      .join('\n');
+    const brief = [
+      'שגיאת ייבוא',
+      '',
+      `שגיאה: ${errorText}`,
+      '',
+      `מאגר: ${activeProfile.package.title}`,
+      `משאב: ${activeProfile.resource.name || activeProfile.resource.id}`,
+      `קישור: ${activeProfile.odata_resource_url}`,
+      `פורמט: ${activeProfile.format} | ${activeProfile.total_records} רשומות`,
+      `ביטחון מיפוי: ${Math.round(activeProfile.mapping_confidence * 100)}% (${activeProfile.mapping_method})`,
+      '',
+      'מיפוי שדות:',
+      mappingLines,
+      '',
+      `שדות זמינים: ${activeProfile.fields.join(', ')}`,
+      `שדות לא מזוהים: ${activeProfile.unmapped_fields.join(', ') || 'אין'}`,
+    ].join('\n');
+    navigator.clipboard.writeText(brief).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+
+  const CopyBriefButton = ({ errorText }: { errorText: string }) => (
+    <button
+      onClick={() => copyBrief(errorText)}
+      className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors shrink-0 ${
+        copied
+          ? 'border-green-300 bg-green-50 text-green-700'
+          : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-600'
+      }`}
+      title="העתק דיווח ללוח"
+    >
+      {copied
+        ? <><ClipboardCheck className="w-3 h-3" />הועתק</>
+        : <><Clipboard className="w-3 h-3" />העתק דיווח</>
+      }
+    </button>
+  );
 
   // ── Person suggestion: score every person by word-overlap with the dataset title ──
   const diaryTitle = activeProfile.package.title;
@@ -609,7 +662,17 @@ function InlineImportPanel({
             {missingRequired.length > 0 && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 mb-3 flex items-center gap-2 text-xs text-red-700">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>שדות חובה חסרים במיפוי: <strong>{missingRequired.join(', ')}</strong>. יש לבחור עמודה מתאימה מהרשימה.</span>
+                <span className="flex-1">שדות חובה חסרים במיפוי: <strong>{missingRequired.join(', ')}</strong>. יש לבחור עמודה מתאימה מהרשימה.</span>
+                <CopyBriefButton errorText={`שדות חובה חסרים במיפוי: ${missingRequired.join(', ')}`} />
+              </div>
+            )}
+
+            {/* Low record count warning */}
+            {activeProfile.total_records < 10 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3 flex items-center gap-2 text-xs text-amber-700">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span className="flex-1">מאגר זה מכיל רק <strong>{activeProfile.total_records}</strong> רשומות — ייתכן שהמיפוי שגוי או שהנתונים חסרים.</span>
+                <CopyBriefButton errorText={`מאגר עם ${activeProfile.total_records} רשומות בלבד`} />
               </div>
             )}
 
@@ -715,10 +778,13 @@ function InlineImportPanel({
               </button>
 
               {importError && (
-                <span className="text-sm text-red-600 flex items-center gap-1">
-                  <XCircle className="w-4 h-4" />
-                  {importError.message}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-red-600 flex items-center gap-1">
+                    <XCircle className="w-4 h-4" />
+                    {importError.message}
+                  </span>
+                  <CopyBriefButton errorText={importError.message} />
+                </div>
               )}
             </div>
           </div>
