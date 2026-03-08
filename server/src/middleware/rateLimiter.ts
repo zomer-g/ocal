@@ -14,3 +14,11 @@ export const adminApiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+export const downloadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many download requests, please try again later' },
+});

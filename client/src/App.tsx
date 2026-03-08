@@ -5,6 +5,7 @@ import { RequireAuth } from '@/components/admin/RequireAuth';
 import { SearchPage } from '@/pages/SearchPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { AboutPage } from '@/pages/AboutPage';
+import { DiariesPage } from '@/pages/DiariesPage';
 import { LoginPage } from '@/pages/admin/LoginPage';
 import { DashboardPage } from '@/pages/admin/DashboardPage';
 import { SyncPage } from '@/pages/admin/SyncPage';
@@ -19,6 +20,7 @@ export default function App() {
       <Route element={<PublicLayout />}>
         <Route path="/" element={<SearchPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/diaries" element={<DiariesPage />} />
         <Route path="/about" element={<AboutPage />} />
       </Route>
 

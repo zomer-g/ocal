@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, Search, Menu, X, Info } from 'lucide-react';
+import { Calendar, Search, Menu, X, Info, BookOpen } from 'lucide-react';
 import { useSiteContent } from '@/hooks/useContent';
 
 export function Header() {
@@ -12,6 +12,7 @@ export function Header() {
   const navItems = [
     { path: '/', label: 'חיפוש', icon: Search },
     { path: '/calendar', label: 'לוח שנה', icon: Calendar },
+    { path: '/diaries', label: 'יומנים', icon: BookOpen },
     { path: '/about', label: 'אודות', icon: Info },
   ];
 
