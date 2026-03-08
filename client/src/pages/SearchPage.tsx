@@ -58,34 +58,34 @@ export function SearchPage() {
           <p className="text-primary-100 text-sm sm:text-base mb-6">
             חיפוש ביומני נבחרי ציבור וגורמים ממשלתיים
           </p>
-          <div className="w-full">
-            {filters.advancedMode ? (
-              <AdvancedSearchBuilder />
-            ) : (
-              <div className="flex flex-col items-center gap-2">
-                <SearchBar value={filters.q} onChange={filters.setQuery} variant="hero" />
-                <button
-                  type="button"
-                  onClick={() => filters.setAdvancedMode(true)}
-                  className="text-xs text-primary-200 hover:text-white transition-colors underline-offset-2 hover:underline"
-                >
-                  חיפוש מתקדם ▾
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Stats row */}
-          {stats && (stats.total_events > 0 || stats.total_sources > 0) && (
-            <div className="flex items-center justify-center gap-6 sm:gap-10 mt-8" role="region" aria-label="סטטיסטיקות">
-              <StatBadge value={stats.total_events} label="אירועים" />
-              <StatBadge value={stats.total_sources} label="מקורות" />
-              {stats.total_organizations > 0 && (
-                <StatBadge value={stats.total_organizations} label="ארגונים" />
-              )}
+        </div>
+        <div className="max-w-6xl mx-auto">
+          {filters.advancedMode ? (
+            <AdvancedSearchBuilder />
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <SearchBar value={filters.q} onChange={filters.setQuery} variant="hero" />
+              <button
+                type="button"
+                onClick={() => filters.setAdvancedMode(true)}
+                className="text-xs text-primary-200 hover:text-white transition-colors underline-offset-2 hover:underline"
+              >
+                חיפוש מתקדם ▾
+              </button>
             </div>
           )}
         </div>
+
+        {/* Stats row */}
+        {stats && (stats.total_events > 0 || stats.total_sources > 0) && (
+          <div className="flex items-center justify-center gap-6 sm:gap-10 mt-8" role="region" aria-label="סטטיסטיקות">
+            <StatBadge value={stats.total_events} label="אירועים" />
+            <StatBadge value={stats.total_sources} label="מקורות" />
+            {stats.total_organizations > 0 && (
+              <StatBadge value={stats.total_organizations} label="ארגונים" />
+            )}
+          </div>
+        )}
       </section>
 
       {/* ── Main Content ── */}

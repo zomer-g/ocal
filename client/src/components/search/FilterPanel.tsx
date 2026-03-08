@@ -1,7 +1,6 @@
 import { useState, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useFilterStore } from '@/stores/filterStore';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { useSources } from '@/hooks/useSources';
 import { getPublicEntities } from '@/api/events';
 import { ChevronDown, ChevronRight, Search, X, Loader2 } from 'lucide-react';
@@ -14,9 +13,8 @@ const HEBREW_MONTHS = [
 export function FilterPanel() {
   const {
     from_date, to_date, source_ids, entity_names,
-    setDateRange, setSourceIds, setEntityNames,
+    setDateRange, setSourceIds, setEntityNames, reset,
   } = useFilterStore();
-  const { hideFutureEvents, setHideFutureEvents } = useSettingsStore();
   const { data: sourcesData } = useSources();
   const sources = sourcesData?.data ?? [];
 
@@ -25,6 +23,7 @@ export function FilterPanel() {
 
   // ── Entity search ──
   const [entitySearch, setEntitySearch] = useState('');
+  const [showEntities, setShowEntities] = useState(false);
 
   const minDate = sources.reduce((min, s) => {
     if (!s.first_event_date) return min;
@@ -134,18 +133,17 @@ export function FilterPanel() {
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4 overflow-hidden" role="region" aria-label="סינון תוצאות">
-      <h3 className="text-sm font-semibold text-gray-700">סינון</h3>
-
-      {/* ── הגדרות ── */}
-      <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={hideFutureEvents}
-          onChange={(e) => setHideFutureEvents(e.target.checked)}
-          className="rounded border-gray-300 text-primary-500"
-        />
-        הסתר אירועים עתידיים
-      </label>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700">סינון</h3>
+        {(from_date || to_date || source_ids.length > 0 || entity_names.length > 0) && (
+          <button
+            onClick={reset}
+            className="text-[10px] text-gray-400 hover:text-red-500 underline"
+          >
+            נקה הכל
+          </button>
+        )}
+      </div>
 
       {/* ── שנה / חודש ── */}
       {years.length > 0 && (
@@ -240,80 +238,79 @@ export function FilterPanel() {
         </div>
       )}
 
-      {/* ── Entity search input ── */}
-      {hasEntitySections && (
-        <div className="relative">
-          <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" aria-hidden="true" />
-          <input
-            type="text"
-            value={entitySearch}
-            onChange={(e) => setEntitySearch(e.target.value)}
-            placeholder="חיפוש ישות..."
-            className="w-full text-xs pr-7 pl-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-400 bg-gray-50"
-            aria-label="חיפוש ישות לסינון"
-          />
-          {entitySearch && (
-            <button
-              onClick={() => setEntitySearch('')}
-              className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              aria-label="נקה חיפוש"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-      )}
+      {/* ── ישויות (collapsible) ── */}
+      <div className="space-y-2">
+        <button
+          onClick={() => setShowEntities(!showEntities)}
+          className="flex items-center gap-1 text-xs text-gray-500 font-medium w-full hover:text-gray-700 transition-colors"
+        >
+          {showEntities ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          ישויות
+          {entitiesLoading && <Loader2 className="w-3 h-3 animate-spin text-gray-400 mr-1" />}
+        </button>
 
-      {/* ── Entity sections (with loading skeleton) ── */}
-      {entitiesLoading && !entitiesData ? (
-        <>
-          <div className="space-y-1 min-w-0">
-            <h4 className="text-xs text-gray-500 font-medium">אנשים</h4>
-            <SkeletonRows />
-          </div>
-          <div className="space-y-1 min-w-0">
-            <h4 className="text-xs text-gray-500 font-medium">מקומות</h4>
-            <SkeletonRows />
-          </div>
-        </>
-      ) : (
-        <>
-          {/* ── אנשים ── */}
-          {personEntities.length > 0 && (
-            <div className="space-y-1 min-w-0">
-              <h4 className="text-xs text-gray-500 font-medium">אנשים</h4>
-              <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-                {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-              </div>
+        {showEntities && (
+          <>
+            <div className="relative">
+              <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" aria-hidden="true" />
+              <input
+                type="text"
+                value={entitySearch}
+                onChange={(e) => setEntitySearch(e.target.value)}
+                placeholder="חיפוש ישות..."
+                className="w-full text-xs pr-7 pl-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-400 bg-gray-50"
+                aria-label="חיפוש ישות לסינון"
+              />
+              {entitySearch && (
+                <button
+                  onClick={() => setEntitySearch('')}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label="נקה חיפוש"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
-          )}
 
-          {/* ── ארגונים ── */}
-          {orgEntities.length > 0 && (
-            <div className="space-y-1 min-w-0">
-              <h4 className="text-xs text-gray-500 font-medium">ארגונים</h4>
-              <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-                {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-              </div>
-            </div>
-          )}
+            {entitiesLoading && !entitiesData ? (
+              <SkeletonRows />
+            ) : (
+              <>
+                {personEntities.length > 0 && (
+                  <div className="space-y-1 min-w-0">
+                    <h4 className="text-xs text-gray-500 font-medium">אנשים</h4>
+                    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
+                      {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+                    </div>
+                  </div>
+                )}
 
-          {/* ── מקומות ── */}
-          {placeEntities.length > 0 && (
-            <div className="space-y-1 min-w-0">
-              <h4 className="text-xs text-gray-500 font-medium">מקומות</h4>
-              <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-                {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-              </div>
-            </div>
-          )}
+                {orgEntities.length > 0 && (
+                  <div className="space-y-1 min-w-0">
+                    <h4 className="text-xs text-gray-500 font-medium">ארגונים</h4>
+                    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
+                      {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+                    </div>
+                  </div>
+                )}
 
-          {/* No entity results message */}
-          {entitySearch && personEntities.length === 0 && orgEntities.length === 0 && placeEntities.length === 0 && (
-            <p className="text-xs text-gray-400 text-center py-2">לא נמצאה ישות מתאימה</p>
-          )}
-        </>
-      )}
+                {placeEntities.length > 0 && (
+                  <div className="space-y-1 min-w-0">
+                    <h4 className="text-xs text-gray-500 font-medium">מקומות</h4>
+                    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
+                      {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+                    </div>
+                  </div>
+                )}
+
+                {entitySearch && personEntities.length === 0 && orgEntities.length === 0 && placeEntities.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-2">לא נמצאה ישות מתאימה</p>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
 
       {/* ── שכבות ── */}
       {sources.length > 0 && (

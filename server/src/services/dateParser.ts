@@ -92,6 +92,14 @@ export function parseDate(value: unknown): Date | null {
     if (!isNaN(date.getTime())) return date;
   }
 
+  // Embedded DD/MM/YYYY within a longer string (e.g. "יום ב 01/04/2024 11:30")
+  // Strips Hebrew day-of-week prefix and trailing time
+  const embeddedMatch = str.match(/(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+  if (embeddedMatch) {
+    const date = new Date(+embeddedMatch[3], +embeddedMatch[2] - 1, +embeddedMatch[1]);
+    if (!isNaN(date.getTime())) return date;
+  }
+
   return null;
 }
 
@@ -119,8 +127,8 @@ export function parseTime(value: unknown): { hours: number; minutes: number } | 
 
   const str = value.trim();
 
-  // HH:MM or HH:MM:SS
-  const timeMatch = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  // HH:MM or HH:MM:SS (standalone or at end of combined string like "יום ב 01/04/2024 11:30")
+  const timeMatch = str.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if (timeMatch) {
     const hours = +timeMatch[1];
     const minutes = +timeMatch[2];
@@ -146,6 +154,12 @@ export function parseDateTime(
 
   if (timeValue != null && timeValue !== '') {
     const time = parseTime(timeValue);
+    if (time) {
+      date.setHours(time.hours, time.minutes, 0, 0);
+    }
+  } else if (typeof dateValue === 'string') {
+    // Try to extract time from combined date+time string (e.g. "יום ב 01/04/2024 11:30")
+    const time = parseTime(dateValue);
     if (time) {
       date.setHours(time.hours, time.minutes, 0, 0);
     }

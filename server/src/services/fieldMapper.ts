@@ -58,6 +58,8 @@ const HEURISTIC_PATTERNS: Record<keyof FieldMapping, RegExp[]> = {
     /^יום$/i,               // "יום"
     /מתאריך/i,              // "מתאריך"
     /תאריך.?אירוע/i,        // "תאריך אירוע"
+    /מועד.?התחלה/i,         // "מועד התחלה" — date+time combined (e.g. בני גנץ diary)
+    /^מועד$/i,              // "מועד" — generic date/occasion
   ],
   start_time: [
     /^שעת\s*התחלה$/i,
@@ -74,6 +76,7 @@ const HEURISTIC_PATTERNS: Record<keyof FieldMapping, RegExp[]> = {
     /^end.*date$/i,
     /^end$/i,
     /עד.?תאריך/i,           // "עד תאריך"
+    /מועד.?סיום/i,          // "מועד סיום" — date+time combined (e.g. בני גנץ diary)
   ],
   end_time: [
     /^שעת\s*סיום$/i,
