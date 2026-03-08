@@ -36,6 +36,7 @@ export interface DiaryEvent {
   source_color?: string;
   match_count?: number | null;
   other_fields?: Record<string, unknown> | null;
+  top_entities?: Array<{ name: string; type: string }> | null;
 }
 
 export interface EventSearchResponse {

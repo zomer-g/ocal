@@ -51,14 +51,14 @@ export function SearchPage() {
     <div>
       {/* ── Hero Section ── */}
       <section className="bg-gradient-to-b from-primary-800 to-primary-700 text-white py-10 sm:py-14 px-4">
-        <div className="max-w-3xl mx-auto text-center">
+        <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">
             יומן לעם
           </h1>
           <p className="text-primary-100 text-sm sm:text-base mb-6">
             חיפוש ביומני נבחרי ציבור וגורמים ממשלתיים
           </p>
-          <div className="max-w-2xl mx-auto">
+          <div className="w-full">
             {filters.advancedMode ? (
               <AdvancedSearchBuilder />
             ) : (

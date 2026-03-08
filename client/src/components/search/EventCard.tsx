@@ -125,13 +125,52 @@ export function EventCard({ event }: EventCardProps) {
             </div>
 
             <div className="mt-2 flex items-center gap-2">
-              <span className="text-sm text-gray-500">{event.source_name || event.dataset_name}</span>
+              {event.dataset_link ? (
+                <a
+                  href={event.dataset_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-500 hover:text-primary-700 hover:underline inline-flex items-center gap-1"
+                >
+                  {event.source_name || event.dataset_name}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ) : (
+                <span className="text-sm text-gray-500">{event.source_name || event.dataset_name}</span>
+              )}
               {(event.match_count ?? 0) > 1 && (
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
                   {event.match_count} יומנים
                 </span>
               )}
             </div>
+
+            {/* Top entities chips (pre-loaded) */}
+            {event.top_entities && event.top_entities.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {event.top_entities.map((e) => (
+                  <button
+                    key={e.name + e.type}
+                    onClick={() => handleEntityClick(e.name)}
+                    className={`text-xs px-1.5 py-0.5 rounded-full border transition-colors ${
+                      entity_names.includes(e.name)
+                        ? 'bg-primary-100 border-primary-300 text-primary-800'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-primary-50 hover:border-primary-200'
+                    }`}
+                  >
+                    {e.type === 'person' ? '👤' : e.type === 'organization' ? '🏢' : '📍'} {e.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* First 2 other_fields preview */}
+            {otherFields.slice(0, 2).map(([key, value]) => (
+              <div key={key} className="flex gap-2 text-xs text-gray-500 mt-0.5">
+                <span className="shrink-0 text-gray-400">{key}:</span>
+                <span className="truncate">{String(value)}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -139,10 +178,10 @@ export function EventCard({ event }: EventCardProps) {
       {/* Expanded section */}
       {expanded && (
         <div className="border-t border-gray-100 px-4 pb-4 pt-3 space-y-3 mr-4">
-          {/* Other fields */}
-          {otherFields.length > 0 && (
+          {/* Other fields (skip first 2 already shown in card header) */}
+          {otherFields.length > 2 && (
             <div className="space-y-1">
-              {otherFields.map(([key, value]) => (
+              {otherFields.slice(2).map(([key, value]) => (
                 <div key={key} className="flex gap-2 text-sm">
                   <span className="text-gray-400 shrink-0 min-w-[80px]">{key}:</span>
                   <span className="text-gray-700 break-words">{String(value)}</span>
@@ -227,20 +266,6 @@ export function EventCard({ event }: EventCardProps) {
             </div>
           )}
 
-          {/* Source link */}
-          {event.dataset_link && (
-            <div>
-              <a
-                href={event.dataset_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-primary-700 hover:underline"
-              >
-                <ExternalLink className="w-3 h-3" aria-hidden="true" />
-                צפה במקור
-              </a>
-            </div>
-          )}
         </div>
       )}
     </div>

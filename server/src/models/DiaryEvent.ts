@@ -59,6 +59,7 @@ export const DiaryEventModel = {
       's.name as source_name',
       's.color as source_color',
       db.raw('(SELECT total_events FROM similar_events WHERE id = e.match_group_id) as match_count'),
+      db.raw(`(SELECT json_agg(sub) FROM (SELECT ee.entity_name AS name, ee.entity_type AS type FROM event_entities ee WHERE ee.event_id = e.id AND ee.confidence >= 0.5 GROUP BY ee.entity_name, ee.entity_type ORDER BY MAX(ee.confidence) DESC LIMIT 5) sub) AS top_entities`),
     ];
 
     // Full-text search

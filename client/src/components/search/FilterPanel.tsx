@@ -75,10 +75,12 @@ export function FilterPanel() {
   })();
 
   // ── Entities ──
+  // Stable queryKey (no source_ids) — avoids re-fetch on every source checkbox toggle.
+  // Server caches this response for 5 min; client caches it here too.
   const { data: entitiesData, isLoading: entitiesLoading } = useQuery({
-    queryKey: ['public-entities', source_ids],
-    queryFn: () => getPublicEntities(source_ids.length ? source_ids : undefined),
-    staleTime: 60 * 1000,
+    queryKey: ['public-entities'],
+    queryFn: () => getPublicEntities(),
+    staleTime: 5 * 60 * 1000,
   });
   const entities = entitiesData?.data ?? [];
 
