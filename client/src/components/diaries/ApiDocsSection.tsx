@@ -21,7 +21,7 @@ const ENDPOINTS: EndpointDoc[] = [
       { name: 'q', description: 'חיפוש טקסט חופשי' },
       { name: 'from_date / to_date', description: 'טווח תאריכים (YYYY-MM-DD)' },
       { name: 'source_ids', description: 'מזהי מקורות מופרדים בפסיק' },
-      { name: 'entity_names', description: 'שמות ישויות מופרדים בפסיק' },
+      { name: 'entity_names', description: 'שמות ישויות מופרדים ב-|| (למשל: שם1||שם2)' },
       { name: 'page / per_page', description: 'עימוד (ברירת מחדל: 50)' },
       { name: 'sort', description: 'date_asc | date_desc | relevance' },
     ],

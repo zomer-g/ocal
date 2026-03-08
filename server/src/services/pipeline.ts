@@ -487,6 +487,7 @@ export async function processSource(
       records_fetched: result.recordsFetched,
       records_created: result.recordsCreated,
       records_skipped: result.recordsSkipped,
+      records_failed: result.recordsFailed,
       completed_at: new Date(),
       duration_ms: result.duration_ms,
     });

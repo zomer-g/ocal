@@ -30,7 +30,7 @@ eventsRouter.get('/', validate(searchSchema, 'query'), async (req, res, next) =>
       ? query.source_ids.split(',').filter(Boolean)
       : undefined;
     const entityNames = query.entity_names
-      ? query.entity_names.split(',').filter(Boolean)
+      ? query.entity_names.split('||').map((n) => n.trim().toLowerCase()).filter(Boolean)
       : undefined;
 
     const { rows, total } = await DiaryEventModel.search({

@@ -398,12 +398,26 @@ function SourceCard({ source }: { source: DiarySource }) {
           {syncStatus?.latest_sync_log && (
             <div className="pt-3 border-t border-gray-200">
               <div className="text-xs font-medium text-gray-500 mb-1">סנכרון אחרון:</div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
                 <DetailItem label="רשומות שנקראו" value={String(syncStatus.latest_sync_log.records_fetched)} />
                 <DetailItem label="רשומות שנוצרו" value={String(syncStatus.latest_sync_log.records_created)} />
                 <DetailItem label="רשומות שדולגו" value={String(syncStatus.latest_sync_log.records_skipped)} />
+                <DetailItem
+                  label="נכשלו"
+                  value={String(syncStatus.latest_sync_log.records_failed ?? 0)}
+                  highlight={(syncStatus.latest_sync_log.records_failed ?? 0) > 0 ? 'warning' : undefined}
+                />
                 <DetailItem label="משך" value={`${((syncStatus.latest_sync_log.duration_ms || 0) / 1000).toFixed(1)}s`} />
               </div>
+
+              {/* Warning banner: all records failed */}
+              {(syncStatus.latest_sync_log.records_failed ?? 0) > 0 &&
+                syncStatus.latest_sync_log.records_created === 0 && (
+                <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-800">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" />
+                  <span>כל הרשומות נכשלו — יתכן שמיפוי השדות אינו תואם לקובץ הנוכחי.</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -781,11 +795,13 @@ function SyncStatusBadge({ status }: { status: string }) {
   );
 }
 
-function DetailItem({ label, value }: { label: string; value: string }) {
+function DetailItem({ label, value, highlight }: { label: string; value: string; highlight?: 'warning' }) {
   return (
     <div>
       <span className="text-[10px] text-gray-400">{label}</span>
-      <div className="text-sm text-gray-700">{value}</div>
+      <div className={`text-sm font-medium ${highlight === 'warning' ? 'text-amber-600' : 'text-gray-700'}`}>
+        {value}
+      </div>
     </div>
   );
 }

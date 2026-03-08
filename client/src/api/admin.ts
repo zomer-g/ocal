@@ -131,6 +131,7 @@ export interface SyncStatusResponse {
     records_fetched: number;
     records_created: number;
     records_skipped: number;
+    records_failed?: number;
     duration_ms: number;
     started_at: string;
     completed_at: string | null;

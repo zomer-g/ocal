@@ -2,6 +2,38 @@ import { db } from '../config/database.js';
 
 const TABLE = 'diary_events';
 
+/**
+ * Build a PostgreSQL tsquery string from the user's search query.
+ * Supports boolean mode: words separated by AND/OR/NOT are converted
+ * to tsquery operators (&, |, !). Otherwise falls back to prefix-AND mode.
+ */
+function buildTsQuery(q: string): string {
+  const trimmed = q.trim();
+  const hasBoolOps = /\b(AND|OR|NOT)\b/i.test(trimmed);
+
+  if (!hasBoolOps) {
+    // Default: all words must appear (prefix match)
+    return trimmed
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((w) => `${w}:*`)
+      .join(' & ');
+  }
+
+  // Boolean mode: map AND/OR/NOT keywords to tsquery operators
+  return trimmed
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((tok) => {
+      const u = tok.toUpperCase();
+      if (u === 'AND') return '&';
+      if (u === 'OR') return '|';
+      if (u === 'NOT') return '!';
+      return `${tok}:*`;
+    })
+    .join(' ');
+}
+
 export interface EventSearchParams {
   q?: string;
   from_date?: string;
@@ -31,17 +63,20 @@ export const DiaryEventModel = {
 
     // Full-text search
     if (params.q) {
-      const tsQuery = params.q
-        .trim()
-        .split(/\s+/)
-        .filter((w) => w.length > 0)
-        .map((w) => `${w}:*`)
-        .join(' & ');
+      const tsQuery = buildTsQuery(params.q);
+      const hasBoolOps = /\b(AND|OR|NOT)\b/i.test(params.q);
 
-      query = query.where(function () {
-        this.whereRaw(`e.search_vector @@ to_tsquery('hebrew', ?)`, [tsQuery])
-          .orWhereRaw('e.title ILIKE ?', [`%${params.q}%`]);
-      });
+      if (hasBoolOps) {
+        // Boolean mode: only tsquery (ILIKE can't replicate boolean logic)
+        // Wrap in try/catch at query time; if PG rejects the tsquery fall back to ILIKE
+        query = query.whereRaw(`e.search_vector @@ to_tsquery('hebrew', ?)`, [tsQuery]);
+      } else {
+        // Default mode: tsquery OR title ILIKE fallback
+        query = query.where(function () {
+          this.whereRaw(`e.search_vector @@ to_tsquery('hebrew', ?)`, [tsQuery])
+            .orWhereRaw('e.title ILIKE ?', [`%${params.q}%`]);
+        });
+      }
 
       selectCols.push(
         db.raw(`ts_rank_cd(e.search_vector, to_tsquery('hebrew', ?)) as rank`, [tsQuery]) as unknown as string
@@ -64,11 +99,15 @@ export const DiaryEventModel = {
       query = query.whereRaw('e.participants ILIKE ?', [`%${params.participants}%`]);
     }
     if (params.entity_names?.length) {
+      const normalized = params.entity_names; // already lowercased+trimmed by route
       query = query.whereExists(function () {
         this.select(db.raw('1'))
           .from('event_entities as ee')
           .whereRaw('ee.event_id = e.id')
-          .whereIn('ee.entity_name', params.entity_names!);
+          .whereRaw(
+            `LOWER(TRIM(ee.entity_name)) IN (${normalized.map(() => '?').join(',')})`,
+            normalized,
+          );
       });
     }
 
@@ -121,11 +160,15 @@ export const DiaryEventModel = {
       query = query.whereIn('e.source_id', sourceIds);
     }
     if (entityNames?.length) {
+      const normalized = entityNames.map((n) => n.trim().toLowerCase());
       query = query.whereExists(function () {
         this.select(db.raw('1'))
           .from('event_entities as ee')
           .whereRaw('ee.event_id = e.id')
-          .whereIn('ee.entity_name', entityNames);
+          .whereRaw(
+            `LOWER(TRIM(ee.entity_name)) IN (${normalized.map(() => '?').join(',')})`,
+            normalized,
+          );
       });
     }
 
@@ -147,11 +190,15 @@ export const DiaryEventModel = {
       query = query.whereIn('e.source_id', sourceIds);
     }
     if (entityNames?.length) {
+      const normalized = entityNames.map((n) => n.trim().toLowerCase());
       query = query.whereExists(function () {
         this.select(db.raw('1'))
           .from('event_entities as ee')
           .whereRaw('ee.event_id = e.id')
-          .whereIn('ee.entity_name', entityNames);
+          .whereRaw(
+            `LOWER(TRIM(ee.entity_name)) IN (${normalized.map(() => '?').join(',')})`,
+            normalized,
+          );
       });
     }
 

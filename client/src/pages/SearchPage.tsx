@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { SearchBar } from '@/components/search/SearchBar';
+import { AdvancedSearchBuilder } from '@/components/search/AdvancedSearchBuilder';
 import { FilterPanel } from '@/components/search/FilterPanel';
 import { SearchResults } from '@/components/search/SearchResults';
 import { Pagination } from '@/components/shared/Pagination';
@@ -20,15 +21,28 @@ export function SearchPage() {
     ? (!filters.to_date || filters.to_date > today ? today : filters.to_date)
     : filters.to_date || undefined;
 
+  // Build the combined query string for boolean search
+  const combinedQ =
+    filters.advancedMode && filters.extraConditions.length > 0
+      ? [
+          filters.q,
+          ...filters.extraConditions
+            .filter((c) => c.term.trim())
+            .map((c) => `${c.operator} ${c.term.trim()}`),
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : filters.q || undefined;
+
   const { data, isLoading, isError } = useEvents({
-    q: filters.q || undefined,
+    q: combinedQ,
     from_date: filters.from_date || undefined,
     to_date: effectiveTo,
     source_ids: filters.source_ids.length ? filters.source_ids.join(',') : undefined,
-    entity_names: filters.entity_names.length ? filters.entity_names.join(',') : undefined,
+    entity_names: filters.entity_names.length ? filters.entity_names.join('||') : undefined,
     location: filters.location || undefined,
     participants: filters.participants || undefined,
-    sort: filters.q ? 'relevance' : filters.sort,
+    sort: combinedQ ? 'relevance' : filters.sort,
     page: filters.page,
     per_page: 50,
   });
@@ -45,7 +59,20 @@ export function SearchPage() {
             חיפוש ביומני נבחרי ציבור וגורמים ממשלתיים
           </p>
           <div className="max-w-2xl mx-auto">
-            <SearchBar value={filters.q} onChange={filters.setQuery} variant="hero" />
+            {filters.advancedMode ? (
+              <AdvancedSearchBuilder />
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <SearchBar value={filters.q} onChange={filters.setQuery} variant="hero" />
+                <button
+                  type="button"
+                  onClick={() => filters.setAdvancedMode(true)}
+                  className="text-xs text-primary-200 hover:text-white transition-colors underline-offset-2 hover:underline"
+                >
+                  חיפוש מתקדם ▾
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Stats row */}
