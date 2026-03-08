@@ -7,6 +7,7 @@ export interface CalendarParams {
   view: CalendarView;
   source_ids?: string;
   entity_names?: string;
+  max_date?: string;
 }
 
 export interface CalendarResponse {

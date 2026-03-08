@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useCalendarStore } from '@/stores/calendarStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useCalendar } from '@/hooks/useCalendar';
 import { useSources } from '@/hooks/useSources';
 import { CalendarHeader, TimeGrid, MonthGrid, LayerPanel, EventDetailModal } from '@/components/calendar';
@@ -8,6 +9,7 @@ import type { DiaryEvent } from '@/api/events';
 
 export function CalendarPage() {
   const { date, view, setDate, setView, enabledSourceIds, selectedEntityNames, setAllSources, sourcesInitialized } = useCalendarStore();
+  const { hideFutureEvents } = useSettingsStore();
   const { data: sourcesData } = useSources();
   const sources = sourcesData?.data ?? [];
   const [selectedEvent, setSelectedEvent] = useState<DiaryEvent | null>(null);
@@ -29,11 +31,13 @@ export function CalendarPage() {
     ? selectedEntityNames.join(',')
     : undefined;
 
+  const today = new Date().toISOString().split('T')[0];
   const { data, isLoading } = useCalendar({
     date,
     view,
     source_ids: sourceIdsParam,
     entity_names: entityNamesParam,
+    max_date: hideFutureEvents ? today : undefined,
   });
 
   // All events from API (before client-side source filtering)

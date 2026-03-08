@@ -1,6 +1,7 @@
 import { useState, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useFilterStore } from '@/stores/filterStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useSources } from '@/hooks/useSources';
 import { getPublicEntities } from '@/api/events';
 import { ChevronDown, ChevronRight, Search, X, Loader2 } from 'lucide-react';
@@ -15,6 +16,7 @@ export function FilterPanel() {
     from_date, to_date, source_ids, entity_names,
     setDateRange, setSourceIds, setEntityNames,
   } = useFilterStore();
+  const { hideFutureEvents, setHideFutureEvents } = useSettingsStore();
   const { data: sourcesData } = useSources();
   const sources = sourcesData?.data ?? [];
 
@@ -131,6 +133,17 @@ export function FilterPanel() {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4 overflow-hidden" role="region" aria-label="סינון תוצאות">
       <h3 className="text-sm font-semibold text-gray-700">סינון</h3>
+
+      {/* ── הגדרות ── */}
+      <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={hideFutureEvents}
+          onChange={(e) => setHideFutureEvents(e.target.checked)}
+          className="rounded border-gray-300 text-primary-500"
+        />
+        הסתר אירועים עתידיים
+      </label>
 
       {/* ── שנה / חודש ── */}
       {years.length > 0 && (

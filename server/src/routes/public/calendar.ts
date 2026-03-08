@@ -10,6 +10,7 @@ const calendarSchema = z.object({
   view: z.enum(['month', 'week', '4day', 'day']).default('month'),
   source_ids: z.string().optional(),
   entity_names: z.string().optional(),
+  max_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 // GET /api/public/calendar
@@ -50,6 +51,11 @@ calendarRouter.get('/', validate(calendarSchema, 'query'), async (req, res, next
     } else {
       from = query.date;
       to = query.date;
+    }
+
+    // Cap the end of the range if max_date is provided (e.g. hide future events)
+    if (query.max_date && to > query.max_date) {
+      to = query.max_date;
     }
 
     const [events, event_counts] = await Promise.all([

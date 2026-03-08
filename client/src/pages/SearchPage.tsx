@@ -4,18 +4,26 @@ import { FilterPanel } from '@/components/search/FilterPanel';
 import { SearchResults } from '@/components/search/SearchResults';
 import { Pagination } from '@/components/shared/Pagination';
 import { useFilterStore } from '@/stores/filterStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useEvents } from '@/hooks/useEvents';
 import { useStats } from '@/hooks/useStats';
 import { Loader2, SlidersHorizontal, X } from 'lucide-react';
 
 export function SearchPage() {
   const filters = useFilterStore();
+  const { hideFutureEvents } = useSettingsStore();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const { data: stats } = useStats();
+
+  const today = new Date().toISOString().split('T')[0];
+  const effectiveTo = hideFutureEvents
+    ? (!filters.to_date || filters.to_date > today ? today : filters.to_date)
+    : filters.to_date || undefined;
+
   const { data, isLoading, isError } = useEvents({
     q: filters.q || undefined,
     from_date: filters.from_date || undefined,
-    to_date: filters.to_date || undefined,
+    to_date: effectiveTo,
     source_ids: filters.source_ids.length ? filters.source_ids.join(',') : undefined,
     entity_names: filters.entity_names.length ? filters.entity_names.join(',') : undefined,
     location: filters.location || undefined,
