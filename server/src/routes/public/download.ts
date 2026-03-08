@@ -86,11 +86,21 @@ const downloadSchema = z.object({
   format: z.enum(['json', 'csv']).default('csv'),
 });
 
+const sourceParamsSchema = z.object({
+  sourceId: z.string().uuid(),
+});
+
 // ── GET /api/public/download/source/:sourceId ─────────────────────────────────
 downloadRouter.get('/source/:sourceId', validate(downloadSchema, 'query'), async (req, res, next) => {
   try {
     const { format } = req.query as z.infer<typeof downloadSchema>;
-    const { sourceId } = req.params;
+
+    const paramsResult = sourceParamsSchema.safeParse(req.params);
+    if (!paramsResult.success) {
+      res.status(400).json({ error: 'Invalid source ID' });
+      return;
+    }
+    const { sourceId } = paramsResult.data;
 
     const source = await db('diary_sources')
       .where({ id: sourceId, is_enabled: true })

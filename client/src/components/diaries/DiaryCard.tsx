@@ -46,7 +46,7 @@ export function DiaryCard({ source }: DiaryCardProps) {
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-primary-600 hover:underline"
           >
-            data.gov.il
+            {(() => { try { return new URL(datasetUrl).hostname.replace(/^www\./, ''); } catch { return 'מקור'; } })()}
             <ExternalLink className="w-3 h-3" />
           </a>
         )}
