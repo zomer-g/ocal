@@ -59,11 +59,11 @@ export function SearchPage() {
             חיפוש ביומני נבחרי ציבור וגורמים ממשלתיים
           </p>
         </div>
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-3xl mx-auto px-4">
           {filters.advancedMode ? (
             <AdvancedSearchBuilder />
           ) : (
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-2 w-full">
               <SearchBar value={filters.q} onChange={filters.setQuery} variant="hero" />
               <button
                 type="button"

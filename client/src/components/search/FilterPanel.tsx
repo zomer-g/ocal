@@ -131,9 +131,14 @@ export function FilterPanel() {
     </div>
   );
 
+  // Shared section header style
+  const SectionHeader = ({ children }: { children: React.ReactNode }) => (
+    <h4 className="text-xs text-gray-500 font-medium pb-1 border-b border-gray-100">{children}</h4>
+  );
+
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4 overflow-hidden" role="region" aria-label="סינון תוצאות">
-      <div className="flex items-center justify-between">
+    <div className="bg-white rounded-lg border border-gray-200 p-4 divide-y divide-gray-100 overflow-hidden" role="region" aria-label="סינון תוצאות">
+      <div className="flex items-center justify-between pb-3">
         <h3 className="text-sm font-semibold text-gray-700">סינון</h3>
         {(from_date || to_date || source_ids.length > 0 || entity_names.length > 0) && (
           <button
@@ -147,8 +152,8 @@ export function FilterPanel() {
 
       {/* ── שנה / חודש ── */}
       {years.length > 0 && (
-        <div className="space-y-1 min-w-0">
-          <h4 className="text-xs text-gray-500 font-medium mb-1">שנה / חודש</h4>
+        <div className="space-y-2 py-3 min-w-0">
+          <SectionHeader>שנה / חודש</SectionHeader>
           <div className="max-h-56 overflow-y-auto space-y-0.5">
             {years.map((year) => {
               const isExpanded = expandedYears.has(year);
@@ -208,7 +213,7 @@ export function FilterPanel() {
 
       {/* ── Active entity chips ── */}
       {entity_names.length > 0 && (
-        <div className="space-y-1">
+        <div className="space-y-1 py-3">
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-500 font-medium">ישויות פעילות</span>
             <button
@@ -239,18 +244,24 @@ export function FilterPanel() {
       )}
 
       {/* ── ישויות (collapsible) ── */}
-      <div className="space-y-2">
+      <div className="py-3">
         <button
           onClick={() => setShowEntities(!showEntities)}
-          className="flex items-center gap-1 text-xs text-gray-500 font-medium w-full hover:text-gray-700 transition-colors"
+          className="flex items-center gap-1 text-xs text-gray-500 font-medium w-full hover:text-gray-700 transition-colors pb-1 border-b border-gray-100"
         >
           {showEntities ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           ישויות
           {entitiesLoading && <Loader2 className="w-3 h-3 animate-spin text-gray-400 mr-1" />}
         </button>
 
-        {showEntities && (
-          <>
+        <div
+          className="transition-all duration-200 ease-in-out overflow-hidden"
+          style={{
+            maxHeight: showEntities ? '1000px' : '0',
+            opacity: showEntities ? 1 : 0,
+          }}
+        >
+          <div className="space-y-2 pt-2">
             <div className="relative">
               <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" aria-hidden="true" />
               <input
@@ -275,10 +286,10 @@ export function FilterPanel() {
             {entitiesLoading && !entitiesData ? (
               <SkeletonRows />
             ) : (
-              <>
+              <div className="transition-opacity duration-200 ease-in-out" style={{ opacity: entitiesLoading ? 0.5 : 1 }}>
                 {personEntities.length > 0 && (
-                  <div className="space-y-1 min-w-0">
-                    <h4 className="text-xs text-gray-500 font-medium">אנשים</h4>
+                  <div className="space-y-1 min-w-0 mb-2">
+                    <h5 className="text-xs text-gray-400 font-medium">אנשים</h5>
                     <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                       {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
                     </div>
@@ -286,8 +297,8 @@ export function FilterPanel() {
                 )}
 
                 {orgEntities.length > 0 && (
-                  <div className="space-y-1 min-w-0">
-                    <h4 className="text-xs text-gray-500 font-medium">ארגונים</h4>
+                  <div className="space-y-1 min-w-0 mb-2">
+                    <h5 className="text-xs text-gray-400 font-medium">ארגונים</h5>
                     <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                       {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
                     </div>
@@ -295,8 +306,8 @@ export function FilterPanel() {
                 )}
 
                 {placeEntities.length > 0 && (
-                  <div className="space-y-1 min-w-0">
-                    <h4 className="text-xs text-gray-500 font-medium">מקומות</h4>
+                  <div className="space-y-1 min-w-0 mb-2">
+                    <h5 className="text-xs text-gray-400 font-medium">מקומות</h5>
                     <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
                       {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
                     </div>
@@ -306,16 +317,16 @@ export function FilterPanel() {
                 {entitySearch && personEntities.length === 0 && orgEntities.length === 0 && placeEntities.length === 0 && (
                   <p className="text-xs text-gray-400 text-center py-2">לא נמצאה ישות מתאימה</p>
                 )}
-              </>
+              </div>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
 
       {/* ── שכבות ── */}
       {sources.length > 0 && (
-        <div className="space-y-2 min-w-0">
-          <h4 className="text-xs text-gray-500 font-medium">שכבות</h4>
+        <div className="space-y-2 pt-3 min-w-0">
+          <SectionHeader>שכבות</SectionHeader>
           <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1">
             {sources.map((source) => (
               <label key={source.id} className="flex items-start gap-2 text-sm cursor-pointer min-w-0">

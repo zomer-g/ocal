@@ -24,7 +24,7 @@ export function SearchBar({ value, onChange, variant = 'default' }: SearchBarPro
   const isHero = variant === 'hero';
 
   return (
-    <div className="relative" role="search">
+    <div className="relative w-full" role="search">
       <label htmlFor={isHero ? 'hero-search-input' : 'search-input'} className="sr-only">חיפוש אירועים</label>
       <Search className={`absolute top-1/2 -translate-y-1/2 ${
         isHero ? 'w-6 h-6 text-gray-400 right-4' : 'w-5 h-5 text-gray-400 right-3'
