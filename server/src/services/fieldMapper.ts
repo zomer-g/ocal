@@ -166,23 +166,32 @@ export function tryHeuristicMapping(fields: string[]): MappingResult {
 
   logger.debug({ cleanFields }, 'Normalized field names for heuristic mapping');
 
+  // For each target field, find the field with the BEST (earliest/most-specific)
+  // pattern match rather than the first field in document order.
+  // This prevents generic column names like "יום" (day-of-week) from stealing
+  // start_date when "תאריך התחלה" (actual date) appears later in the sheet.
   for (const [targetField, patterns] of Object.entries(HEURISTIC_PATTERNS)) {
-    for (let i = 0; i < cleanFields.length; i++) {
-      const cleanField = cleanFields[i];
-      const originalField = originalFields[i];
-      if (mapped.has(cleanField)) continue;
+    let bestFieldIdx = -1;
+    let bestPatternIdx = Infinity;
 
-      for (const pattern of patterns) {
-        if (pattern.test(cleanField)) {
-          // Store the ORIGINAL field name — the pipeline uses it to look up data in raw records
-          (mapping as Record<string, string>)[targetField] = originalField;
-          mapped.add(cleanField);
-          matchCount++;
-          break;
+    for (let i = 0; i < cleanFields.length; i++) {
+      if (mapped.has(cleanFields[i])) continue;
+
+      for (let p = 0; p < patterns.length; p++) {
+        if (p >= bestPatternIdx) break; // can't beat current best
+        if (patterns[p].test(cleanFields[i])) {
+          bestFieldIdx = i;
+          bestPatternIdx = p;
+          break; // this field's best pattern found, try next field
         }
       }
+    }
 
-      if ((mapping as Record<string, string>)[targetField]) break;
+    if (bestFieldIdx >= 0) {
+      // Store the ORIGINAL field name — the pipeline uses it to look up data in raw records
+      (mapping as Record<string, string>)[targetField] = originalFields[bestFieldIdx];
+      mapped.add(cleanFields[bestFieldIdx]);
+      matchCount++;
     }
   }
 

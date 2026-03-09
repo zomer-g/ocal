@@ -59,7 +59,7 @@ export function SearchPage() {
             חיפוש ביומני נבחרי ציבור וגורמים ממשלתיים
           </p>
         </div>
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           {filters.advancedMode ? (
             <AdvancedSearchBuilder />
           ) : (

@@ -23,7 +23,7 @@ export function FilterPanel() {
 
   // ── Entity search ──
   const [entitySearch, setEntitySearch] = useState('');
-  const [showEntities, setShowEntities] = useState(false);
+  const [showEntities, setShowEntities] = useState(true);
 
   const minDate = sources.reduce((min, s) => {
     if (!s.first_event_date) return min;
