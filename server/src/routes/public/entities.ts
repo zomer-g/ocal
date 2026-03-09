@@ -26,9 +26,11 @@ entitiesRouter.get('/', async (req, res, next) => {
       ? String(req.query.source_ids).split(',').filter(Boolean)
       : undefined;
     const typeFilter = req.query.type as string | undefined;
+    const fromDate = req.query.from_date as string | undefined;
+    const toDate = req.query.to_date as string | undefined;
 
-    // Cache key: keyed by source filter + type filter
-    const cacheKey = `${sourceIds?.length ? [...sourceIds].sort().join(',') : 'all'}:${typeFilter ?? ''}`;
+    // Cache key: keyed by source filter + type filter + date range
+    const cacheKey = `${sourceIds?.length ? [...sourceIds].sort().join(',') : 'all'}:${typeFilter ?? ''}:${fromDate ?? ''}:${toDate ?? ''}`;
 
     const cached = getCached(cacheKey);
     if (cached) {
@@ -54,6 +56,12 @@ entitiesRouter.get('/', async (req, res, next) => {
     }
     if (typeFilter) {
       query = query.where('ee.entity_type', typeFilter);
+    }
+    if (fromDate) {
+      query = query.where('de.event_date', '>=', fromDate);
+    }
+    if (toDate) {
+      query = query.where('de.event_date', '<=', toDate);
     }
 
     const entities = await query.orderBy('event_count', 'desc').limit(200);

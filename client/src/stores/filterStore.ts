@@ -30,6 +30,9 @@ interface FilterState {
   setSort: (sort: 'date_asc' | 'date_desc' | 'relevance') => void;
   setPage: (page: number) => void;
   reset: () => void;
+  clearDateRange: () => void;
+  clearEntities: () => void;
+  clearSources: () => void;
 
   // Advanced search actions
   setAdvancedMode: (on: boolean) => void;
@@ -64,6 +67,9 @@ export const useFilterStore = create<FilterState>((set) => ({
   setSort: (sort) => set({ sort, page: 1 }),
   setPage: (page) => set({ page }),
   reset: () => set(initialState),
+  clearDateRange: () => set({ from_date: '', to_date: '', page: 1 }),
+  clearEntities: () => set({ entity_names: [], page: 1 }),
+  clearSources: () => set({ source_ids: [], page: 1 }),
 
   setAdvancedMode: (on) =>
     set((state) => ({

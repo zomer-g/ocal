@@ -128,7 +128,7 @@ export function SearchPage() {
 
         <div className="mt-4 sm:mt-6 flex gap-6">
           {/* Desktop sidebar filters */}
-          <aside className="w-64 shrink-0 hidden lg:block">
+          <aside className="w-64 shrink-0 hidden lg:block sticky top-4 self-start max-h-[calc(100vh-6rem)] overflow-y-auto">
             <FilterPanel />
           </aside>
 

@@ -78,9 +78,15 @@ export interface PublicEntity {
   event_count: number;
 }
 
-export async function getPublicEntities(sourceIds?: string[]): Promise<{ data: PublicEntity[] }> {
+export async function getPublicEntities(
+  sourceIds?: string[],
+  fromDate?: string,
+  toDate?: string,
+): Promise<{ data: PublicEntity[] }> {
   const params: Record<string, string> = {};
   if (sourceIds?.length) params.source_ids = sourceIds.join(',');
+  if (fromDate) params.from_date = fromDate;
+  if (toDate) params.to_date = toDate;
   const { data } = await api.get('/public/entities', { params });
   return data;
 }

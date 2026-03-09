@@ -1,126 +1,53 @@
-import { useState, memo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useFilterStore } from '@/stores/filterStore';
 import { useSources } from '@/hooks/useSources';
 import { getPublicEntities } from '@/api/events';
-import { ChevronDown, ChevronRight, Search, X, Loader2 } from 'lucide-react';
+import { FilterSection } from './FilterSection';
+import { Calendar, Users, Building2, MapPin, BookOpen, ChevronDown, ChevronRight } from 'lucide-react';
 
 const HEBREW_MONTHS = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
   'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
 ];
 
-export function FilterPanel() {
-  const {
-    from_date, to_date, source_ids, entity_names,
-    setDateRange, setSourceIds, setEntityNames, reset,
-  } = useFilterStore();
-  const { data: sourcesData } = useSources();
-  const sources = sourcesData?.data ?? [];
+// ── Memoized row components ───────────────────────────────────────────
 
-  // ── Year / Month accordion ──
-  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
+const EntityRow = memo(({ name, count, checked, onToggle }: {
+  name: string; count: number; checked: boolean; onToggle: () => void;
+}) => (
+  <label className="flex items-center gap-2 text-sm cursor-pointer min-w-0 py-0.5">
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={onToggle}
+      className="rounded border-gray-300 text-primary-500 shrink-0"
+    />
+    <span className="min-w-0 flex-1 text-xs text-gray-700 truncate">{name}</span>
+    <span className="text-gray-400 text-[10px] shrink-0 tabular-nums">({count})</span>
+  </label>
+));
 
-  // ── Entity search ──
-  const [entitySearch, setEntitySearch] = useState('');
-  const [showEntities, setShowEntities] = useState(true);
+const SourceRow = memo(({ name, color, count, checked, onToggle }: {
+  name: string; color: string; count: number; checked: boolean; onToggle: () => void;
+}) => (
+  <label className="flex items-center gap-2 text-sm cursor-pointer min-w-0 py-0.5">
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={onToggle}
+      className="rounded border-gray-300 text-primary-500 shrink-0"
+    />
+    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+    <span className="min-w-0 flex-1 text-xs text-gray-700 truncate">{name}</span>
+    <span className="text-gray-400 text-[10px] shrink-0 tabular-nums">({count})</span>
+  </label>
+));
 
-  const minDate = sources.reduce((min, s) => {
-    if (!s.first_event_date) return min;
-    return !min || s.first_event_date < min ? s.first_event_date : min;
-  }, '');
-  const maxDate = sources.reduce((max, s) => {
-    if (!s.last_event_date) return max;
-    return !max || s.last_event_date > max ? s.last_event_date : max;
-  }, '');
+// ── Skeleton ──────────────────────────────────────────────────────────
 
-  const minYear = minDate ? new Date(minDate + 'T12:00:00').getFullYear() : new Date().getFullYear();
-  const maxYear = maxDate ? new Date(maxDate + 'T12:00:00').getFullYear() : new Date().getFullYear();
-  const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => maxYear - i);
-
-  const selectYear = (year: number) => setDateRange(`${year}-01-01`, `${year}-12-31`);
-
-  const selectMonth = (year: number, month: number) => {
-    const firstDay = `${year}-${String(month).padStart(2, '0')}-01`;
-    const lastDay = new Date(year, month, 0).toISOString().split('T')[0];
-    setDateRange(firstDay, lastDay);
-  };
-
-  const toggleYear = (year: number) => {
-    setExpandedYears((prev) => {
-      const next = new Set(prev);
-      if (next.has(year)) next.delete(year);
-      else next.add(year);
-      return next;
-    });
-  };
-
-  const activeYear = (() => {
-    if (!from_date || !to_date) return null;
-    const y = new Date(from_date + 'T12:00:00').getFullYear();
-    if (from_date === `${y}-01-01` && to_date === `${y}-12-31`) return y;
-    return null;
-  })();
-
-  const activeMonth = (() => {
-    if (!from_date || !to_date) return null;
-    const d = new Date(from_date + 'T12:00:00');
-    const y = d.getFullYear();
-    const m = d.getMonth() + 1;
-    const firstDay = `${y}-${String(m).padStart(2, '0')}-01`;
-    const lastDay = new Date(y, m, 0).toISOString().split('T')[0];
-    if (from_date === firstDay && to_date === lastDay) return { year: y, month: m };
-    return null;
-  })();
-
-  // ── Entities ──
-  // Stable queryKey (no source_ids) — avoids re-fetch on every source checkbox toggle.
-  // Server caches this response for 5 min; client caches it here too.
-  const { data: entitiesData, isLoading: entitiesLoading } = useQuery({
-    queryKey: ['public-entities'],
-    queryFn: () => getPublicEntities(),
-    staleTime: 5 * 60 * 1000,
-  });
-  const entities = entitiesData?.data ?? [];
-
-  const byCount = (list: typeof entities) =>
-    [...list].sort((a, b) => Number(b.event_count) - Number(a.event_count));
-
-  const filterBySearch = (list: typeof entities) =>
-    entitySearch.trim()
-      ? list.filter((e) => e.entity_name.toLowerCase().includes(entitySearch.toLowerCase()))
-      : list;
-
-  const personEntities = filterBySearch(byCount(entities.filter((e) => e.entity_type === 'person')));
-  const orgEntities    = filterBySearch(byCount(entities.filter((e) => e.entity_type === 'organization')));
-  const placeEntities  = filterBySearch(byCount(entities.filter((e) => e.entity_type === 'place')));
-
-  const hasEntitySections = personEntities.length > 0 || orgEntities.length > 0 || placeEntities.length > 0
-    || entities.length > 0; // show search even if filtered results are empty
-
-  const toggleEntity = (name: string) => {
-    const next = entity_names.includes(name)
-      ? entity_names.filter((n) => n !== name)
-      : [...entity_names, name];
-    setEntityNames(next);
-  };
-
-  // Shared entity row renderer
-  const EntityRow = memo(({ name, count }: { name: string; count: number }) => (
-    <label className="flex items-start gap-2 text-sm cursor-pointer min-w-0">
-      <input
-        type="checkbox"
-        checked={entity_names.includes(name)}
-        onChange={() => toggleEntity(name)}
-        className="rounded border-gray-300 text-primary-500 mt-0.5 shrink-0"
-      />
-      <span className="min-w-0 flex-1" style={{ overflowWrap: 'anywhere' }}>{name}</span>
-      <span className="text-gray-400 text-xs shrink-0">({count})</span>
-    </label>
-  ));
-
-  // Skeleton rows while loading
-  const SkeletonRows = () => (
+function SkeletonRows() {
+  return (
     <div className="space-y-2 animate-pulse">
       {[1, 2, 3, 4].map((i) => (
         <div key={i} className="flex items-center gap-2">
@@ -130,228 +57,386 @@ export function FilterPanel() {
       ))}
     </div>
   );
+}
 
-  // Shared section header style
-  const SectionHeader = ({ children }: { children: React.ReactNode }) => (
-    <h4 className="text-xs text-gray-500 font-medium pb-1 border-b border-gray-100">{children}</h4>
-  );
+// ── Main FilterPanel ──────────────────────────────────────────────────
+
+export function FilterPanel() {
+  const {
+    from_date, to_date, source_ids, entity_names,
+    setDateRange, setSourceIds, setEntityNames,
+    clearDateRange, clearEntities, clearSources, reset,
+  } = useFilterStore();
+
+  const { data: sourcesData } = useSources();
+  const sources = sourcesData?.data ?? [];
+
+  // ── Local search states ──
+  const [yearSearch, setYearSearch] = useState('');
+  const [peopleSearch, setPeopleSearch] = useState('');
+  const [orgsSearch, setOrgsSearch] = useState('');
+  const [placesSearch, setPlacesSearch] = useState('');
+  const [sourcesSearch, setSourcesSearch] = useState('');
+
+  // ── Year/Month data ──
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
+
+  const { minYear, maxYear } = useMemo(() => {
+    const minDate = sources.reduce((min, s) => {
+      if (!s.first_event_date) return min;
+      return !min || s.first_event_date < min ? s.first_event_date : min;
+    }, '');
+    const maxDate = sources.reduce((max, s) => {
+      if (!s.last_event_date) return max;
+      return !max || s.last_event_date > max ? s.last_event_date : max;
+    }, '');
+    return {
+      minYear: minDate ? new Date(minDate + 'T12:00:00').getFullYear() : new Date().getFullYear(),
+      maxYear: maxDate ? new Date(maxDate + 'T12:00:00').getFullYear() : new Date().getFullYear(),
+    };
+  }, [sources]);
+
+  const years = useMemo(() => {
+    const all = Array.from({ length: maxYear - minYear + 1 }, (_, i) => maxYear - i);
+    if (!yearSearch.trim()) return all;
+    return all.filter((y) => String(y).includes(yearSearch.trim()));
+  }, [minYear, maxYear, yearSearch]);
+
+  const activeYear = useMemo(() => {
+    if (!from_date || !to_date) return null;
+    const y = new Date(from_date + 'T12:00:00').getFullYear();
+    return from_date === `${y}-01-01` && to_date === `${y}-12-31` ? y : null;
+  }, [from_date, to_date]);
+
+  const activeMonth = useMemo(() => {
+    if (!from_date || !to_date) return null;
+    const d = new Date(from_date + 'T12:00:00');
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const firstDay = `${y}-${String(m).padStart(2, '0')}-01`;
+    const lastDay = new Date(y, m, 0).toISOString().split('T')[0];
+    return from_date === firstDay && to_date === lastDay ? { year: y, month: m } : null;
+  }, [from_date, to_date]);
+
+  const selectYear = (year: number) => setDateRange(`${year}-01-01`, `${year}-12-31`);
+  const selectMonth = (year: number, month: number) => {
+    const firstDay = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).toISOString().split('T')[0];
+    setDateRange(firstDay, lastDay);
+  };
+  const toggleYear = (year: number) => {
+    setExpandedYears((prev) => {
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year);
+      else next.add(year);
+      return next;
+    });
+  };
+
+  // ── Cross-filtered entities query ──
+  const { data: entitiesData, isLoading: entitiesLoading, isFetching } = useQuery({
+    queryKey: ['public-entities', source_ids, from_date, to_date],
+    queryFn: () => getPublicEntities(
+      source_ids.length ? source_ids : undefined,
+      from_date || undefined,
+      to_date || undefined,
+    ),
+    staleTime: 2 * 60 * 1000,
+    placeholderData: (prev) => prev,
+  });
+  const allEntities = entitiesData?.data ?? [];
+
+  // ── Derived entity lists ──
+  const people = useMemo(() => {
+    const list = allEntities
+      .filter((e) => e.entity_type === 'person')
+      .sort((a, b) => Number(b.event_count) - Number(a.event_count));
+    if (!peopleSearch.trim()) return list;
+    const q = peopleSearch.trim().toLowerCase();
+    return list.filter((e) => e.entity_name.toLowerCase().includes(q));
+  }, [allEntities, peopleSearch]);
+
+  const orgs = useMemo(() => {
+    const list = allEntities
+      .filter((e) => e.entity_type === 'organization')
+      .sort((a, b) => Number(b.event_count) - Number(a.event_count));
+    if (!orgsSearch.trim()) return list;
+    const q = orgsSearch.trim().toLowerCase();
+    return list.filter((e) => e.entity_name.toLowerCase().includes(q));
+  }, [allEntities, orgsSearch]);
+
+  const places = useMemo(() => {
+    const list = allEntities
+      .filter((e) => e.entity_type === 'place')
+      .sort((a, b) => Number(b.event_count) - Number(a.event_count));
+    if (!placesSearch.trim()) return list;
+    const q = placesSearch.trim().toLowerCase();
+    return list.filter((e) => e.entity_name.toLowerCase().includes(q));
+  }, [allEntities, placesSearch]);
+
+  // ── Cross-filtered sources ──
+  const filteredSources = useMemo(() => {
+    let result = sources;
+    if (from_date && to_date) {
+      result = result.filter(
+        (s) => s.first_event_date && s.last_event_date &&
+          s.first_event_date <= to_date && s.last_event_date >= from_date,
+      );
+    }
+    if (sourcesSearch.trim()) {
+      const q = sourcesSearch.trim().toLowerCase();
+      result = result.filter((s) => s.name.toLowerCase().includes(q));
+    }
+    return result;
+  }, [sources, from_date, to_date, sourcesSearch]);
+
+  // ── Entity toggle helpers ──
+  const toggleEntity = (name: string) => {
+    const next = entity_names.includes(name)
+      ? entity_names.filter((n) => n !== name)
+      : [...entity_names, name];
+    setEntityNames(next);
+  };
+
+  const selectedPeopleCount = useMemo(() => {
+    const peopleNames = new Set(allEntities.filter((e) => e.entity_type === 'person').map((e) => e.entity_name));
+    return entity_names.filter((n) => peopleNames.has(n)).length;
+  }, [allEntities, entity_names]);
+
+  const selectedOrgsCount = useMemo(() => {
+    const orgNames = new Set(allEntities.filter((e) => e.entity_type === 'organization').map((e) => e.entity_name));
+    return entity_names.filter((n) => orgNames.has(n)).length;
+  }, [allEntities, entity_names]);
+
+  const selectedPlacesCount = useMemo(() => {
+    const placeNames = new Set(allEntities.filter((e) => e.entity_type === 'place').map((e) => e.entity_name));
+    return entity_names.filter((n) => placeNames.has(n)).length;
+  }, [allEntities, entity_names]);
+
+  // ── Select all / Clear helpers ──
+  const selectAllFromList = (list: typeof allEntities) => {
+    const names = list.map((e) => e.entity_name);
+    setEntityNames([...new Set([...entity_names, ...names])]);
+  };
+  const clearEntityType = (type: string) => {
+    const typeNames = new Set(allEntities.filter((e) => e.entity_type === type).map((e) => e.entity_name));
+    setEntityNames(entity_names.filter((n) => !typeNames.has(n)));
+  };
+
+  const hasAnyFilter = from_date || to_date || source_ids.length > 0 || entity_names.length > 0;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 divide-y divide-gray-100 overflow-hidden" role="region" aria-label="סינון תוצאות">
-      <div className="flex items-center justify-between pb-3">
-        <h3 className="text-sm font-semibold text-gray-700">סינון</h3>
-        {(from_date || to_date || source_ids.length > 0 || entity_names.length > 0) && (
-          <button
-            onClick={reset}
-            className="text-[10px] text-gray-400 hover:text-red-500 underline"
-          >
+    <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 overflow-hidden" role="region" aria-label="סינון תוצאות">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <h3 className="text-sm font-bold text-gray-700">סינון</h3>
+        {hasAnyFilter && (
+          <button onClick={reset} className="text-[10px] text-gray-400 hover:text-red-500 transition-colors underline">
             נקה הכל
           </button>
         )}
       </div>
 
       {/* ── שנה / חודש ── */}
-      {years.length > 0 && (
-        <div className="space-y-2 py-3 min-w-0">
-          <SectionHeader>שנה / חודש</SectionHeader>
-          <div className="max-h-56 overflow-y-auto space-y-0.5">
-            {years.map((year) => {
-              const isExpanded = expandedYears.has(year);
-              const isActiveYear = activeYear === year;
-              return (
-                <div key={year}>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => toggleYear(year)}
-                      className="p-0.5 text-gray-400 hover:text-gray-600 shrink-0"
-                      aria-label={isExpanded ? `כווץ ${year}` : `הרחב ${year}`}
-                    >
-                      {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                    </button>
-                    <button
-                      onClick={() => selectYear(year)}
-                      className={`text-xs px-2 py-0.5 rounded transition-colors flex-1 text-right ${
-                        isActiveYear ? 'bg-primary-100 text-primary-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {year}
-                    </button>
-                  </div>
-                  {isExpanded && (
-                    <div className="mr-5 grid grid-cols-3 gap-0.5 mt-0.5">
-                      {HEBREW_MONTHS.map((monthName, idx) => {
-                        const m = idx + 1;
-                        const isActiveM = activeMonth?.year === year && activeMonth.month === m;
-                        return (
-                          <button
-                            key={m}
-                            onClick={() => selectMonth(year, m)}
-                            className={`text-xs px-1.5 py-1 rounded transition-colors text-center ${
-                              isActiveM ? 'bg-primary-100 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
-                            }`}
-                          >
-                            {monthName}
-                          </button>
-                        );
-                      })}
+      <div className="px-4">
+        <FilterSection
+          title="שנה / חודש"
+          icon={<Calendar className="w-3.5 h-3.5" />}
+          defaultExpanded
+          searchPlaceholder="חיפוש שנה..."
+          searchValue={yearSearch}
+          onSearchChange={setYearSearch}
+          selectedCount={from_date ? 1 : 0}
+          onClearAll={from_date ? clearDateRange : undefined}
+        >
+          {years.length > 0 ? (
+            <div className="space-y-0.5">
+              {years.map((year) => {
+                const isExpanded = expandedYears.has(year);
+                const isActiveYear = activeYear === year;
+                return (
+                  <div key={year}>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => toggleYear(year)}
+                        className="p-0.5 text-gray-400 hover:text-gray-600 shrink-0"
+                      >
+                        {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                      </button>
+                      <button
+                        onClick={() => selectYear(year)}
+                        className={`text-xs px-2 py-0.5 rounded transition-colors flex-1 text-right ${
+                          isActiveYear ? 'bg-primary-100 text-primary-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {year}
+                      </button>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {(from_date || to_date) && (
-            <button
-              onClick={() => setDateRange('', '')}
-              className="text-[10px] text-gray-400 hover:text-gray-600 underline mt-0.5"
-            >
-              נקה סינון תאריך
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── Active entity chips ── */}
-      {entity_names.length > 0 && (
-        <div className="space-y-1 py-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500 font-medium">ישויות פעילות</span>
-            <button
-              onClick={() => setEntityNames([])}
-              className="text-[10px] text-gray-400 hover:text-gray-600 underline"
-            >
-              נקה הכל
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {entity_names.map((name) => (
-              <span
-                key={name}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-100 text-primary-800 text-xs font-medium"
-              >
-                {name}
-                <button
-                  onClick={() => toggleEntity(name)}
-                  aria-label={`הסר ${name}`}
-                  className="hover:text-primary-600"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── ישויות (collapsible) ── */}
-      <div className="py-3">
-        <button
-          onClick={() => setShowEntities(!showEntities)}
-          className="flex items-center gap-1 text-xs text-gray-500 font-medium w-full hover:text-gray-700 transition-colors pb-1 border-b border-gray-100"
-        >
-          {showEntities ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          ישויות
-          {entitiesLoading && <Loader2 className="w-3 h-3 animate-spin text-gray-400 mr-1" />}
-        </button>
-
-        <div
-          className="transition-all duration-200 ease-in-out overflow-hidden"
-          style={{
-            maxHeight: showEntities ? '1000px' : '0',
-            opacity: showEntities ? 1 : 0,
-          }}
-        >
-          <div className="space-y-2 pt-2">
-            <div className="relative">
-              <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" aria-hidden="true" />
-              <input
-                type="text"
-                value={entitySearch}
-                onChange={(e) => setEntitySearch(e.target.value)}
-                placeholder="חיפוש ישות..."
-                className="w-full text-xs pr-7 pl-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-400 bg-gray-50"
-                aria-label="חיפוש ישות לסינון"
-              />
-              {entitySearch && (
-                <button
-                  onClick={() => setEntitySearch('')}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  aria-label="נקה חיפוש"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
+                    {isExpanded && (
+                      <div className="mr-5 grid grid-cols-3 gap-0.5 mt-0.5">
+                        {HEBREW_MONTHS.map((monthName, idx) => {
+                          const m = idx + 1;
+                          const isActiveM = activeMonth?.year === year && activeMonth.month === m;
+                          return (
+                            <button
+                              key={m}
+                              onClick={() => selectMonth(year, m)}
+                              className={`text-[11px] px-1 py-1 rounded transition-colors text-center ${
+                                isActiveM ? 'bg-primary-100 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              {monthName}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-
-            {entitiesLoading && !entitiesData ? (
-              <SkeletonRows />
-            ) : (
-              <div className="transition-opacity duration-200 ease-in-out" style={{ opacity: entitiesLoading ? 0.5 : 1 }}>
-                {personEntities.length > 0 && (
-                  <div className="space-y-1 min-w-0 mb-2">
-                    <h5 className="text-xs text-gray-400 font-medium">אנשים</h5>
-                    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-                      {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-                    </div>
-                  </div>
-                )}
-
-                {orgEntities.length > 0 && (
-                  <div className="space-y-1 min-w-0 mb-2">
-                    <h5 className="text-xs text-gray-400 font-medium">ארגונים</h5>
-                    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-                      {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-                    </div>
-                  </div>
-                )}
-
-                {placeEntities.length > 0 && (
-                  <div className="space-y-1 min-w-0 mb-2">
-                    <h5 className="text-xs text-gray-400 font-medium">מקומות</h5>
-                    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-                      {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
-                    </div>
-                  </div>
-                )}
-
-                {entitySearch && personEntities.length === 0 && orgEntities.length === 0 && placeEntities.length === 0 && (
-                  <p className="text-xs text-gray-400 text-center py-2">לא נמצאה ישות מתאימה</p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+          ) : (
+            <p className="text-xs text-gray-400 text-center py-2">לא נמצאו שנים</p>
+          )}
+        </FilterSection>
       </div>
 
-      {/* ── שכבות ── */}
+      {/* ── אנשים ── */}
+      <div className="px-4">
+        <FilterSection
+          title="אנשים"
+          icon={<Users className="w-3.5 h-3.5" />}
+          defaultExpanded
+          searchPlaceholder="חיפוש אנשים..."
+          searchValue={peopleSearch}
+          onSearchChange={setPeopleSearch}
+          selectedCount={selectedPeopleCount}
+          onSelectAll={() => selectAllFromList(people)}
+          onClearAll={selectedPeopleCount > 0 ? () => clearEntityType('person') : undefined}
+          isLoading={isFetching}
+        >
+          {entitiesLoading && !entitiesData ? (
+            <SkeletonRows />
+          ) : people.length > 0 ? (
+            people.map((e) => (
+              <EntityRow
+                key={e.entity_name}
+                name={e.entity_name}
+                count={Number(e.event_count)}
+                checked={entity_names.includes(e.entity_name)}
+                onToggle={() => toggleEntity(e.entity_name)}
+              />
+            ))
+          ) : (
+            <p className="text-xs text-gray-400 text-center py-2">
+              {peopleSearch ? 'לא נמצאו אנשים' : 'אין נתונים'}
+            </p>
+          )}
+        </FilterSection>
+      </div>
+
+      {/* ── ארגונים ── */}
+      <div className="px-4">
+        <FilterSection
+          title="ארגונים"
+          icon={<Building2 className="w-3.5 h-3.5" />}
+          searchPlaceholder="חיפוש ארגונים..."
+          searchValue={orgsSearch}
+          onSearchChange={setOrgsSearch}
+          selectedCount={selectedOrgsCount}
+          onSelectAll={() => selectAllFromList(orgs)}
+          onClearAll={selectedOrgsCount > 0 ? () => clearEntityType('organization') : undefined}
+          isLoading={isFetching}
+        >
+          {entitiesLoading && !entitiesData ? (
+            <SkeletonRows />
+          ) : orgs.length > 0 ? (
+            orgs.map((e) => (
+              <EntityRow
+                key={e.entity_name}
+                name={e.entity_name}
+                count={Number(e.event_count)}
+                checked={entity_names.includes(e.entity_name)}
+                onToggle={() => toggleEntity(e.entity_name)}
+              />
+            ))
+          ) : (
+            <p className="text-xs text-gray-400 text-center py-2">
+              {orgsSearch ? 'לא נמצאו ארגונים' : 'אין נתונים'}
+            </p>
+          )}
+        </FilterSection>
+      </div>
+
+      {/* ── מקומות ── */}
+      <div className="px-4">
+        <FilterSection
+          title="מקומות"
+          icon={<MapPin className="w-3.5 h-3.5" />}
+          searchPlaceholder="חיפוש מקומות..."
+          searchValue={placesSearch}
+          onSearchChange={setPlacesSearch}
+          selectedCount={selectedPlacesCount}
+          onSelectAll={() => selectAllFromList(places)}
+          onClearAll={selectedPlacesCount > 0 ? () => clearEntityType('place') : undefined}
+          isLoading={isFetching}
+        >
+          {entitiesLoading && !entitiesData ? (
+            <SkeletonRows />
+          ) : places.length > 0 ? (
+            places.map((e) => (
+              <EntityRow
+                key={e.entity_name}
+                name={e.entity_name}
+                count={Number(e.event_count)}
+                checked={entity_names.includes(e.entity_name)}
+                onToggle={() => toggleEntity(e.entity_name)}
+              />
+            ))
+          ) : (
+            <p className="text-xs text-gray-400 text-center py-2">
+              {placesSearch ? 'לא נמצאו מקומות' : 'אין נתונים'}
+            </p>
+          )}
+        </FilterSection>
+      </div>
+
+      {/* ── יומנים ── */}
       {sources.length > 0 && (
-        <div className="space-y-2 pt-3 min-w-0">
-          <SectionHeader>שכבות</SectionHeader>
-          <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1">
-            {sources.map((source) => (
-              <label key={source.id} className="flex items-start gap-2 text-sm cursor-pointer min-w-0">
-                <input
-                  type="checkbox"
+        <div className="px-4">
+          <FilterSection
+            title="יומנים"
+            icon={<BookOpen className="w-3.5 h-3.5" />}
+            defaultExpanded
+            searchPlaceholder="חיפוש יומנים..."
+            searchValue={sourcesSearch}
+            onSearchChange={setSourcesSearch}
+            selectedCount={source_ids.length}
+            onSelectAll={() => setSourceIds(filteredSources.map((s) => s.id))}
+            onClearAll={source_ids.length > 0 ? clearSources : undefined}
+          >
+            {filteredSources.length > 0 ? (
+              filteredSources.map((source) => (
+                <SourceRow
+                  key={source.id}
+                  name={source.name}
+                  color={source.color}
+                  count={source.total_events}
                   checked={source_ids.includes(source.id)}
-                  onChange={() => {
+                  onToggle={() => {
                     const next = source_ids.includes(source.id)
                       ? source_ids.filter((id) => id !== source.id)
                       : [...source_ids, source.id];
                     setSourceIds(next);
                   }}
-                  className="rounded border-gray-300 mt-0.5 shrink-0"
-                  aria-label={source.name}
                 />
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
-                  style={{ backgroundColor: source.color }}
-                  aria-hidden="true"
-                />
-                <span className="min-w-0 flex-1" style={{ overflowWrap: 'anywhere' }}>{source.name}</span>
-                <span className="text-gray-400 text-xs shrink-0">({source.total_events})</span>
-              </label>
-            ))}
-          </div>
+              ))
+            ) : (
+              <p className="text-xs text-gray-400 text-center py-2">
+                {sourcesSearch ? 'לא נמצאו יומנים' : 'אין נתונים'}
+              </p>
+            )}
+          </FilterSection>
         </div>
       )}
     </div>
