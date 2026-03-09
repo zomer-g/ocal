@@ -13,6 +13,7 @@ import {
   getOrganizations,
   type QueueItem,
   type FieldMapping,
+  type AutomationSettings,
 } from '@/api/admin';
 import {
   Loader2,
@@ -238,7 +239,7 @@ function SettingsPanel({
   onScan,
   scanResult,
 }: {
-  settings: ReturnType<typeof useQuery>['data'] extends { settings: infer S } ? S : undefined;
+  settings: AutomationSettings | undefined;
   isLoading: boolean;
   isSaving: boolean;
   isScanning: boolean;
@@ -254,7 +255,7 @@ function SettingsPanel({
     );
   }
 
-  const s = settings as Record<string, unknown>;
+  const s = settings;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
@@ -268,7 +269,7 @@ function SettingsPanel({
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
-            checked={s.auto_scan_enabled as boolean}
+            checked={s.auto_scan_enabled}
             onChange={(e) => onSave({ auto_scan_enabled: e.target.checked })}
             disabled={isSaving}
             className="rounded border-gray-300 text-primary-500"
@@ -280,7 +281,7 @@ function SettingsPanel({
         <div>
           <label className="text-xs text-gray-500 block mb-1">תדירות סריקה</label>
           <select
-            value={s.auto_scan_interval_hours as number}
+            value={s.auto_scan_interval_hours}
             onChange={(e) => onSave({ auto_scan_interval_hours: Number(e.target.value) })}
             disabled={isSaving}
             className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5"
@@ -294,13 +295,13 @@ function SettingsPanel({
 
         {/* Mapping threshold */}
         <div>
-          <label className="text-xs text-gray-500 block mb-1">סף מיפוי ({((s.auto_import_confidence_threshold as number) * 100).toFixed(0)}%)</label>
+          <label className="text-xs text-gray-500 block mb-1">סף מיפוי ({((s.auto_import_confidence_threshold) * 100).toFixed(0)}%)</label>
           <input
             type="range"
             min={50}
             max={100}
             step={5}
-            value={(s.auto_import_confidence_threshold as number) * 100}
+            value={(s.auto_import_confidence_threshold) * 100}
             onChange={(e) => onSave({ auto_import_confidence_threshold: Number(e.target.value) / 100 })}
             disabled={isSaving}
             className="w-full"
@@ -309,13 +310,13 @@ function SettingsPanel({
 
         {/* Owner threshold */}
         <div>
-          <label className="text-xs text-gray-500 block mb-1">סף זיהוי בעלים ({((s.owner_confidence_threshold as number) * 100).toFixed(0)}%)</label>
+          <label className="text-xs text-gray-500 block mb-1">סף זיהוי בעלים ({((s.owner_confidence_threshold) * 100).toFixed(0)}%)</label>
           <input
             type="range"
             min={50}
             max={100}
             step={5}
-            value={(s.owner_confidence_threshold as number) * 100}
+            value={(s.owner_confidence_threshold) * 100}
             onChange={(e) => onSave({ owner_confidence_threshold: Number(e.target.value) / 100 })}
             disabled={isSaving}
             className="w-full"
@@ -663,7 +664,7 @@ function QueueRow({
                     <div key={field}>
                       <span className="text-[10px] text-gray-400">{field}</span>
                       <select
-                        value={(approveMapping as Record<string, string | undefined>)[field] ?? ''}
+                        value={(approveMapping as unknown as Record<string, string | undefined>)[field] ?? ''}
                         onChange={(e) => setApproveMapping({ ...approveMapping, [field]: e.target.value || undefined })}
                         className="w-full text-xs border border-gray-200 rounded px-1 py-1"
                       >
