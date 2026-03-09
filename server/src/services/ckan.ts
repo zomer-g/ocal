@@ -405,6 +405,166 @@ function parseSpreadsheet(
     logger.warn({ sheetName, sheetRef: sheet['!ref'], rowScores }, 'No better header row found — using row 0');
   }
 
+  // ── Detect header-less CSVs ──────────────────────────────────────────────
+  // Some government CSV exports (Outlook, Google Calendar) have no header row —
+  // the first row is data.  SheetJS then treats row 1 values as column names,
+  // producing "field names" like "01/04/2024" or "12:00 - כיסוי וקליטה...".
+  // Detect this by checking if field names look like data values, and if so,
+  // re-parse with positional headers and content-based column type assignment.
+  const DATE_RE = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/;
+  const TIME_RE = /^\d{1,2}:\d{2}(:\d{2})?$/;
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (records.length > 0) {
+    const rawKeys = Object.keys(records[0]);
+    let dataLikeKeys = 0;
+    for (const k of rawKeys) {
+      const nk = normalizeKey(k);
+      if (DATE_RE.test(nk) || TIME_RE.test(nk) || EMAIL_RE.test(nk) || nk.length > 80) {
+        dataLikeKeys++;
+      }
+    }
+    if (dataLikeKeys >= 2) {
+      // Header-less CSV detected — re-parse with numeric headers so row 1 becomes data
+      logger.info({ dataLikeKeys, totalKeys: rawKeys.length }, 'Header-less CSV detected — re-parsing with content-based column names');
+
+      const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+        header: 1,
+        defval: '',
+        ...(bestHeaderRow > sheetRange.s.r ? { range: bestHeaderRow } : {}),
+      });
+
+      // Analyze column content from first few rows to assign names
+      const colCount = allRows.length > 0 ? (allRows[0] as unknown[]).length : 0;
+      const syntheticHeaders: string[] = [];
+      let titleAssigned = false;
+      let dateAssigned = false;
+      let startTimeAssigned = false;
+      let endTimeAssigned = false;
+
+      for (let c = 0; c < colCount; c++) {
+        // Sample values from first 5 data rows
+        const samples = allRows.slice(0, Math.min(5, allRows.length))
+          .map(row => String((row as unknown[])[c] ?? '').trim())
+          .filter(v => v !== '');
+
+        const hasDate = samples.some(v => DATE_RE.test(v));
+        const hasTime = samples.some(v => TIME_RE.test(v));
+        const hasEmail = samples.some(v => EMAIL_RE.test(v));
+        const avgLen = samples.length > 0 ? samples.reduce((s, v) => s + v.length, 0) / samples.length : 0;
+        const hasText = samples.some(v => /[a-zA-Z\u05D0-\u05EA]/.test(v));
+
+        if (hasDate && !dateAssigned) {
+          syntheticHeaders.push('תאריך');
+          dateAssigned = true;
+        } else if (hasTime && !startTimeAssigned) {
+          syntheticHeaders.push('שעת התחלה');
+          startTimeAssigned = true;
+        } else if (hasTime && !endTimeAssigned) {
+          syntheticHeaders.push('שעת סיום');
+          endTimeAssigned = true;
+        } else if (!titleAssigned && hasText && !hasEmail && avgLen > 5) {
+          syntheticHeaders.push('נושא');
+          titleAssigned = true;
+        } else if (hasEmail) {
+          syntheticHeaders.push(`משתתפים_${c + 1}`);
+        } else {
+          syntheticHeaders.push(`עמודה_${c + 1}`);
+        }
+      }
+
+      // If title wasn't assigned, pick the first text column
+      if (!titleAssigned) {
+        const idx = syntheticHeaders.findIndex(h => h.startsWith('עמודה_'));
+        if (idx >= 0) syntheticHeaders[idx] = 'נושא';
+      }
+
+      // Merge multiple attendee columns into a single "משתתפים" column
+      const attendeeCols = syntheticHeaders
+        .map((h, i) => ({ h, i }))
+        .filter(({ h }) => h.startsWith('משתתפים_'));
+      if (attendeeCols.length > 1) {
+        syntheticHeaders[attendeeCols[0].i] = 'משתתפים';
+        // Mark remaining attendee cols for merging
+        const mergeIndices = attendeeCols.slice(1).map(({ i }) => i);
+
+        records = allRows.map(row => {
+          const out: Record<string, unknown> = {};
+          const attendeeParts: string[] = [];
+          for (let c = 0; c < syntheticHeaders.length; c++) {
+            const val = String((row as unknown[])[c] ?? '').trim();
+            if (c === attendeeCols[0].i || mergeIndices.includes(c)) {
+              if (val) attendeeParts.push(val);
+            } else {
+              out[syntheticHeaders[c]] = (row as unknown[])[c] ?? '';
+            }
+          }
+          out['משתתפים'] = attendeeParts.join(', ');
+          return out;
+        });
+        // Remove merged attendee headers
+        for (let i = mergeIndices.length - 1; i >= 0; i--) {
+          syntheticHeaders.splice(mergeIndices[i], 1);
+        }
+      } else {
+        // Rename single attendee column if exists
+        const atIdx = syntheticHeaders.findIndex(h => h.startsWith('משתתפים_'));
+        if (atIdx >= 0) syntheticHeaders[atIdx] = 'משתתפים';
+
+        // Rebuild records with synthetic headers
+        records = allRows.map(row => {
+          const out: Record<string, unknown> = {};
+          for (let c = 0; c < syntheticHeaders.length; c++) {
+            out[syntheticHeaders[c]] = (row as unknown[])[c] ?? '';
+          }
+          return out;
+        });
+      }
+
+      logger.info({ syntheticHeaders }, 'Assigned synthetic column names to header-less CSV');
+    }
+  }
+
+  // ── Detect missing title column — content-based fallback ───────────────
+  // Some Outlook CSV exports have a blank header for the Subject column.
+  // After __EMPTY handling, it gets renamed to "עמודה_N" which the heuristic
+  // mapper won't recognize as "title". Check if any עמודה_N column contains
+  // varied text data that looks like event titles, and rename it to "נושא".
+  if (records.length > 0) {
+    const rawKeys = Object.keys(records[0]).map(normalizeKey).filter(Boolean);
+    const hasKnownTitle = rawKeys.some(k =>
+      /נושא/i.test(k) || /title/i.test(k) || /subject/i.test(k) || /כותרת/i.test(k) || /description/i.test(k) || /summary/i.test(k)
+    );
+    if (!hasKnownTitle) {
+      // Find a column with varied text content that could be titles
+      const sampleSize = Math.min(records.length, 10);
+      for (const key of Object.keys(records[0])) {
+        const nk = normalizeKey(key);
+        if (!nk) continue;
+        // Skip columns already identified as known types
+        if (/date|time|תאריך|שעה|location|מיקום|reminder/i.test(nk)) continue;
+        // Check if this column has varied, medium-length text
+        const vals = records.slice(0, sampleSize).map(r => String(r[key] ?? '').trim()).filter(v => v !== '');
+        if (vals.length < 3) continue;
+        const avgLen = vals.reduce((s, v) => s + v.length, 0) / vals.length;
+        const uniqueCount = new Set(vals).size;
+        const hasLetters = vals.some(v => /[a-zA-Z\u05D0-\u05EA]/.test(v));
+        if (hasLetters && avgLen > 3 && avgLen < 200 && uniqueCount >= Math.min(3, vals.length * 0.5)) {
+          // Rename this column to נושא in all records
+          logger.info({ originalColumn: nk, avgLen, uniqueCount }, 'Auto-detected title column from content analysis');
+          records = records.map(r => {
+            const out: Record<string, unknown> = {};
+            for (const [k, v] of Object.entries(r)) {
+              out[normalizeKey(k) === nk ? 'נושא' : k] = v;
+            }
+            return out;
+          });
+          break;
+        }
+      }
+    }
+  }
+
   // Check which __EMPTY columns actually contain data (blank header but real values).
   // These are common in government XLSX files where some headers are missing.
   const emptyColsWithData = new Set<string>();
