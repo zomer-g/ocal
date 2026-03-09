@@ -405,3 +405,155 @@ export async function globalMergeEntities(
   });
   return data;
 }
+
+// ── Automation ──
+
+export interface AutomationSettings {
+  auto_scan_enabled: boolean;
+  auto_scan_interval_hours: number;
+  auto_import_confidence_threshold: number;
+  owner_confidence_threshold: number;
+  [key: string]: unknown;
+}
+
+export interface AutomationStatus {
+  scheduler_running: boolean;
+  scan_in_progress: boolean;
+  settings: AutomationSettings;
+  pending_count: number;
+  last_scan: AutoImportLog | null;
+}
+
+export interface QueueItem {
+  id: string;
+  resource_id: string;
+  dataset_id: string;
+  dataset_title: string;
+  resource_name: string;
+  resource_format: string;
+  organization: string | null;
+  odata_dataset_url: string;
+  odata_resource_url: string;
+  fields: string[];
+  sample_records: Record<string, unknown>[];
+  total_records: number;
+  suggested_mapping: FieldMapping;
+  mapping_method: string;
+  mapping_confidence: number;
+  mapping_issues: string[];
+  suggested_person_id: string | null;
+  suggested_person_name: string | null;
+  person_confidence: number;
+  suggested_org_id: string | null;
+  suggested_org_name: string | null;
+  org_confidence: number;
+  owner_signals: Record<string, number>;
+  status: 'pending' | 'auto_imported' | 'approved' | 'rejected' | 'error';
+  failure_reason: string | null;
+  suggested_name: string;
+  suggested_color: string;
+  imported_source_id: string | null;
+  discovered_at: string;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QueueListResponse {
+  data: QueueItem[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
+export interface AutoImportLog {
+  id: string;
+  scan_started_at: string;
+  scan_completed_at: string | null;
+  resources_discovered: number;
+  resources_new: number;
+  resources_auto_imported: number;
+  resources_queued: number;
+  resources_skipped: number;
+  errors: string[] | null;
+  duration_ms: number | null;
+}
+
+export interface AutoImportLogListResponse {
+  data: AutoImportLog[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
+export interface ScanResult {
+  resourcesDiscovered: number;
+  resourcesNew: number;
+  resourcesAutoImported: number;
+  resourcesQueued: number;
+  resourcesSkipped: number;
+  errors: string[];
+  durationMs: number;
+}
+
+export async function getAutomationStatus(): Promise<AutomationStatus> {
+  const { data } = await api.get('/admin/automation/status');
+  return data;
+}
+
+export async function getAutomationSettings(): Promise<AutomationSettings> {
+  const { data } = await api.get('/admin/automation/settings');
+  return data;
+}
+
+export async function updateAutomationSettings(updates: Partial<AutomationSettings>): Promise<AutomationSettings> {
+  const { data } = await api.put('/admin/automation/settings', updates);
+  return data;
+}
+
+export async function triggerScan(): Promise<ScanResult> {
+  const { data } = await api.post('/admin/automation/scan');
+  return data;
+}
+
+export async function getAutomationQueue(
+  params: { status?: string; page?: number; limit?: number } = {}
+): Promise<QueueListResponse> {
+  const { data } = await api.get('/admin/automation/queue', { params });
+  return data;
+}
+
+export async function getQueueItem(id: string): Promise<QueueItem> {
+  const { data } = await api.get(`/admin/automation/queue/${id}`);
+  return data;
+}
+
+export async function approveQueueItem(
+  id: string,
+  body: {
+    name: string;
+    color: string;
+    field_mapping: FieldMapping;
+    person_id?: string | null;
+    organization_id?: string | null;
+  }
+): Promise<{ source_id: string; message: string }> {
+  const { data } = await api.post(`/admin/automation/queue/${id}/approve`, body);
+  return data;
+}
+
+export async function rejectQueueItem(
+  id: string,
+  body: { reason?: string; add_exception?: boolean } = {}
+): Promise<{ message: string }> {
+  const { data } = await api.post(`/admin/automation/queue/${id}/reject`, body);
+  return data;
+}
+
+export async function deleteQueueItem(id: string): Promise<{ message: string }> {
+  const { data } = await api.delete(`/admin/automation/queue/${id}`);
+  return data;
+}
+
+export async function getAutomationLogs(
+  params: { page?: number; limit?: number } = {}
+): Promise<AutoImportLogListResponse> {
+  const { data } = await api.get('/admin/automation/logs', { params });
+  return data;
+}

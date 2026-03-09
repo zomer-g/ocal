@@ -22,6 +22,9 @@ const envSchema = z.object({
   CKAN_BASE_URL: z.string().url().default('https://www.odata.org.il'),
   ODATA_API_KEY: z.string().default(''),
 
+  AUTO_SCAN_ENABLED: z.coerce.boolean().default(false),
+  AUTO_SCAN_INTERVAL_HOURS: z.coerce.number().min(1).max(168).default(12),
+
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   LOG_LEVEL: z.string().default('info'),
 });
