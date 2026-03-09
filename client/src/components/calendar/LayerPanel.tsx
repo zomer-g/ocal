@@ -1,7 +1,6 @@
-import { useState, memo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useCalendarStore } from '@/stores/calendarStore';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { getPublicEntities } from '@/api/events';
 import { Eye, EyeOff, ChevronDown, ChevronRight, Search, X } from 'lucide-react';
 import type { DiarySource } from '@/api/sources';
@@ -18,7 +17,6 @@ interface LayerPanelProps {
 
 export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
   const { enabledSourceIds, selectedEntityNames, toggleSource, setAllSources, setEntityNames, date, setDate, setView } = useCalendarStore();
-  const { hideFutureEvents, setHideFutureEvents } = useSettingsStore();
   const allEnabled = sources.length > 0 && sources.every((s) => enabledSourceIds.has(s.id));
 
   // ── Year / Month accordion ──
@@ -63,11 +61,18 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
   };
 
   // ── Entities ──
-  const sourceIdsArray = Array.from(enabledSourceIds);
+  // When all sources are enabled (or none explicitly selected), pass undefined
+  // to avoid sending 300+ UUIDs and to hit the server's "all" cache key.
+  const entitySourceFilter = useMemo(() => {
+    if (allEnabled || enabledSourceIds.size === 0) return undefined;
+    return Array.from(enabledSourceIds).sort();
+  }, [enabledSourceIds, allEnabled]);
+
   const { data: entitiesData, isLoading: entitiesLoading } = useQuery({
-    queryKey: ['public-entities', sourceIdsArray],
-    queryFn: () => getPublicEntities(sourceIdsArray.length ? sourceIdsArray : undefined),
-    staleTime: 60 * 1000,
+    queryKey: ['public-entities', entitySourceFilter ?? 'all'],
+    queryFn: () => getPublicEntities(entitySourceFilter),
+    staleTime: 2 * 60 * 1000,
+    placeholderData: (prev) => prev,
   });
   const entities = entitiesData?.data ?? [];
 
@@ -126,17 +131,6 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4 overflow-hidden" role="region" aria-label="סינון תצוגה">
       <h3 className="text-sm font-semibold text-gray-700">סינון</h3>
-
-      {/* ── הגדרות ── */}
-      <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={hideFutureEvents}
-          onChange={(e) => setHideFutureEvents(e.target.checked)}
-          className="rounded border-gray-300 text-primary-500"
-        />
-        הסתר אירועים עתידיים
-      </label>
 
       {/* ── שנה / חודש ── */}
       {years.length > 0 && (
@@ -248,8 +242,8 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
       )}
 
       {/* ── Entity sections (with loading skeleton) ── */}
-      {entitiesLoading && !entitiesData ? (
-        <>
+      {entitiesLoading && entities.length === 0 ? (
+        <div className="space-y-3">
           <div className="space-y-1 min-w-0">
             <h4 className="text-xs text-gray-500 font-medium">אנשים</h4>
             <SkeletonRows />
@@ -258,7 +252,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
             <h4 className="text-xs text-gray-500 font-medium">מקומות</h4>
             <SkeletonRows />
           </div>
-        </>
+        </div>
       ) : (
         <>
           {/* ── אנשים ── */}
