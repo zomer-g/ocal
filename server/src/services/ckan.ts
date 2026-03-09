@@ -256,11 +256,23 @@ async function downloadFile(url: string): Promise<Buffer> {
 /** Build a SheetJS workbook from a file buffer */
 function readWorkbook(buffer: Buffer, format?: string): XLSX.WorkBook {
   if (format?.toUpperCase() === 'CSV') {
-    // CSV: decode as UTF-8 string to preserve Hebrew characters.
-    // SheetJS buffer mode doesn't reliably detect UTF-8 for CSV files,
-    // which causes Hebrew text to appear as garbled bytes.
     let str = buffer.toString('utf-8');
     if (str.charCodeAt(0) === 0xFEFF) str = str.slice(1); // strip BOM
+
+    // Many Israeli government CSVs are encoded in Windows-1255, not UTF-8.
+    // If the UTF-8 decode produced no Hebrew characters but the raw buffer
+    // contains bytes in the Windows-1255 Hebrew range (0xC0–0xFA), re-decode.
+    const hasHebrew = /[\u05D0-\u05EA]/.test(str);
+    if (!hasHebrew) {
+      const hasWin1255Bytes = buffer.some(b => b >= 0xC0 && b <= 0xFA);
+      if (hasWin1255Bytes) {
+        const decoder = new TextDecoder('windows-1255');
+        str = decoder.decode(buffer);
+        if (str.charCodeAt(0) === 0xFEFF) str = str.slice(1);
+        logger.info('CSV re-decoded as Windows-1255 (no Hebrew found in UTF-8 decode)');
+      }
+    }
+
     return XLSX.read(str, { type: 'string' });
   }
   return XLSX.read(buffer, { type: 'buffer', codepage: 65001 });
@@ -393,21 +405,54 @@ function parseSpreadsheet(
     logger.warn({ sheetName, sheetRef: sheet['!ref'], rowScores }, 'No better header row found — using row 0');
   }
 
-  // Derive fields from the first record.  filter(Boolean) drops empty strings;
-  // the __EMPTY* check drops SheetJS placeholder keys generated for blank
-  // header cells (trailing formatting-only columns, etc.).
+  // Check which __EMPTY columns actually contain data (blank header but real values).
+  // These are common in government XLSX files where some headers are missing.
+  const emptyColsWithData = new Set<string>();
+  if (records.length > 0) {
+    const sampleSize = Math.min(records.length, 5);
+    for (const key of Object.keys(records[0])) {
+      const nk = normalizeKey(key);
+      if (nk.startsWith('__EMPTY')) {
+        const hasData = records.slice(0, sampleSize).some(r => {
+          const v = r[key];
+          return v !== '' && v !== null && v !== undefined;
+        });
+        if (hasData) emptyColsWithData.add(key);
+      }
+    }
+  }
+
+  // Rename __EMPTY columns that have data to positional names (עמודה_N)
+  const emptyColRenames = new Map<string, string>();
+  if (emptyColsWithData.size > 0) {
+    const allKeys = Object.keys(records[0]);
+    for (const key of emptyColsWithData) {
+      const idx = allKeys.indexOf(key);
+      emptyColRenames.set(normalizeKey(key), `עמודה_${idx + 1}`);
+    }
+    logger.info({ renamedColumns: Object.fromEntries(emptyColRenames) },
+      'Renamed blank-header columns that contain data');
+  }
+
   const fields = records.length > 0
-    ? Object.keys(records[0]).map(normalizeKey).filter(k => k && !k.startsWith('__EMPTY'))
+    ? Object.keys(records[0]).map(normalizeKey)
+        .filter(k => k && (!k.startsWith('__EMPTY') || emptyColRenames.has(k)))
+        .map(k => emptyColRenames.get(k) || k)
     : [];
 
-  // Normalize field names in every record so they match the extracted field list.
-  // Also skip SheetJS placeholder keys (__EMPTY, __EMPTY_1, …) that appear when
-  // a header cell has no text — these are artefacts of blank trailing columns.
+  // Normalize field names in every record. Rename __EMPTY columns that have
+  // data to positional names; drop truly empty __EMPTY columns.
   const cleaned = records.map(record => {
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(record)) {
       const k = normalizeKey(key);
-      if (k && !k.startsWith('__EMPTY')) out[k] = value;
+      if (!k) continue;
+      if (k.startsWith('__EMPTY')) {
+        const renamed = emptyColRenames.get(k);
+        if (renamed) out[renamed] = value;
+      } else {
+        out[k] = value;
+      }
     }
     return out;
   });
