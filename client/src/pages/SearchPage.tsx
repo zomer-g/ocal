@@ -8,7 +8,7 @@ import { useFilterStore } from '@/stores/filterStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useEvents } from '@/hooks/useEvents';
 import { useStats } from '@/hooks/useStats';
-import { Loader2, SlidersHorizontal, X } from 'lucide-react';
+import { Loader2, SlidersHorizontal, X, ArrowUpDown } from 'lucide-react';
 
 export function SearchPage() {
   const filters = useFilterStore();
@@ -42,7 +42,7 @@ export function SearchPage() {
     entity_names: filters.entity_names.length ? filters.entity_names.join('||') : undefined,
     location: filters.location || undefined,
     participants: filters.participants || undefined,
-    sort: combinedQ ? 'relevance' : filters.sort,
+    sort: filters.sort,
     page: filters.page,
     per_page: 50,
   });
@@ -149,6 +149,30 @@ export function SearchPage() {
 
             {data && (
               <>
+                {/* Sort toggle — show when search query is active */}
+                {data.pagination.total > 0 && (
+                  <div className="flex items-center justify-between mb-1">
+                    <div />
+                    <div className="flex items-center gap-1">
+                      <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+                      {(['relevance', 'date_desc', 'date_asc'] as const)
+                        .filter((s) => s === 'relevance' ? !!combinedQ : true)
+                        .map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => filters.setSort(s)}
+                          className={`text-xs px-2 py-1 rounded transition-colors ${
+                            filters.sort === s
+                              ? 'bg-primary-100 text-primary-700 font-medium'
+                              : 'text-gray-500 hover:bg-gray-100'
+                          }`}
+                        >
+                          {s === 'relevance' ? 'רלוונטיות' : s === 'date_desc' ? 'חדש → ישן' : 'ישן → חדש'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <SearchResults events={data.data} total={data.pagination.total} />
                 <Pagination pagination={data.pagination} onPageChange={filters.setPage} />
               </>

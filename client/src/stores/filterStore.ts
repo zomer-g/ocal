@@ -58,7 +58,12 @@ const initialState = {
 export const useFilterStore = create<FilterState>((set) => ({
   ...initialState,
 
-  setQuery: (q) => set({ q, page: 1 }),
+  setQuery: (q) => set((state) => ({
+    q,
+    page: 1,
+    // Auto-switch sort: relevance when searching, date_desc when clearing
+    sort: q.trim() ? (state.sort === 'date_desc' || state.sort === 'date_asc' ? 'relevance' : state.sort) : (state.sort === 'relevance' ? 'date_desc' : state.sort),
+  })),
   setDateRange: (from_date, to_date) => set({ from_date, to_date, page: 1 }),
   setSourceIds: (source_ids) => set({ source_ids, page: 1 }),
   setEntityNames: (entity_names) => set({ entity_names, page: 1 }),
