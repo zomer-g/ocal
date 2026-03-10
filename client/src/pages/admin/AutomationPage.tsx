@@ -62,7 +62,7 @@ export function AutomationPage() {
 
   const { data: importedQueue } = useQuery({
     queryKey: ['automation-queue', 'imported'],
-    queryFn: () => getAutomationQueue({ limit: 50 }),
+    queryFn: () => getAutomationQueue({ status: 'auto_imported', limit: 50 }),
   });
 
   const { data: logs } = useQuery({
@@ -143,7 +143,7 @@ export function AutomationPage() {
             </span>
             {status.pending_count > 0 && (
               <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-                {status.pending_count} ממתינים
+                {status.pending_count} ממתינים לאישור
               </span>
             )}
           </div>
@@ -161,12 +161,19 @@ export function AutomationPage() {
         scanResult={scanMutation.data}
       />
 
+      {/* ── Flow explanation ── */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700 leading-relaxed">
+        <strong>איך זה עובד?</strong> הסורק מחפש יומנים חדשים ב-ODATA.
+        יומנים שעומדים בתנאי הסף (מיפוי שדות ≥ {((status?.settings?.auto_import_confidence_threshold ?? 0.9) * 100).toFixed(0)}%, זיהוי בעלים ≥ {((status?.settings?.owner_confidence_threshold ?? 0.9) * 100).toFixed(0)}%) מיובאים <strong>אוטומטית</strong>.
+        יומנים שלא עומדים בתנאים מופיעים בלשונית <strong>״ממתינים לאישור״</strong> לבדיקה ידנית.
+      </div>
+
       {/* ── Tabs ── */}
       <div className="border-b border-gray-200">
         <div className="flex gap-4">
           {[
-            { key: 'pending' as const, label: 'ממתינים לבדיקה', count: pendingQueue?.pagination.total },
-            { key: 'imported' as const, label: 'כל הפריטים' },
+            { key: 'pending' as const, label: 'ממתינים לאישור', count: pendingQueue?.pagination.total, countColor: 'bg-yellow-100 text-yellow-700' },
+            { key: 'imported' as const, label: 'יובאו אוטומטית', count: importedQueue?.pagination.total, countColor: 'bg-green-100 text-green-700' },
             { key: 'logs' as const, label: 'יומן סריקות' },
           ].map((tab) => (
             <button
@@ -180,7 +187,7 @@ export function AutomationPage() {
             >
               {tab.label}
               {tab.count != null && tab.count > 0 && (
-                <span className="mr-1 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded-full">
+                <span className={`mr-1 px-1.5 py-0.5 text-xs rounded-full ${tab.countColor ?? 'bg-gray-100 text-gray-600'}`}>
                   {tab.count}
                 </span>
               )}
@@ -203,6 +210,7 @@ export function AutomationPage() {
           isApproving={approveMutation.isPending}
           isRejecting={rejectMutation.isPending}
           showActions
+          emptyMessage="אין יומנים ממתינים לאישור. כל היומנים שנמצאו עמדו בתנאי הסף ויובאו אוטומטית."
         />
       )}
 
@@ -218,6 +226,7 @@ export function AutomationPage() {
           onDelete={(id) => deleteMutation.mutate(id)}
           isApproving={approveMutation.isPending}
           isRejecting={rejectMutation.isPending}
+          emptyMessage="עדיין לא יובאו יומנים אוטומטית. הפעל סריקה כדי לגלות יומנים חדשים."
         />
       )}
 
@@ -364,6 +373,7 @@ function QueueTable({
   isApproving,
   isRejecting,
   showActions,
+  emptyMessage,
 }: {
   items: QueueItem[];
   people: Array<{ id: string; name: string; organization_id?: string | null }>;
@@ -376,11 +386,12 @@ function QueueTable({
   isApproving: boolean;
   isRejecting: boolean;
   showActions?: boolean;
+  emptyMessage?: string;
 }) {
   if (items.length === 0) {
     return (
       <div className="text-center py-12 text-gray-400 text-sm">
-        אין פריטים להצגה
+        {emptyMessage ?? 'אין פריטים להצגה'}
       </div>
     );
   }
