@@ -1,12 +1,23 @@
-import { BookOpen, Download, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { BookOpen, Download, Loader2, LayoutGrid, Table2, Code2 } from 'lucide-react';
 import { useSources } from '@/hooks/useSources';
 import { getAllDownloadUrl, triggerDownload } from '@/api/download';
 import { DiaryCard } from '@/components/diaries/DiaryCard';
+import { DiaryTable } from '@/components/diaries/DiaryTable';
 import { ApiDocsSection } from '@/components/diaries/ApiDocsSection';
+
+type Tab = 'cards' | 'table' | 'api';
+
+const TABS: { key: Tab; label: string; icon: typeof LayoutGrid }[] = [
+  { key: 'cards', label: 'כרטיסיות', icon: LayoutGrid },
+  { key: 'table', label: 'טבלה', icon: Table2 },
+  { key: 'api', label: 'API', icon: Code2 },
+];
 
 export function DiariesPage() {
   const { data, isLoading, isError } = useSources();
   const sources = data?.data ?? [];
+  const [activeTab, setActiveTab] = useState<Tab>('cards');
 
   return (
     <div>
@@ -39,7 +50,7 @@ export function DiariesPage() {
       </section>
 
       {/* ── Content ── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Loading */}
         {isLoading && (
           <div className="flex items-center justify-center py-20" role="status" aria-live="polite">
@@ -63,20 +74,52 @@ export function DiariesPage() {
           </div>
         )}
 
-        {/* Source grid */}
+        {/* Tabs + content */}
         {sources.length > 0 && (
           <>
-            <p className="text-sm text-gray-500 mb-6">
-              {sources.length} יומנים פעילים
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sources.map((source) => (
-                <DiaryCard key={source.id} source={source} />
-              ))}
+            {/* Tab bar */}
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-sm text-gray-500">{sources.length} יומנים פעילים</p>
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg" role="tablist">
+                {TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        isActive
+                          ? 'bg-white text-primary-700 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                      aria-selected={isActive}
+                      role="tab"
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* API docs */}
-            <ApiDocsSection />
+            {/* Tab content */}
+            {activeTab === 'cards' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sources.map((source) => (
+                  <DiaryCard key={source.id} source={source} />
+                ))}
+              </div>
+            )}
+
+            {activeTab === 'table' && (
+              <DiaryTable sources={sources} />
+            )}
+
+            {activeTab === 'api' && (
+              <ApiDocsSection alwaysOpen />
+            )}
           </>
         )}
       </div>

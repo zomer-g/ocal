@@ -75,10 +75,82 @@ const ENDPOINTS: EndpointDoc[] = [
   },
 ];
 
-export function ApiDocsSection() {
-  const [open, setOpen] = useState(false);
+function EndpointList() {
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
+  return (
+    <div className="space-y-3" role="list">
+      <p className="text-sm text-gray-500">
+        כל נקודות הקצה פתוחות לציבור ואינן דורשות אימות.
+        בסיס ה-URL:{' '}
+        <code className="bg-gray-100 px-1.5 py-0.5 rounded text-primary-700 text-xs">
+          {baseUrl}
+        </code>
+      </p>
+
+      {ENDPOINTS.map((ep) => (
+        <div
+          key={ep.path}
+          className="bg-gray-50 border border-gray-200 rounded-lg p-4"
+          role="listitem"
+        >
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[11px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded shrink-0">
+              GET
+            </span>
+            <code className="text-sm font-mono text-gray-800 min-w-0" style={{ overflowWrap: 'anywhere' }}>
+              {ep.path}
+            </code>
+          </div>
+          <p className="text-sm text-gray-600 mb-2">{ep.description}</p>
+
+          {ep.params && ep.params.length > 0 && (
+            <ul className="text-xs text-gray-500 space-y-1 mb-2">
+              {ep.params.map((p) => (
+                <li key={p.name}>
+                  <code className="bg-white border border-gray-200 px-1 py-0.5 rounded text-primary-700">
+                    {p.name}
+                  </code>
+                  {' — '}{p.description}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex items-start gap-2 mt-2">
+            <span className="text-[10px] text-gray-400 mt-0.5 shrink-0">דוגמה:</span>
+            <a
+              href={ep.example}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-mono text-primary-600 hover:underline break-all"
+            >
+              {ep.example}
+            </a>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ApiDocsSection({ alwaysOpen }: { alwaysOpen?: boolean }) {
+  const [open, setOpen] = useState(false);
+
+  // When used as a standalone tab, render without the collapsible wrapper
+  if (alwaysOpen) {
+    return (
+      <section aria-label="תיעוד API">
+        <div className="flex items-center gap-2 mb-5">
+          <Code2 className="w-5 h-5 text-primary-600" aria-hidden="true" />
+          <h2 className="text-lg font-semibold text-gray-800">ממשק API פתוח</h2>
+        </div>
+        <EndpointList />
+      </section>
+    );
+  }
+
+  // Collapsible mode (legacy)
   return (
     <section className="mt-12 border-t border-gray-200 pt-8" aria-label="תיעוד API">
       <button
@@ -95,57 +167,8 @@ export function ApiDocsSection() {
       </button>
 
       {open && (
-        <div className="mt-5 space-y-3" role="list">
-          <p className="text-sm text-gray-500">
-            כל נקודות הקצה פתוחות לציבור ואינן דורשות אימות.
-            בסיס ה-URL:{' '}
-            <code className="bg-gray-100 px-1.5 py-0.5 rounded text-primary-700 text-xs">
-              {baseUrl}
-            </code>
-          </p>
-
-          {ENDPOINTS.map((ep) => (
-            <div
-              key={ep.path}
-              className="bg-gray-50 border border-gray-200 rounded-lg p-4"
-              role="listitem"
-            >
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[11px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded shrink-0">
-                  GET
-                </span>
-                <code className="text-sm font-mono text-gray-800 min-w-0" style={{ overflowWrap: 'anywhere' }}>
-                  {ep.path}
-                </code>
-              </div>
-              <p className="text-sm text-gray-600 mb-2">{ep.description}</p>
-
-              {ep.params && ep.params.length > 0 && (
-                <ul className="text-xs text-gray-500 space-y-1 mb-2">
-                  {ep.params.map((p) => (
-                    <li key={p.name}>
-                      <code className="bg-white border border-gray-200 px-1 py-0.5 rounded text-primary-700">
-                        {p.name}
-                      </code>
-                      {' — '}{p.description}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <div className="flex items-start gap-2 mt-2">
-                <span className="text-[10px] text-gray-400 mt-0.5 shrink-0">דוגמה:</span>
-                <a
-                  href={ep.example}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-mono text-primary-600 hover:underline break-all"
-                >
-                  {ep.example}
-                </a>
-              </div>
-            </div>
-          ))}
+        <div className="mt-5">
+          <EndpointList />
         </div>
       )}
     </section>
