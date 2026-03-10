@@ -56,7 +56,7 @@ export function DiaryCard({ source }: DiaryCardProps) {
       <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
         <span className="text-xs text-gray-400 ml-auto">הורד:</span>
         <button
-          onClick={() => triggerDownload(getSourceDownloadUrl(source.id, 'csv'))}
+          onClick={() => triggerDownload(getSourceDownloadUrl(source.id, 'csv', { from_date: source.first_event_date, to_date: source.last_event_date }))}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary-50 text-primary-700 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
           title={`הורד ${source.name} כ-CSV`}
         >
@@ -64,7 +64,7 @@ export function DiaryCard({ source }: DiaryCardProps) {
           CSV
         </button>
         <button
-          onClick={() => triggerDownload(getSourceDownloadUrl(source.id, 'json'))}
+          onClick={() => triggerDownload(getSourceDownloadUrl(source.id, 'json', { from_date: source.first_event_date, to_date: source.last_event_date }))}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
           title={`הורד ${source.name} כ-JSON`}
         >

@@ -84,6 +84,8 @@ function safeName(name: string): string {
 // ── Schema ────────────────────────────────────────────────────────────────────
 const downloadSchema = z.object({
   format: z.enum(['json', 'csv']).default('csv'),
+  from_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 const sourceParamsSchema = z.object({
@@ -111,13 +113,19 @@ downloadRouter.get('/source/:sourceId', validate(downloadSchema, 'query'), async
       return;
     }
 
-    const rows: EventRow[] = await db('diary_events as e')
+    const { from_date, to_date } = req.query as z.infer<typeof downloadSchema>;
+
+    let sourceQuery = db('diary_events as e')
       .join('diary_sources as s', 'e.source_id', 's.id')
       .select(EXPORT_COLS)
       .where('e.source_id', sourceId)
       .where('e.is_active', true)
-      .where('s.is_enabled', true)
-      .orderBy('e.start_time', 'asc');
+      .where('s.is_enabled', true);
+
+    if (from_date) sourceQuery = sourceQuery.where('e.event_date', '>=', from_date);
+    if (to_date) sourceQuery = sourceQuery.where('e.event_date', '<=', to_date);
+
+    const rows: EventRow[] = await sourceQuery.orderBy('e.start_time', 'asc');
 
     const filename = safeName(source.name);
 
@@ -142,11 +150,18 @@ downloadRouter.get('/all', validate(downloadSchema, 'query'), async (req, res, n
   try {
     const { format } = req.query as z.infer<typeof downloadSchema>;
 
-    const rows: EventRow[] = await db('diary_events as e')
+    const { from_date, to_date } = req.query as z.infer<typeof downloadSchema>;
+
+    let allQuery = db('diary_events as e')
       .join('diary_sources as s', 'e.source_id', 's.id')
       .select(EXPORT_COLS)
       .where('e.is_active', true)
-      .where('s.is_enabled', true)
+      .where('s.is_enabled', true);
+
+    if (from_date) allQuery = allQuery.where('e.event_date', '>=', from_date);
+    if (to_date) allQuery = allQuery.where('e.event_date', '<=', to_date);
+
+    const rows: EventRow[] = await allQuery
       .orderBy('s.name', 'asc')
       .orderBy('e.start_time', 'asc');
 

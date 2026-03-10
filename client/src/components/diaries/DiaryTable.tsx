@@ -8,17 +8,35 @@ interface DiaryTableProps {
   sources: DiarySource[];
 }
 
+/** Compute year range string from min/max dates, e.g. "2019–2026" or "2024" */
+function yearRange(first: string | null, last: string | null): string {
+  if (!first || !last) return '—';
+  const y1 = new Date(first + 'T12:00:00').getFullYear();
+  const y2 = new Date(last + 'T12:00:00').getFullYear();
+  return y1 === y2 ? String(y1) : `${y1}–${y2}`;
+}
+
+const TOTAL_COLS = 8; // must match number of <th> in thead
+
 const ExpandedDetails = memo(({ source }: { source: DiarySource }) => {
   const datasetUrl = source.dataset_url ?? source.ckan_metadata?.datasetUrl ?? null;
   const resourceUrl = source.resource_url ?? source.ckan_metadata?.resourceUrl ?? null;
 
   return (
     <tr>
-      <td colSpan={6} className="bg-gray-50 px-5 py-4 border-b border-gray-200">
+      <td colSpan={TOTAL_COLS} className="bg-gray-50 px-5 py-4 border-b border-gray-200">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 text-xs">
           <div>
-            <span className="text-gray-400 block mb-0.5">בעלים</span>
-            <span className="text-gray-700">{source.person_name ?? '—'}</span>
+            <span className="text-gray-400 block mb-0.5">תאריך ראשון</span>
+            <span className="text-gray-700">
+              {source.first_event_date ? formatDateShort(source.first_event_date) : '—'}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400 block mb-0.5">תאריך אחרון</span>
+            <span className="text-gray-700">
+              {source.last_event_date ? formatDateShort(source.last_event_date) : '—'}
+            </span>
           </div>
           <div>
             <span className="text-gray-400 block mb-0.5">ארגון</span>
@@ -36,14 +54,6 @@ const ExpandedDetails = memo(({ source }: { source: DiarySource }) => {
             <span className="text-gray-400 block mb-0.5">סטטוס סנכרון</span>
             <span className={`font-medium ${source.sync_status === 'completed' ? 'text-green-600' : source.sync_status === 'failed' ? 'text-red-600' : 'text-yellow-600'}`}>
               {source.sync_status === 'completed' ? 'הושלם' : source.sync_status === 'failed' ? 'נכשל' : source.sync_status}
-            </span>
-          </div>
-          <div>
-            <span className="text-gray-400 block mb-0.5">טווח תאריכים</span>
-            <span className="text-gray-700">
-              {source.first_event_date && source.last_event_date
-                ? `${formatDateShort(source.first_event_date)} – ${formatDateShort(source.last_event_date)}`
-                : '—'}
             </span>
           </div>
           {source.ckan_metadata?.organization && (
@@ -132,18 +142,20 @@ export function DiaryTable({ sources }: DiaryTableProps) {
         <table className="w-full text-sm" dir="rtl">
           <thead>
             <tr className="bg-gray-50 text-right">
-              <th className="px-4 py-3 text-xs font-medium text-gray-500 w-8" />
-              <th className="px-4 py-3 text-xs font-medium text-gray-500">שם היומן</th>
-              <th className="px-4 py-3 text-xs font-medium text-gray-500">אירועים</th>
-              <th className="px-4 py-3 text-xs font-medium text-gray-500 hidden sm:table-cell">מקור</th>
-              <th className="px-4 py-3 text-xs font-medium text-gray-500">CSV</th>
-              <th className="px-4 py-3 text-xs font-medium text-gray-500">JSON</th>
+              <th className="px-3 py-3 text-xs font-medium text-gray-500 w-8" />
+              <th className="px-3 py-3 text-xs font-medium text-gray-500">שם היומן</th>
+              <th className="px-3 py-3 text-xs font-medium text-gray-500 hidden md:table-cell">בעל היומן</th>
+              <th className="px-3 py-3 text-xs font-medium text-gray-500">אירועים</th>
+              <th className="px-3 py-3 text-xs font-medium text-gray-500 hidden sm:table-cell">שנים</th>
+              <th className="px-3 py-3 text-xs font-medium text-gray-500 hidden sm:table-cell">מקור</th>
+              <th className="px-3 py-3 text-xs font-medium text-gray-500">CSV</th>
+              <th className="px-3 py-3 text-xs font-medium text-gray-500">JSON</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-10 text-gray-400 text-sm">
+                <td colSpan={TOTAL_COLS} className="text-center py-10 text-gray-400 text-sm">
                   {search ? 'לא נמצאו יומנים התואמים לחיפוש' : 'אין יומנים להצגה'}
                 </td>
               </tr>
@@ -151,6 +163,7 @@ export function DiaryTable({ sources }: DiaryTableProps) {
               filtered.map((source) => {
                 const isExpanded = expandedId === source.id;
                 const datasetUrl = source.dataset_url ?? source.ckan_metadata?.datasetUrl ?? null;
+                const downloadDates = { from_date: source.first_event_date, to_date: source.last_event_date };
                 return (
                   <>
                     <tr
@@ -159,39 +172,44 @@ export function DiaryTable({ sources }: DiaryTableProps) {
                       onClick={() => setExpandedId(isExpanded ? null : source.id)}
                     >
                       {/* Expand toggle */}
-                      <td className="px-4 py-3 text-gray-400">
+                      <td className="px-3 py-3 text-gray-400">
                         {isExpanded
                           ? <ChevronUp className="w-4 h-4" />
                           : <ChevronDown className="w-4 h-4" />}
                       </td>
 
-                      {/* Name + color + subtitle */}
-                      <td className="px-4 py-3">
+                      {/* Name + color */}
+                      <td className="px-3 py-3">
                         <div className="flex items-center gap-2 min-w-0">
                           <span
                             className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: source.color }}
                           />
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium text-gray-900 truncate max-w-[280px]">
-                              {source.name}
-                            </div>
-                            {(source.person_name || source.organization_name) && (
-                              <div className="text-xs text-gray-500 truncate">
-                                {source.person_name ?? source.organization_name}
-                              </div>
-                            )}
-                          </div>
+                          <span className="text-sm font-medium text-gray-900 truncate max-w-[240px]">
+                            {source.name}
+                          </span>
                         </div>
                       </td>
 
+                      {/* Owner */}
+                      <td className="px-3 py-3 hidden md:table-cell">
+                        <span className="text-xs text-gray-600 truncate block max-w-[180px]">
+                          {source.person_name ?? source.organization_name ?? '—'}
+                        </span>
+                      </td>
+
                       {/* Events count */}
-                      <td className="px-4 py-3 text-gray-700 tabular-nums">
+                      <td className="px-3 py-3 text-gray-700 tabular-nums text-xs">
                         {source.total_events.toLocaleString('he-IL')}
                       </td>
 
+                      {/* Year range */}
+                      <td className="px-3 py-3 hidden sm:table-cell text-xs text-gray-600 tabular-nums">
+                        {yearRange(source.first_event_date, source.last_event_date)}
+                      </td>
+
                       {/* Source link */}
-                      <td className="px-4 py-3 hidden sm:table-cell">
+                      <td className="px-3 py-3 hidden sm:table-cell">
                         {datasetUrl ? (
                           <a
                             href={datasetUrl}
@@ -209,11 +227,11 @@ export function DiaryTable({ sources }: DiaryTableProps) {
                       </td>
 
                       {/* CSV download */}
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            triggerDownload(getSourceDownloadUrl(source.id, 'csv'));
+                            triggerDownload(getSourceDownloadUrl(source.id, 'csv', downloadDates));
                           }}
                           className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-primary-50 text-primary-700 border border-primary-200 rounded hover:bg-primary-100 transition-colors"
                           title={`הורד ${source.name} כ-CSV`}
@@ -224,11 +242,11 @@ export function DiaryTable({ sources }: DiaryTableProps) {
                       </td>
 
                       {/* JSON download */}
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            triggerDownload(getSourceDownloadUrl(source.id, 'json'));
+                            triggerDownload(getSourceDownloadUrl(source.id, 'json', downloadDates));
                           }}
                           className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded hover:bg-gray-100 transition-colors"
                           title={`הורד ${source.name} כ-JSON`}
