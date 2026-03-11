@@ -40,9 +40,12 @@ const HEURISTIC_PATTERNS: Record<keyof FieldMapping, RegExp[]> = {
     /שם.?פגישה/i,           // "שם הפגישה", "שם פגישה"
     /^שם$/i,                // "שם" by itself
     /אירוע.?פגישה/i,        // "אירוע/פגישה"
+    /פעילות/i,              // "פעילות" (activity — common in government diaries)
     /פירוט/i,               // "פירוט"
     /סוג.?אירוע/i,          // "סוג אירוע"
     /תוכן/i,               // "תוכן"
+    /^אירוע$/i,             // "אירוע" (event — standalone column name)
+    /^פגישה$/i,             // "פגישה" (meeting — standalone column name)
     /^event$/i,
     /^summary$/i,
   ],
@@ -247,7 +250,7 @@ const LLM_PROMPT = `You are mapping columns from an Israeli public official's ca
 IMPORTANT data patterns to recognize:
 - Excel serial date numbers (e.g. 45270, 45882) represent dates — the column containing them is a date column
 - Decimal fractions (e.g. 0.4375, 0.625, 0.708) represent times as fractions of a day — the column containing them is a time column
-- Hebrew column names may use creative or non-standard naming (e.g. "שם אירוע/פגישה" = title, "יום בשבוע" with serial numbers = start_date, "משאבי פגישה" with venues = location)
+- Hebrew column names may use creative or non-standard naming (e.g. "פעילות" = title, "שם אירוע/פגישה" = title, "יום בשבוע" with serial numbers = start_date, "משאבי פגישה" with venues = location)
 
 Given these column names: {{FIELDS}}
 
