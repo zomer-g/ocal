@@ -15,6 +15,7 @@ const searchSchema = z.object({
   location: z.string().optional(),
   participants: z.string().optional(),
   entity_names: z.string().optional(),
+  cross_ref_status: z.enum(['confirmed', 'unconfirmed']).optional(),
   page: z.coerce.number().optional(),
   per_page: z.coerce.number().optional(),
   sort: z.enum(['date_asc', 'date_desc', 'relevance']).optional(),
@@ -41,6 +42,7 @@ eventsRouter.get('/', validate(searchSchema, 'query'), async (req, res, next) =>
       location: query.location,
       participants: query.participants,
       entity_names: entityNames,
+      cross_ref_status: query.cross_ref_status,
       sort: query.sort ?? (query.q ? 'relevance' : 'date_desc'),
       offset,
       limit: per_page,
@@ -79,6 +81,45 @@ eventsRouter.get('/:id/entities', async (req, res, next) => {
       .orderBy('entity_type')
       .orderBy('entity_name');
     res.json({ data: entities });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/public/events/:id/cross-refs
+eventsRouter.get('/:id/cross-refs', async (req, res, next) => {
+  try {
+    const crossRefs = await db('entity_cross_refs as ecr')
+      .join('event_entities as ee', 'ee.id', 'ecr.event_entity_id')
+      .join('people as p', 'p.id', 'ecr.target_person_id')
+      .join('diary_sources as ds', 'ds.id', 'ecr.target_source_id')
+      .leftJoin('diary_events as me', 'me.id', 'ecr.matched_event_id')
+      .where('ecr.source_event_id', req.params.id)
+      .select(
+        'ecr.id',
+        'ecr.status',
+        'ecr.match_method',
+        'ecr.match_score',
+        'ecr.event_date',
+        'ee.entity_name',
+        'p.name as target_person_name',
+        'ds.name as target_source_name',
+        'ds.color as target_source_color',
+        'me.id as matched_event_id',
+        'me.title as matched_title',
+        'me.start_time as matched_start_time',
+        'me.location as matched_location',
+      )
+      .orderBy('ecr.status')
+      .orderBy('ee.entity_name');
+
+    const confirmed = crossRefs.filter((r: { status: string }) => r.status === 'confirmed').length;
+    const unconfirmed = crossRefs.filter((r: { status: string }) => r.status === 'unconfirmed').length;
+
+    res.json({
+      cross_refs: crossRefs,
+      summary: { confirmed, unconfirmed, total: crossRefs.length },
+    });
   } catch (err) {
     next(err);
   }

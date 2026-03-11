@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, MapPin, Users, CalendarDays, ChevronDown, ChevronUp, ExternalLink, Tag, BookOpen } from 'lucide-react';
+import { Clock, MapPin, Users, CalendarDays, ChevronDown, ChevronUp, ExternalLink, Tag, BookOpen, CheckCircle2, XCircle, ArrowLeftRight } from 'lucide-react';
 import type { DiaryEvent } from '@/api/events';
-import { getEventEntities, getEventMatches } from '@/api/events';
+import { getEventEntities, getEventMatches, getEventCrossRefs } from '@/api/events';
 import { formatTime } from '@/lib/formatters';
 import { useCalendarStore } from '@/stores/calendarStore';
 import { useFilterStore } from '@/stores/filterStore';
@@ -47,6 +47,17 @@ export function EventCard({ event }: EventCardProps) {
     staleTime: 5 * 60 * 1000,
   });
   const matchedEvents = matchesData?.matched_events ?? [];
+
+  // Fetch cross-refs only when expanded and cross_ref_summary exists
+  const crossRefSummary = event.cross_ref_summary;
+  const hasCrossRefs = crossRefSummary && crossRefSummary.total > 0;
+  const { data: crossRefsData } = useQuery({
+    queryKey: ['event-cross-refs', event.id],
+    queryFn: () => getEventCrossRefs(event.id),
+    enabled: expanded && !!hasCrossRefs,
+    staleTime: 5 * 60 * 1000,
+  });
+  const crossRefs = crossRefsData?.cross_refs ?? [];
 
   const personEntities = entities.filter((e) => e.entity_type === 'person');
   const orgEntities = entities.filter((e) => e.entity_type === 'organization');
@@ -141,6 +152,18 @@ export function EventCard({ event }: EventCardProps) {
               {(event.match_count ?? 0) > 1 && (
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
                   {event.match_count} יומנים
+                </span>
+              )}
+              {hasCrossRefs && crossRefSummary.unconfirmed > 0 && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 text-xs font-medium">
+                  <XCircle className="w-3 h-3" />
+                  {crossRefSummary.unconfirmed} לא אומתו
+                </span>
+              )}
+              {hasCrossRefs && crossRefSummary.confirmed > 0 && crossRefSummary.unconfirmed === 0 && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium">
+                  <CheckCircle2 className="w-3 h-3" />
+                  {crossRefSummary.confirmed} אומתו
                 </span>
               )}
             </div>
@@ -259,6 +282,46 @@ export function EventCard({ event }: EventCardProps) {
                       {me.location && (
                         <div className="text-gray-400 text-xs truncate">{me.location}</div>
                       )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Cross-references — verify participant meetings across diaries */}
+          {crossRefs.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-500" aria-hidden="true" />
+                <span className="text-xs font-semibold text-indigo-700">הצלבה מול יומנים</span>
+              </div>
+              <div className="space-y-1.5">
+                {crossRefs.map((cr) => (
+                  <div key={cr.id} className="flex items-start gap-2 text-sm">
+                    {cr.status === 'confirmed' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />
+                    ) : (
+                      <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-xs">
+                        <span className="font-medium text-gray-700">{cr.target_person_name}</span>
+                        {cr.status === 'confirmed' ? (
+                          <span className="text-green-600">
+                            {' '}— אומת
+                            <span className="text-gray-400">
+                              {' '}({cr.target_source_name}
+                              {cr.matched_title && `: "${cr.matched_title}"`})
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-red-500">
+                            {' '}— לא אומת
+                            <span className="text-gray-400"> (ליומן {cr.target_source_name} אין רישום ביום זה)</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

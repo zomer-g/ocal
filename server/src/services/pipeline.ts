@@ -496,9 +496,19 @@ export async function processSource(
 
     // ── Step 5: Trigger entity extraction in background (Stages 1 + 2 only, no AI cost) ──
     // AI NER (Stage 3) is triggered manually from the admin UI.
+    // Cross-referencing is chained AFTER entity extraction (it needs entities to exist).
     extractEntitiesForSource(sourceId, { skipAI: true, clearExisting: isResync })
-      .then((r) => logger.info({ sourceId, entities: r.entitiesInserted }, 'Entity extraction done'))
-      .catch((err) => logger.warn({ sourceId, err }, 'Entity extraction failed (non-fatal)'));
+      .then((r) => {
+        logger.info({ sourceId, entities: r.entitiesInserted }, 'Entity extraction done');
+        // Chain cross-referencing after entities are available
+        return import('./crossReferencer.js').then((m) =>
+          m.crossReferenceForSource(sourceId, { isResync }),
+        );
+      })
+      .then((r) => {
+        if (r) logger.info({ sourceId, confirmed: r.confirmed, unconfirmed: r.unconfirmed }, 'Cross-referencing done');
+      })
+      .catch((err) => logger.warn({ sourceId, err }, 'Entity extraction or cross-referencing failed (non-fatal)'));
 
     // ── Step 6: Find cross-diary event matches in background ──
     import('./eventMatcher.js')

@@ -14,6 +14,7 @@ interface FilterState {
   entity_names: string[];
   location: string;
   participants: string;
+  cross_ref_status: 'confirmed' | 'unconfirmed' | '';
   sort: 'date_asc' | 'date_desc' | 'relevance';
   page: number;
 
@@ -27,6 +28,7 @@ interface FilterState {
   setEntityNames: (names: string[]) => void;
   setLocation: (location: string) => void;
   setParticipants: (participants: string) => void;
+  setCrossRefStatus: (status: 'confirmed' | 'unconfirmed' | '') => void;
   setSort: (sort: 'date_asc' | 'date_desc' | 'relevance') => void;
   setPage: (page: number) => void;
   reset: () => void;
@@ -49,6 +51,7 @@ const initialState = {
   entity_names: [] as string[],
   location: '',
   participants: '',
+  cross_ref_status: '' as '' | 'confirmed' | 'unconfirmed',
   sort: 'date_desc' as const,
   page: 1,
   advancedMode: false,
@@ -69,6 +72,7 @@ export const useFilterStore = create<FilterState>((set) => ({
   setEntityNames: (entity_names) => set({ entity_names, page: 1 }),
   setLocation: (location) => set({ location, page: 1 }),
   setParticipants: (participants) => set({ participants, page: 1 }),
+  setCrossRefStatus: (cross_ref_status) => set({ cross_ref_status, page: 1 }),
   setSort: (sort) => set({ sort, page: 1 }),
   setPage: (page) => set({ page }),
   reset: () => set(initialState),

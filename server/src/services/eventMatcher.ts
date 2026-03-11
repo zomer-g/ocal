@@ -28,7 +28,7 @@ const ABBREVIATIONS: Record<string, string> = {
   'סמנכ"ל': 'סגן מנהל כללי',
 };
 
-function normalizeTitle(title: string): string {
+export function normalizeTitle(title: string): string {
   let t = title.normalize('NFC');
   t = t.replace(NIKUD_RE, '');
   t = t.replace(ZERO_WIDTH_RE, '');

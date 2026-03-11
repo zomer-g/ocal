@@ -42,6 +42,7 @@ export interface EventSearchParams {
   location?: string;
   participants?: string;
   entity_names?: string[];
+  cross_ref_status?: 'confirmed' | 'unconfirmed';
   sort?: 'date_asc' | 'date_desc' | 'relevance';
   offset: number;
   limit: number;
@@ -60,6 +61,7 @@ export const DiaryEventModel = {
       's.color as source_color',
       db.raw('(SELECT total_events FROM similar_events WHERE id = e.match_group_id) as match_count'),
       db.raw(`(SELECT json_agg(sub) FROM (SELECT ee.entity_name AS name, ee.entity_type AS type FROM event_entities ee WHERE ee.event_id = e.id AND ee.confidence >= 0.5 GROUP BY ee.entity_name, ee.entity_type ORDER BY MAX(ee.confidence) DESC LIMIT 5) sub) AS top_entities`),
+      db.raw(`(SELECT json_build_object('confirmed', COUNT(*) FILTER (WHERE status='confirmed'), 'unconfirmed', COUNT(*) FILTER (WHERE status='unconfirmed'), 'total', COUNT(*)) FROM entity_cross_refs WHERE source_event_id = e.id) AS cross_ref_summary`),
     ];
 
     // Full-text search
@@ -109,6 +111,14 @@ export const DiaryEventModel = {
             `LOWER(TRIM(ee.entity_name)) IN (${normalized.map(() => '?').join(',')})`,
             normalized,
           );
+      });
+    }
+    if (params.cross_ref_status) {
+      query = query.whereExists(function () {
+        this.select(db.raw('1'))
+          .from('entity_cross_refs as ecr')
+          .whereRaw('ecr.source_event_id = e.id')
+          .where('ecr.status', params.cross_ref_status!);
       });
     }
 

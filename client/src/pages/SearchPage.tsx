@@ -42,6 +42,7 @@ export function SearchPage() {
     entity_names: filters.entity_names.length ? filters.entity_names.join('||') : undefined,
     location: filters.location || undefined,
     participants: filters.participants || undefined,
+    cross_ref_status: filters.cross_ref_status || undefined,
     sort: filters.sort,
     page: filters.page,
     per_page: 50,
@@ -99,7 +100,7 @@ export function SearchPage() {
         >
           <SlidersHorizontal className="w-4 h-4" />
           סינון
-          {(filters.from_date || filters.to_date || filters.source_ids.length > 0 || filters.location || filters.participants || filters.entity_names.length > 0) && (
+          {(filters.from_date || filters.to_date || filters.source_ids.length > 0 || filters.location || filters.participants || filters.entity_names.length > 0 || filters.cross_ref_status) && (
             <span className="w-2 h-2 rounded-full bg-primary-600" />
           )}
         </button>

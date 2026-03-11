@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatTime, formatHebrewDate } from '@/lib/formatters';
-import { X, MapPin, Users, Clock, ExternalLink, Calendar, Tag, BookOpen } from 'lucide-react';
+import { X, MapPin, Users, Clock, ExternalLink, Calendar, Tag, BookOpen, CheckCircle2, XCircle, ArrowLeftRight } from 'lucide-react';
 import type { DiaryEvent } from '@/api/events';
-import { getEventEntities, getEventMatches } from '@/api/events';
+import { getEventEntities, getEventMatches, getEventCrossRefs } from '@/api/events';
 import { useCalendarStore } from '@/stores/calendarStore';
 
 interface EventDetailModalProps {
@@ -46,6 +46,17 @@ export function EventDetailModal({ event, onClose }: EventDetailModalProps) {
     staleTime: 5 * 60 * 1000,
   });
   const matchedEvents = matchesData?.matched_events ?? [];
+
+  // Fetch cross-refs
+  const crossRefSummary = event.cross_ref_summary;
+  const hasCrossRefs = crossRefSummary && crossRefSummary.total > 0;
+  const { data: crossRefsData } = useQuery({
+    queryKey: ['event-cross-refs', event.id],
+    queryFn: () => getEventCrossRefs(event.id),
+    enabled: !!hasCrossRefs,
+    staleTime: 5 * 60 * 1000,
+  });
+  const crossRefs = crossRefsData?.cross_refs ?? [];
 
   // Group entities by type
   const personEntities = entities.filter((e) => e.entity_type === 'person');
@@ -249,6 +260,46 @@ export function EventDetailModal({ event, onClose }: EventDetailModalProps) {
                       {me.location && (
                         <div className="text-gray-400 text-xs truncate">{me.location}</div>
                       )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Cross-references — verify participant meetings across diaries */}
+          {crossRefs.length > 0 && (
+            <div className="border-t pt-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-500" aria-hidden="true" />
+                <span className="text-xs font-semibold text-indigo-700">הצלבה מול יומנים</span>
+              </div>
+              <div className="space-y-1.5">
+                {crossRefs.map((cr) => (
+                  <div key={cr.id} className="flex items-start gap-2 text-sm">
+                    {cr.status === 'confirmed' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />
+                    ) : (
+                      <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-xs">
+                        <span className="font-medium text-gray-700">{cr.target_person_name}</span>
+                        {cr.status === 'confirmed' ? (
+                          <span className="text-green-600">
+                            {' '}— אומת
+                            <span className="text-gray-400">
+                              {' '}({cr.target_source_name}
+                              {cr.matched_title && `: "${cr.matched_title}"`})
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-red-500">
+                            {' '}— לא אומת
+                            <span className="text-gray-400"> (ליומן {cr.target_source_name} אין רישום ביום זה)</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

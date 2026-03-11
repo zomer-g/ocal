@@ -4,7 +4,7 @@ import { useFilterStore } from '@/stores/filterStore';
 import { useSources } from '@/hooks/useSources';
 import { getPublicEntities } from '@/api/events';
 import { FilterSection } from './FilterSection';
-import { Calendar, Users, Building2, MapPin, BookOpen, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calendar, Users, Building2, MapPin, BookOpen, ChevronDown, ChevronRight, ArrowLeftRight } from 'lucide-react';
 
 const HEBREW_MONTHS = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
@@ -63,8 +63,8 @@ function SkeletonRows() {
 
 export function FilterPanel() {
   const {
-    from_date, to_date, source_ids, entity_names,
-    setDateRange, setSourceIds, setEntityNames,
+    from_date, to_date, source_ids, entity_names, cross_ref_status,
+    setDateRange, setSourceIds, setEntityNames, setCrossRefStatus,
     clearDateRange, clearEntities, clearSources, reset,
   } = useFilterStore();
 
@@ -224,7 +224,7 @@ export function FilterPanel() {
     setEntityNames(entity_names.filter((n) => !typeNames.has(n)));
   };
 
-  const hasAnyFilter = from_date || to_date || source_ids.length > 0 || entity_names.length > 0;
+  const hasAnyFilter = from_date || to_date || source_ids.length > 0 || entity_names.length > 0 || cross_ref_status;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 overflow-hidden" role="region" aria-label="סינון תוצאות">
@@ -440,6 +440,36 @@ export function FilterPanel() {
           </FilterSection>
         </div>
       )}
+
+      {/* ── הצלבה ── */}
+      <div className="px-4">
+        <FilterSection
+          title="סטטוס הצלבה"
+          icon={<ArrowLeftRight className="w-3.5 h-3.5" />}
+          selectedCount={cross_ref_status ? 1 : 0}
+          onClearAll={cross_ref_status ? () => setCrossRefStatus('') : undefined}
+        >
+          <div className="flex gap-1">
+            {([
+              { value: '', label: 'הכל' },
+              { value: 'confirmed', label: 'אומת' },
+              { value: 'unconfirmed', label: 'לא אומת' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setCrossRefStatus(opt.value)}
+                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  cross_ref_status === opt.value
+                    ? 'bg-primary-100 border-primary-300 text-primary-800 font-medium'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-primary-50 hover:border-primary-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </FilterSection>
+      </div>
     </div>
   );
 }

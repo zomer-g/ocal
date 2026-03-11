@@ -8,6 +8,7 @@ export interface EventSearchParams {
   entity_names?: string;
   location?: string;
   participants?: string;
+  cross_ref_status?: 'confirmed' | 'unconfirmed';
   page?: number;
   per_page?: number;
   sort?: 'date_asc' | 'date_desc' | 'relevance';
@@ -37,6 +38,7 @@ export interface DiaryEvent {
   match_count?: number | null;
   other_fields?: Record<string, unknown> | null;
   top_entities?: Array<{ name: string; type: string }> | null;
+  cross_ref_summary?: CrossRefSummary | null;
 }
 
 export interface EventSearchResponse {
@@ -117,5 +119,39 @@ export interface EventMatchesResponse {
 
 export async function getEventMatches(eventId: string): Promise<EventMatchesResponse> {
   const { data } = await api.get(`/public/events/${eventId}/matches`);
+  return data;
+}
+
+// ── Cross-References ──
+
+export interface CrossRefSummary {
+  confirmed: number;
+  unconfirmed: number;
+  total: number;
+}
+
+export interface CrossRefDetail {
+  id: string;
+  status: 'confirmed' | 'unconfirmed';
+  match_method: 'match_group' | 'title_similarity' | 'time_overlap' | null;
+  match_score: number | null;
+  event_date: string;
+  entity_name: string;
+  target_person_name: string;
+  target_source_name: string;
+  target_source_color: string;
+  matched_event_id: string | null;
+  matched_title: string | null;
+  matched_start_time: string | null;
+  matched_location: string | null;
+}
+
+export interface EventCrossRefsResponse {
+  cross_refs: CrossRefDetail[];
+  summary: CrossRefSummary;
+}
+
+export async function getEventCrossRefs(eventId: string): Promise<EventCrossRefsResponse> {
+  const { data } = await api.get(`/public/events/${eventId}/cross-refs`);
   return data;
 }
