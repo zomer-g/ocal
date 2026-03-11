@@ -171,6 +171,8 @@ export function SyncPage() {
             },
             isProfileLoading: profileMutation.isPending,
             profilingResourceId: profileMutation.variables?.resourceId,
+            profileError: profileMutation.isError ? (profileMutation.error as Error) : null,
+            profileErrorResourceId: profileMutation.isError ? profileMutation.variables?.resourceId : undefined,
             activeProfile,
             importName,
             importColor,
@@ -260,6 +262,8 @@ function DatasetCard({
   onSheetChange,
   isProfileLoading,
   profilingResourceId,
+  profileError,
+  profileErrorResourceId,
   activeProfile,
   importName,
   importColor,
@@ -285,6 +289,8 @@ function DatasetCard({
   onSheetChange: (sheetName: string) => void;
   isProfileLoading: boolean;
   profilingResourceId?: string;
+  profileError: Error | null;
+  profileErrorResourceId?: string;
   activeProfile: ProfileResponse | null;
   importName: string;
   importColor: string;
@@ -389,6 +395,20 @@ function DatasetCard({
                     {isSynced ? 'מיובא' : 'פרופיל'}
                   </button>
                 </div>
+
+                {/* ── Profile error (shown inline for the resource that failed) ── */}
+                {profileError && profileErrorResourceId === resource.id && (
+                  <div className="bg-red-50 border-t border-red-200 px-3 sm:px-4 py-3 flex items-center gap-2 text-xs text-red-700">
+                    <XCircle className="w-4 h-4 shrink-0" />
+                    <span className="flex-1">שגיאה בטעינת פרופיל: {profileError.message}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onProfile(resource.id); }}
+                      className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded hover:bg-red-200 shrink-0"
+                    >
+                      נסה שוב
+                    </button>
+                  </div>
+                )}
 
                 {/* ── Inline Profile + Import panel (everything together) ── */}
                 {isActive && activeProfile && importMapping && (
