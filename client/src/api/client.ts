@@ -19,6 +19,11 @@ api.interceptors.response.use(
     ) {
       window.location.href = '/admin/login';
     }
+    // Extract server error message so UI shows it instead of generic "Request failed with status code 500"
+    const serverMessage = error.response?.data?.error;
+    if (serverMessage && typeof serverMessage === 'string') {
+      error.message = serverMessage;
+    }
     return Promise.reject(error);
   }
 );

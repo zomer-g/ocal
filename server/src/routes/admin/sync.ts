@@ -67,7 +67,7 @@ const profileSchema = z.object({
   sheet_name: z.string().optional(),
 });
 
-adminSyncRouter.post('/profile', validate(profileSchema, 'body'), async (req, res, next) => {
+adminSyncRouter.post('/profile', validate(profileSchema, 'body'), async (req, res) => {
   try {
     const profile = await profileSource(req.body.resource_id, req.body.sheet_name);
 
@@ -92,8 +92,15 @@ adminSyncRouter.post('/profile', validate(profileSchema, 'body'), async (req, re
       sheet_name: profile.sheetName,
       available_sheets: profile.availableSheets,
     });
-  } catch (err) {
-    next(err);
+  } catch (err: unknown) {
+    // Return a descriptive error instead of generic 500
+    const axiosErr = err as { isAxiosError?: boolean; response?: { status: number }; message?: string };
+    const message = axiosErr.isAxiosError && axiosErr.response
+      ? `ODATA השיב שגיאה ${axiosErr.response.status} — ייתכן שהקובץ לא זמין או שהשרת לא מגיב`
+      : (err instanceof Error ? err.message : 'שגיאה לא ידועה');
+    const status = axiosErr.isAxiosError && axiosErr.response ? 502 : 500;
+    logger.error({ err, resourceId: req.body.resource_id }, 'Profile failed');
+    res.status(status).json({ error: message });
   }
 });
 
