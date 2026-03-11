@@ -398,16 +398,17 @@ function DatasetCard({
 
                 {/* ── Profile error (shown inline for the resource that failed) ── */}
                 {profileError && profileErrorResourceId === resource.id && (
-                  <div className="bg-red-50 border-t border-red-200 px-3 sm:px-4 py-3 flex items-center gap-2 text-xs text-red-700">
-                    <XCircle className="w-4 h-4 shrink-0" />
-                    <span className="flex-1">שגיאה בטעינת פרופיל: {profileError.message}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onProfile(resource.id); }}
-                      className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded hover:bg-red-200 shrink-0"
-                    >
-                      נסה שוב
-                    </button>
-                  </div>
+                  <ProfileErrorBanner
+                    error={profileError}
+                    datasetTitle={dataset.title}
+                    resourceName={resource.name}
+                    resourceId={resource.id}
+                    resourceUrl={resource.url}
+                    resourceFormat={resource.format}
+                    odataUrl={resource.odata_url}
+                    onRetry={() => onProfile(resource.id)}
+                    isRetrying={isProfileLoading && profilingResourceId === resource.id}
+                  />
                 )}
 
                 {/* ── Inline Profile + Import panel (everything together) ── */}
@@ -882,6 +883,81 @@ function InlineImportPanel({
 // ────────────────────────────────────────────
 // Small helpers
 // ────────────────────────────────────────────
+
+function ProfileErrorBanner({
+  error,
+  datasetTitle,
+  resourceName,
+  resourceId,
+  resourceUrl,
+  resourceFormat,
+  odataUrl,
+  onRetry,
+  isRetrying,
+}: {
+  error: Error;
+  datasetTitle: string;
+  resourceName: string;
+  resourceId: string;
+  resourceUrl: string;
+  resourceFormat: string;
+  odataUrl: string;
+  onRetry: () => void;
+  isRetrying: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copyLog = () => {
+    const log = [
+      'שגיאת פרופיל',
+      '',
+      `שגיאה: ${error.message}`,
+      '',
+      `מאגר: ${datasetTitle}`,
+      `משאב: ${resourceName}`,
+      `מזהה משאב: ${resourceId}`,
+      `פורמט: ${resourceFormat}`,
+      `קישור משאב: ${odataUrl}`,
+      `כתובת הורדה: ${resourceUrl}`,
+    ].join('\n');
+    navigator.clipboard.writeText(log).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+
+  return (
+    <div className="bg-red-50 border-t border-red-200 px-3 sm:px-4 py-3 flex items-center gap-2 text-xs text-red-700">
+      <XCircle className="w-4 h-4 shrink-0" />
+      <span className="flex-1">שגיאה בטעינת פרופיל: {error.message}</span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          copyLog();
+        }}
+        className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors shrink-0 ${
+          copied
+            ? 'border-green-300 bg-green-50 text-green-700'
+            : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-600'
+        }`}
+        title="העתק דיווח ללוח"
+      >
+        {copied
+          ? <><ClipboardCheck className="w-3 h-3" />הועתק</>
+          : <><Clipboard className="w-3 h-3" />העתק דיווח</>
+        }
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onRetry(); }}
+        disabled={isRetrying}
+        className="px-2 py-1 text-xs font-medium bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-50 flex items-center gap-1 shrink-0"
+      >
+        {isRetrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileSpreadsheet className="w-3 h-3" />}
+        פרופיל
+      </button>
+    </div>
+  );
+}
 
 function FormatBadge({ format }: { format: string }) {
   const colors: Record<string, string> = {
