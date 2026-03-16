@@ -66,7 +66,7 @@ function parseUrlToState(search: string) {
         const op = c.slice(0, colonIdx).toUpperCase();
         const term = c.slice(colonIdx + 1);
         if ((op !== 'AND' && op !== 'OR') || !term) return null;
-        return { id: crypto.randomUUID(), operator: op as 'AND' | 'OR', term };
+        return { id: crypto.randomUUID() as string, operator: op as 'AND' | 'OR', term };
       })
       .filter((c): c is ExtraCondition => c !== null);
     if (extraConditions.length > 0) {
