@@ -43,7 +43,7 @@ interface FilterState {
   removeExtraCondition: (id: string) => void;
 }
 
-const initialState = {
+export const initialState = {
   q: '',
   from_date: '',
   to_date: '',

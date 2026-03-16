@@ -8,9 +8,11 @@ import { useFilterStore } from '@/stores/filterStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useEvents } from '@/hooks/useEvents';
 import { useStats } from '@/hooks/useStats';
+import { useUrlSync } from '@/hooks/useUrlSync';
 import { Loader2, SlidersHorizontal, X, ArrowUpDown } from 'lucide-react';
 
 export function SearchPage() {
+  useUrlSync();
   const filters = useFilterStore();
   const { hideFutureEvents } = useSettingsStore();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
