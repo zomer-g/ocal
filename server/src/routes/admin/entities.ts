@@ -4,6 +4,10 @@ import { logger } from '../../utils/logger.js';
 
 export const adminEntitiesRouter = Router();
 
+// ── Stats cache (unfiltered, changes slowly) ──
+let _statsCache: { data: Record<string, number>; expiresAt: number } | null = null;
+const STATS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 // GET /api/admin/entities
 // Returns aggregated unique entities across ALL sources, grouped by entity_name + entity_type.
 // Query: ?type=person|organization|place&search=...&page=1&limit=100
@@ -15,9 +19,11 @@ adminEntitiesRouter.get('/', async (req, res, next) => {
     const typeFilter = req.query.type as string | undefined;
     const search = req.query.search as string | undefined;
 
+    // Main data query — confidence >= 0.5 enables partial index idx_ee_agg_name_type
     let query = db('event_entities as ee')
       .join('diary_events as de', 'de.id', 'ee.event_id')
       .join('diary_sources as ds', 'ds.id', 'de.source_id')
+      .where('ee.confidence', '>=', 0.5)
       .select(
         'ee.entity_name',
         'ee.entity_type',
@@ -43,8 +49,9 @@ adminEntitiesRouter.get('/', async (req, res, next) => {
         FROM event_entities ee
         JOIN diary_events de ON de.id = ee.event_id
         JOIN diary_sources ds ON ds.id = de.source_id
-        ${typeFilter ? `WHERE ee.entity_type = ?` : ''}
-        ${search?.trim() ? `${typeFilter ? 'AND' : 'WHERE'} ee.entity_name ILIKE ?` : ''}
+        WHERE ee.confidence >= 0.5
+        ${typeFilter ? `AND ee.entity_type = ?` : ''}
+        ${search?.trim() ? `AND ee.entity_name ILIKE ?` : ''}
         GROUP BY ee.entity_name, ee.entity_type
       ) sub`,
       [
@@ -53,6 +60,7 @@ adminEntitiesRouter.get('/', async (req, res, next) => {
       ]
     );
 
+    // Run data + count in parallel (2 connections), then stats from cache
     const [countResult, data] = await Promise.all([
       countQuery,
       query.orderBy('event_count', 'desc').limit(limit).offset(offset),
@@ -60,29 +68,34 @@ adminEntitiesRouter.get('/', async (req, res, next) => {
 
     const total = Number(countResult.rows?.[0]?.cnt ?? 0);
 
-    // Stats aggregation (unfiltered)
-    const stats = await db('event_entities as ee')
-      .join('diary_events as de', 'de.id', 'ee.event_id')
-      .select(
-        db.raw('COUNT(DISTINCT CONCAT(ee.entity_name, ee.entity_type)) as total_unique'),
-        db.raw(`COUNT(DISTINCT CASE WHEN ee.entity_type = 'person' THEN ee.entity_name END) as person_count`),
-        db.raw(`COUNT(DISTINCT CASE WHEN ee.entity_type = 'organization' THEN ee.entity_name END) as org_count`),
-        db.raw(`COUNT(DISTINCT CASE WHEN ee.entity_type = 'place' THEN ee.entity_name END) as place_count`),
-      )
-      .first();
+    // Stats: serve from cache to avoid a 3rd heavy query
+    let stats = _statsCache && Date.now() < _statsCache.expiresAt ? _statsCache.data : null;
+    if (!stats) {
+      try {
+        const row = await db('event_entities as ee')
+          .join('diary_events as de', 'de.id', 'ee.event_id')
+          .where('ee.confidence', '>=', 0.5)
+          .select(
+            db.raw('COUNT(DISTINCT CONCAT(ee.entity_name, ee.entity_type)) as total_unique'),
+            db.raw(`COUNT(DISTINCT CASE WHEN ee.entity_type = 'person' THEN ee.entity_name END) as person_count`),
+            db.raw(`COUNT(DISTINCT CASE WHEN ee.entity_type = 'organization' THEN ee.entity_name END) as org_count`),
+            db.raw(`COUNT(DISTINCT CASE WHEN ee.entity_type = 'place' THEN ee.entity_name END) as place_count`),
+          )
+          .first();
+        stats = {
+          total_unique: Number(row?.total_unique ?? 0),
+          person: Number(row?.person_count ?? 0),
+          organization: Number(row?.org_count ?? 0),
+          place: Number(row?.place_count ?? 0),
+        };
+        _statsCache = { data: stats, expiresAt: Date.now() + STATS_CACHE_TTL };
+      } catch {
+        // If stats query fails, return zeros — don't block the response
+        stats = { total_unique: 0, person: 0, organization: 0, place: 0 };
+      }
+    }
 
-    res.json({
-      data,
-      total,
-      page,
-      limit,
-      stats: {
-        total_unique: Number(stats?.total_unique ?? 0),
-        person: Number(stats?.person_count ?? 0),
-        organization: Number(stats?.org_count ?? 0),
-        place: Number(stats?.place_count ?? 0),
-      },
-    });
+    res.json({ data, total, page, limit, stats });
   } catch (err) {
     next(err);
   }
