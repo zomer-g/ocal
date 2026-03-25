@@ -167,12 +167,19 @@ export async function discoverDiaryResources(query: string = 'יומן'): Promis
 
   let totalResources = 0;
   const datasets = allPackages.map(pkg => {
-    const resources = pkg.resources
+    let resources = pkg.resources
       .filter(r => {
         const fmt = r.format.toUpperCase();
         return r.datastore_active || isSupportedFormat(fmt);
-      })
-      .map(r => {
+      });
+
+    // Hide CKAN auto-generated "Converted CSV" duplicates when originals exist
+    const hasNonConverted = resources.some(r => !r.name.toLowerCase().includes('converted csv'));
+    if (hasNonConverted) {
+      resources = resources.filter(r => !r.name.toLowerCase().includes('converted csv'));
+    }
+
+    const mapped = resources.map(r => {
         totalResources++;
         const fmt = r.format.toUpperCase();
         return {
@@ -191,7 +198,7 @@ export async function discoverDiaryResources(query: string = 'יומן'): Promis
       id: pkg.id,
       title: pkg.title,
       organization: pkg.organization?.title || null,
-      resources,
+      resources: mapped,
     };
   }).filter(d => d.resources.length > 0);
 
