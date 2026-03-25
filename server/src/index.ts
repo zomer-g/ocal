@@ -14,6 +14,9 @@ import { warmEntityCache } from './routes/public/entities.js';
 
 const app = express();
 
+// Render (and most PaaS) runs behind a reverse proxy
+app.set('trust proxy', 1);
+
 // Core middleware
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
