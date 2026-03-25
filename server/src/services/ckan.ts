@@ -151,10 +151,22 @@ export async function discoverDiaryResources(query: string = 'יומן'): Promis
   totalDatasets: number;
   totalResources: number;
 }> {
-  const { packages, totalCount } = await searchDatasets(query, 200);
+  // Paginate through all results — some CKAN instances have >200 diary datasets
+  let allPackages: CKANPackage[] = [];
+  let start = 0;
+  const pageSize = 200;
+  let totalCount = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const page = await searchDatasets(query, pageSize, start);
+    totalCount = page.totalCount;
+    allPackages = allPackages.concat(page.packages);
+    if (allPackages.length >= totalCount || page.packages.length < pageSize) break;
+    start += pageSize;
+  }
 
   let totalResources = 0;
-  const datasets = packages.map(pkg => {
+  const datasets = allPackages.map(pkg => {
     const resources = pkg.resources
       .filter(r => {
         const fmt = r.format.toUpperCase();

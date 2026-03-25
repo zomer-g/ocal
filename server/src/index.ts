@@ -6,7 +6,7 @@ import path from 'path';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
-import { publicApiLimiter } from './middleware/rateLimiter.js';
+import { globalApiLimiter, publicApiLimiter } from './middleware/rateLimiter.js';
 import { publicRoutes } from './routes/public/index.js';
 import { adminRoutes } from './routes/admin/index.js';
 import { startScheduler } from './services/scheduler.js';
@@ -25,7 +25,8 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Routes
+// Routes — global limiter protects against multi-IP bot floods
+app.use('/api', globalApiLimiter);
 app.use('/api/public', publicApiLimiter, publicRoutes);
 app.use('/api/admin', adminRoutes);
 

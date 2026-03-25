@@ -14,5 +14,9 @@ export const db = knex({
   pool: {
     min: 2,
     max: 10,
+    acquireTimeoutMillis: 10_000,  // fail fast instead of waiting 60s
+    afterCreate(conn: pg.Client, done: (err: Error | null, conn: pg.Client) => void) {
+      conn.query('SET statement_timeout = 15000', (err: Error | null) => done(err, conn));
+    },
   },
 });

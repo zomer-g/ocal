@@ -470,6 +470,25 @@ export async function runScan(): Promise<ScanResult> {
         result.errors.push(`Evaluation failed for ${resource.resourceId}: ${msg}`);
         result.resourcesSkipped++;
         logger.warn({ resourceId: resource.resourceId, err: msg }, 'Resource evaluation failed');
+
+        // Track failed evaluations so they don't reappear as "new" on every scan
+        try {
+          await db('auto_import_queue')
+            .insert({
+              resource_id: resource.resourceId,
+              dataset_id: resource.datasetId,
+              dataset_title: resource.datasetTitle,
+              resource_name: resource.resourceName,
+              resource_format: resource.format,
+              organization: resource.organization,
+              status: 'error',
+              failure_reason: msg,
+            })
+            .onConflict('resource_id')
+            .ignore();
+        } catch {
+          // non-critical — just means it'll retry next scan
+        }
       }
 
       // Delay between resources to avoid overwhelming ODATA
