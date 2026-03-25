@@ -500,31 +500,36 @@ export async function runScan(): Promise<ScanResult> {
     const msg = err instanceof Error ? err.message : String(err);
     result.errors.push(`Scan error: ${msg}`);
     logger.error({ err: msg }, 'Auto-import scan failed');
+  } finally {
+    result.durationMs = Date.now() - startTime;
+
+    // Always attempt to update the scan log, even if DB is under pressure
+    try {
+      await db('auto_import_logs').where({ id: scanLog.id }).update({
+        scan_completed_at: new Date(),
+        resources_discovered: result.resourcesDiscovered,
+        resources_new: result.resourcesNew,
+        resources_auto_imported: result.resourcesAutoImported,
+        resources_queued: result.resourcesQueued,
+        resources_skipped: result.resourcesSkipped,
+        errors: result.errors.length > 0 ? result.errors : null,
+        duration_ms: result.durationMs,
+      });
+    } catch (dbErr) {
+      logger.error({ dbErr, scanLogId: scanLog.id },
+        'Failed to update scan log — result will not be persisted');
+    }
+
+    logger.info({
+      discovered: result.resourcesDiscovered,
+      new: result.resourcesNew,
+      autoImported: result.resourcesAutoImported,
+      queued: result.resourcesQueued,
+      skipped: result.resourcesSkipped,
+      errors: result.errors.length,
+      durationMs: result.durationMs,
+    }, 'Auto-import scan completed');
   }
-
-  result.durationMs = Date.now() - startTime;
-
-  // Update scan log
-  await db('auto_import_logs').where({ id: scanLog.id }).update({
-    scan_completed_at: new Date(),
-    resources_discovered: result.resourcesDiscovered,
-    resources_new: result.resourcesNew,
-    resources_auto_imported: result.resourcesAutoImported,
-    resources_queued: result.resourcesQueued,
-    resources_skipped: result.resourcesSkipped,
-    errors: result.errors.length > 0 ? result.errors : null,
-    duration_ms: result.durationMs,
-  });
-
-  logger.info({
-    discovered: result.resourcesDiscovered,
-    new: result.resourcesNew,
-    autoImported: result.resourcesAutoImported,
-    queued: result.resourcesQueued,
-    skipped: result.resourcesSkipped,
-    errors: result.errors.length,
-    durationMs: result.durationMs,
-  }, 'Auto-import scan completed');
 
   return result;
 }

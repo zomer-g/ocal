@@ -151,18 +151,35 @@ export async function discoverDiaryResources(query: string = 'יומן'): Promis
   totalDatasets: number;
   totalResources: number;
 }> {
-  // Paginate through all results — some CKAN instances have >200 diary datasets
+  // Paginate through results with a cap to avoid CKAN API timeouts
+  // (search for "יומן" returns 1500+ results; most beyond ~300 are irrelevant)
+  const MAX_DATASETS = 500;
   let allPackages: CKANPackage[] = [];
   let start = 0;
   const pageSize = 200;
   let totalCount = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const page = await searchDatasets(query, pageSize, start);
+    let page;
+    try {
+      page = await searchDatasets(query, pageSize, start);
+    } catch (err) {
+      logger.warn({ start, pageSize, err: err instanceof Error ? err.message : String(err) },
+        'CKAN page fetch failed — proceeding with datasets fetched so far');
+      break;
+    }
     totalCount = page.totalCount;
     allPackages = allPackages.concat(page.packages);
-    if (allPackages.length >= totalCount || page.packages.length < pageSize) break;
+    if (
+      allPackages.length >= totalCount ||
+      page.packages.length < pageSize ||
+      allPackages.length >= MAX_DATASETS
+    ) break;
     start += pageSize;
+  }
+  if (allPackages.length >= MAX_DATASETS && allPackages.length < totalCount) {
+    logger.info({ fetched: allPackages.length, total: totalCount },
+      'Dataset cap reached — not all CKAN results were fetched');
   }
 
   let totalResources = 0;
