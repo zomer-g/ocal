@@ -59,16 +59,22 @@ adminAutomationRouter.put('/settings', validate(settingsSchema, 'body'), async (
 // Scan
 // ──────────────────────────────────────────────
 
-// POST /api/admin/automation/scan — Trigger manual scan
+// POST /api/admin/automation/scan — Trigger manual scan (runs in background)
 adminAutomationRouter.post('/scan', async (_req, res, next) => {
   try {
-    const result = await triggerManualScan();
-    res.json(result);
-  } catch (err) {
-    if (err instanceof Error && err.message.includes('כבר מתבצעת')) {
-      res.status(409).json({ error: err.message });
+    // Check if scan is already in progress before starting
+    if (isScanActive()) {
+      res.status(409).json({ error: 'סריקה כבר מתבצעת — נסה שוב מאוחר יותר' });
       return;
     }
+
+    // Start scan in background — don't block HTTP response (scan takes minutes)
+    triggerManualScan()
+      .then((result) => logger.info({ result }, 'Manual scan completed'))
+      .catch((err) => logger.error({ err }, 'Manual scan failed'));
+
+    res.json({ message: 'הסריקה החלה ברקע. רענן את הדף בעוד כדקה.' });
+  } catch (err) {
     next(err);
   }
 });
@@ -116,19 +122,20 @@ adminAutomationRouter.get('/queue', async (req, res, next) => {
 });
 
 // POST /api/admin/automation/queue/clear-and-rescan
-// Deletes all pending+error items so the next scan re-evaluates them with latest code
+// Deletes ALL queue items and triggers a background re-scan with latest code
 adminAutomationRouter.post('/queue/clear-and-rescan', async (_req, res, next) => {
   try {
-    const deleted = await db('auto_import_queue')
-      .whereIn('status', ['pending', 'error'])
-      .del();
+    // Clear ALL queue items so they get re-evaluated as "new"
+    const deleted = await db('auto_import_queue').del();
 
-    logger.info({ deleted }, 'Cleared pending/error queue items for re-scan');
+    logger.info({ deleted }, 'Cleared all queue items for full re-scan');
 
-    // Trigger a new scan
-    const result = await triggerManualScan();
+    // Start scan in background — don't block HTTP response
+    triggerManualScan()
+      .then((result) => logger.info({ result }, 'Background re-scan completed'))
+      .catch((err) => logger.error({ err }, 'Background re-scan failed'));
 
-    res.json({ cleared: deleted, scan: result });
+    res.json({ cleared: deleted, message: 'הסריקה החלה ברקע. רענן את הדף בעוד כדקה.' });
   } catch (err) {
     if (err instanceof Error && err.message.includes('כבר מתבצעת')) {
       res.status(409).json({ error: err.message });

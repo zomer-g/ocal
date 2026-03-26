@@ -79,17 +79,24 @@ export function AutomationPage() {
   const { data: status, isLoading: statusLoading } = useQuery({
     queryKey: ['automation-status'],
     queryFn: getAutomationStatus,
-    refetchInterval: 10000,
+    refetchInterval: (query) => {
+      // Poll every 5s while scan is in progress, otherwise every 15s
+      return query.state.data?.scan_in_progress ? 5000 : 15000;
+    },
   });
+
+  const scanInProgress = !!status?.scan_in_progress;
 
   const { data: pendingQueue } = useQuery({
     queryKey: ['automation-queue', 'pending'],
     queryFn: () => getAutomationQueue({ status: 'pending', limit: 50 }),
+    refetchInterval: scanInProgress ? 8000 : false,
   });
 
   const { data: importedQueue } = useQuery({
     queryKey: ['automation-queue', 'imported'],
     queryFn: () => getAutomationQueue({ status: 'auto_imported', limit: 50 }),
+    refetchInterval: scanInProgress ? 8000 : false,
   });
 
   const { data: logs } = useQuery({
@@ -191,12 +198,10 @@ export function AutomationPage() {
         settings={settings}
         isLoading={statusLoading}
         isSaving={settingsMutation.isPending}
-        isScanning={scanMutation.isPending || rescanMutation.isPending || !!status?.scan_in_progress}
+        isScanning={scanMutation.isPending || rescanMutation.isPending || scanInProgress}
         onSave={(updates) => settingsMutation.mutate(updates)}
         onScan={() => scanMutation.mutate()}
         onRescan={() => rescanMutation.mutate()}
-        scanResult={scanMutation.data}
-        rescanResult={rescanMutation.data}
       />
 
       {/* ── Flow explanation ── */}
@@ -285,8 +290,6 @@ function SettingsPanel({
   onSave,
   onScan,
   onRescan,
-  scanResult,
-  rescanResult,
 }: {
   settings: AutomationSettings | undefined;
   isLoading: boolean;
@@ -295,8 +298,6 @@ function SettingsPanel({
   onSave: (updates: Record<string, unknown>) => void;
   onScan: () => void;
   onRescan: () => void;
-  scanResult?: { resourcesNew: number; resourcesAutoImported: number; resourcesQueued: number; errors: string[] } | null;
-  rescanResult?: { cleared: number; scan: { resourcesNew: number; resourcesAutoImported: number; resourcesQueued: number; errors: string[] } } | null;
 }) {
   if (isLoading || !settings) {
     return (
@@ -390,27 +391,16 @@ function SettingsPanel({
           onClick={onRescan}
           disabled={isScanning}
           className="flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 disabled:opacity-50 transition-colors"
-          title="מוחק את כל הפריטים בסטטוס ממתין/שגיאה וסורק מחדש — מועיל אחרי שינוי קוד"
+          title="מוחק את כל הפריטים מהתור וסורק הכל מחדש"
         >
           {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           {isScanning ? 'סורק...' : 'נקה וסרוק מחדש'}
         </button>
 
-        {scanResult && (
-          <span className="text-xs text-gray-500">
-            נסרקו {scanResult.resourcesNew} חדשים —
-            {scanResult.resourcesAutoImported > 0 && ` ${scanResult.resourcesAutoImported} יובאו,`}
-            {scanResult.resourcesQueued > 0 && ` ${scanResult.resourcesQueued} בתור,`}
-            {scanResult.errors.length > 0 && ` ${scanResult.errors.length} שגיאות`}
-          </span>
-        )}
-
-        {rescanResult && (
-          <span className="text-xs text-gray-500">
-            נוקו {rescanResult.cleared} פריטים, נסרקו {rescanResult.scan.resourcesNew} חדשים —
-            {rescanResult.scan.resourcesAutoImported > 0 && ` ${rescanResult.scan.resourcesAutoImported} יובאו,`}
-            {rescanResult.scan.resourcesQueued > 0 && ` ${rescanResult.scan.resourcesQueued} בתור,`}
-            {rescanResult.scan.errors.length > 0 && ` ${rescanResult.scan.errors.length} שגיאות`}
+        {isScanning && (
+          <span className="text-xs text-yellow-600 flex items-center gap-1.5 bg-yellow-50 px-3 py-1.5 rounded-full">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            סריקה פועלת ברקע — התוצאות יתעדכנו אוטומטית
           </span>
         )}
       </div>

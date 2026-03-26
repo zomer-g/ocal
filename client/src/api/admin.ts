@@ -507,12 +507,12 @@ export async function updateAutomationSettings(updates: Partial<AutomationSettin
   return data;
 }
 
-export async function triggerScan(): Promise<ScanResult> {
+export async function triggerScan(): Promise<{ message: string }> {
   const { data } = await api.post('/admin/automation/scan');
   return data;
 }
 
-export async function clearAndRescan(): Promise<{ cleared: number; scan: ScanResult }> {
+export async function clearAndRescan(): Promise<{ cleared: number; message: string }> {
   const { data } = await api.post('/admin/automation/queue/clear-and-rescan');
   return data;
 }
