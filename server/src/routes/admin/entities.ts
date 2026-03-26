@@ -19,17 +19,15 @@ adminEntitiesRouter.get('/', async (req, res, next) => {
     const typeFilter = req.query.type as string | undefined;
     const search = req.query.search as string | undefined;
 
-    // Main data query — confidence >= 0.5 enables partial index idx_ee_agg_name_type
+    // Main data query — no joins needed, count directly from event_entities
+    // confidence >= 0.5 enables partial index idx_ee_agg_name_type
     let query = db('event_entities as ee')
-      .join('diary_events as de', 'de.id', 'ee.event_id')
-      .join('diary_sources as ds', 'ds.id', 'de.source_id')
       .where('ee.confidence', '>=', 0.5)
       .select(
         'ee.entity_name',
         'ee.entity_type',
         db.raw('MAX(ee.entity_id::text)::uuid as entity_id'),
-        db.raw('COUNT(DISTINCT de.id) as event_count'),
-        db.raw('COUNT(DISTINCT de.source_id) as source_count'),
+        db.raw('COUNT(DISTINCT ee.event_id) as event_count'),
         db.raw('MAX(ee.confidence) as max_confidence'),
         db.raw("string_agg(DISTINCT ee.extraction_method, ',' ORDER BY ee.extraction_method) as methods"),
       )
@@ -42,13 +40,11 @@ adminEntitiesRouter.get('/', async (req, res, next) => {
       query = query.where('ee.entity_name', 'ilike', `%${search.trim()}%`);
     }
 
-    // Count total unique entities
+    // Count total unique entities — single-table query, no joins
     const countQuery = db.raw(
       `SELECT COUNT(*) as cnt FROM (
         SELECT ee.entity_name, ee.entity_type
         FROM event_entities ee
-        JOIN diary_events de ON de.id = ee.event_id
-        JOIN diary_sources ds ON ds.id = de.source_id
         WHERE ee.confidence >= 0.5
         ${typeFilter ? `AND ee.entity_type = ?` : ''}
         ${search?.trim() ? `AND ee.entity_name ILIKE ?` : ''}
@@ -60,7 +56,7 @@ adminEntitiesRouter.get('/', async (req, res, next) => {
       ]
     );
 
-    // Run data + count in parallel (2 connections), then stats from cache
+    // Run data + count in parallel
     const [countResult, data] = await Promise.all([
       countQuery,
       query.orderBy('event_count', 'desc').limit(limit).offset(offset),
@@ -73,7 +69,6 @@ adminEntitiesRouter.get('/', async (req, res, next) => {
     if (!stats) {
       try {
         const row = await db('event_entities as ee')
-          .join('diary_events as de', 'de.id', 'ee.event_id')
           .where('ee.confidence', '>=', 0.5)
           .select(
             db.raw('COUNT(DISTINCT CONCAT(ee.entity_name, ee.entity_type)) as total_unique'),

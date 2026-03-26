@@ -19,37 +19,40 @@ function setCache(key: string, data: unknown, ttl = CACHE_TTL): void {
   _cache.set(key, { data, expiresAt: Date.now() + ttl });
 }
 
-/** Run the entities aggregation query. */
+/** Run the entities aggregation query.
+ *  Optimized: first get valid event IDs, then aggregate entities.
+ *  Avoids expensive 3-way JOIN + GROUP BY that was timing out.
+ */
 async function queryEntities(opts: {
   sourceIds?: string[];
   typeFilter?: string;
   fromDate?: string;
   toDate?: string;
 }) {
+  // Step 1: Get enabled source IDs (small, fast query)
+  const enabledSources = await db('diary_sources').where('is_enabled', true).select('id');
+  const enabledIds = enabledSources.map(s => s.id);
+  if (enabledIds.length === 0) return [];
+
+  // Step 2: Build event filter — get event IDs matching source + date filters
+  let eventQuery = db('diary_events').whereIn('source_id', opts.sourceIds?.length ? opts.sourceIds : enabledIds);
+  if (opts.fromDate) eventQuery = eventQuery.where('event_date', '>=', opts.fromDate);
+  if (opts.toDate) eventQuery = eventQuery.where('event_date', '<=', opts.toDate);
+
+  // Step 3: Aggregate entities for those events only (single-table scan + filter)
   let query = db('event_entities as ee')
-    .join('diary_events as de', 'de.id', 'ee.event_id')
-    .join('diary_sources as ds', 'ds.id', 'de.source_id')
-    .where('ds.is_enabled', true)
     .where('ee.confidence', '>=', 0.5)
+    .whereIn('ee.event_id', eventQuery.select('id'))
     .select(
       'ee.entity_name',
       'ee.entity_type',
       db.raw('MAX(ee.entity_id::text)::uuid as entity_id'),
-      db.raw('COUNT(DISTINCT de.id) as event_count'),
+      db.raw('COUNT(DISTINCT ee.event_id) as event_count'),
     )
     .groupBy('ee.entity_name', 'ee.entity_type');
 
-  if (opts.sourceIds && opts.sourceIds.length > 0) {
-    query = query.whereIn('de.source_id', opts.sourceIds);
-  }
   if (opts.typeFilter) {
     query = query.where('ee.entity_type', opts.typeFilter);
-  }
-  if (opts.fromDate) {
-    query = query.where('de.event_date', '>=', opts.fromDate);
-  }
-  if (opts.toDate) {
-    query = query.where('de.event_date', '<=', opts.toDate);
   }
 
   return query.orderBy('event_count', 'desc').limit(200);
