@@ -11,7 +11,7 @@ import { adminOrgsRouter } from './orgs.js';
 import { adminEntitiesRouter } from './entities.js';
 import { adminExportRouter } from './export.js';
 import { adminContentRouter } from './content.js';
-// automation routes removed — will be rebuilt from scratch
+import { adminAutomationRouter } from './automation.js';
 
 export const adminRoutes = Router();
 
@@ -31,4 +31,4 @@ adminRoutes.use('/organizations', adminOrgsRouter);
 adminRoutes.use('/entities', adminEntitiesRouter);
 adminRoutes.use('/export', adminExportRouter);
 adminRoutes.use('/content', adminContentRouter);
-// adminRoutes.use('/automation', ...); — removed, will be rebuilt
+adminRoutes.use('/automation', adminAutomationRouter);

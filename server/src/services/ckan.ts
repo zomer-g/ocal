@@ -101,7 +101,7 @@ export async function searchDatasets(
   start: number = 0,
 ): Promise<{ packages: CKANPackage[]; totalCount: number }> {
   const { data } = await ckanApi.get('/api/3/action/package_search', {
-    params: { q: query, rows, start },
+    params: { q: query, rows, start, sort: 'metadata_modified desc' },
   });
   if (!data.success) throw new Error(`CKAN package_search failed`);
   return {
