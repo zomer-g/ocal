@@ -35,6 +35,31 @@ const SOURCE_COLORS = [
   '#EC4899', '#06B6D4', '#F97316', '#6366F1', '#14B8A6',
 ];
 
+/** Fields to check for the recognition score */
+const SCORE_FIELDS: Array<{ key: string; label: string; required?: boolean }> = [
+  { key: 'title', label: 'כותרת', required: true },
+  { key: 'start_date', label: 'תאריך', required: true },
+  { key: 'start_time', label: 'שעה' },
+  { key: 'end_date', label: 'סיום' },
+  { key: 'end_time', label: 'שעת סיום' },
+  { key: 'location', label: 'מיקום' },
+  { key: 'participants', label: 'משתתפים' },
+];
+
+/** Calculate field recognition score from a mapping object */
+function calcFieldScore(mapping: Record<string, string | undefined> | null | undefined) {
+  if (!mapping) return { mapped: 0, total: SCORE_FIELDS.length, fields: {} as Record<string, boolean> };
+  const fields: Record<string, boolean> = {};
+  let mapped = 0;
+  for (const f of SCORE_FIELDS) {
+    const val = mapping[f.key];
+    const ok = !!val && val.trim() !== '';
+    fields[f.key] = ok;
+    if (ok) mapped++;
+  }
+  return { mapped, total: SCORE_FIELDS.length, fields };
+}
+
 const STATUS_LABELS: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
   pending: { label: 'ממתין לבדיקה', color: 'text-yellow-600 bg-yellow-50', icon: Clock },
   auto_imported: { label: 'יובא אוטומטית', color: 'text-green-600 bg-green-50', icon: CheckCircle },
@@ -449,6 +474,7 @@ function QueueRow({
 }) {
   const statusInfo = STATUS_LABELS[item.status] ?? STATUS_LABELS.pending;
   const StatusIcon = statusInfo.icon;
+  const fieldScore = calcFieldScore(item.suggested_mapping as unknown as Record<string, string | undefined>);
 
   // Approve form state
   const [approveName, setApproveName] = useState(item.suggested_name);
@@ -482,16 +508,41 @@ function QueueRow({
           )}
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          {/* Mapping confidence */}
-          <span className={`text-xs font-medium ${confidenceColor(item.mapping_confidence)}`}>
-            מיפוי: {(item.mapping_confidence * 100).toFixed(0)}%
-          </span>
+        <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
+          {/* Field recognition score */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-gray-400">שדות:</span>
+            <div className="flex gap-0.5">
+              {SCORE_FIELDS.map((f) => (
+                <span
+                  key={f.key}
+                  title={`${f.label}: ${fieldScore.fields[f.key] ? 'זוהה' : 'לא זוהה'}`}
+                  className={`w-2.5 h-2.5 rounded-sm ${
+                    fieldScore.fields[f.key]
+                      ? 'bg-green-500'
+                      : f.required ? 'bg-red-300' : 'bg-gray-200'
+                  }`}
+                />
+              ))}
+            </div>
+            <span className={`text-xs font-medium ${
+              fieldScore.mapped >= 5 ? 'text-green-600' : fieldScore.mapped >= 3 ? 'text-yellow-600' : 'text-red-600'
+            }`}>
+              {fieldScore.mapped}/{fieldScore.total}
+            </span>
+          </div>
 
-          {/* Owner confidence */}
-          <span className={`text-xs font-medium ${confidenceColor(item.person_confidence)}`}>
-            בעלים: {item.suggested_person_name || 'לא זוהה'} ({(item.person_confidence * 100).toFixed(0)}%)
-          </span>
+          {/* Owner recognition score */}
+          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+            item.person_confidence >= 0.9
+              ? 'bg-green-50 text-green-700'
+              : item.person_confidence >= 0.5
+                ? 'bg-yellow-50 text-yellow-700'
+                : 'bg-red-50 text-red-600'
+          }`}>
+            <span>{item.suggested_person_name || 'לא זוהה'}</span>
+            <span className="opacity-60">{(item.person_confidence * 100).toFixed(0)}%</span>
+          </div>
 
           {/* Status */}
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
@@ -528,6 +579,145 @@ function QueueRow({
                 <ExternalLink className="w-3 h-3" />
                 צפה ב-ODATA
               </a>
+            </div>
+          </div>
+
+          {/* Score breakdown */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Field recognition breakdown */}
+            <div className="bg-gray-50 rounded-lg p-3">
+              <h4 className="text-xs font-semibold text-gray-600 mb-2 flex items-center justify-between">
+                <span>זיהוי שדות</span>
+                <span className={`text-xs font-bold ${
+                  fieldScore.mapped >= 5 ? 'text-green-600' : fieldScore.mapped >= 3 ? 'text-yellow-600' : 'text-red-600'
+                }`}>
+                  {fieldScore.mapped}/{fieldScore.total}
+                </span>
+              </h4>
+              <div className="space-y-1">
+                {SCORE_FIELDS.map((f) => {
+                  const mapped = fieldScore.fields[f.key];
+                  const mappedTo = (item.suggested_mapping as unknown as Record<string, string | undefined>)?.[f.key];
+                  return (
+                    <div key={f.key} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] ${
+                          mapped ? 'bg-green-500' : f.required ? 'bg-red-400' : 'bg-gray-300'
+                        }`}>
+                          {mapped ? '✓' : '✗'}
+                        </span>
+                        <span className={`${mapped ? 'text-gray-700' : 'text-gray-400'} ${f.required ? 'font-medium' : ''}`}>
+                          {f.label}
+                          {f.required && <span className="text-red-400 mr-0.5">*</span>}
+                        </span>
+                      </div>
+                      {mapped && mappedTo && (
+                        <span className="text-gray-400 text-[10px] font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200 truncate max-w-[120px]">
+                          {mappedTo}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Confidence bar */}
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+                  <span>ביטחון מיפוי</span>
+                  <span className={`font-medium ${confidenceColor(item.mapping_confidence)}`}>
+                    {(item.mapping_confidence * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full transition-all ${
+                      item.mapping_confidence >= 0.9 ? 'bg-green-500'
+                        : item.mapping_confidence >= 0.7 ? 'bg-yellow-500'
+                          : 'bg-red-400'
+                    }`}
+                    style={{ width: `${Math.min(item.mapping_confidence * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Owner recognition breakdown */}
+            <div className="bg-gray-50 rounded-lg p-3">
+              <h4 className="text-xs font-semibold text-gray-600 mb-2">זיהוי בעלים</h4>
+              <div className="space-y-2">
+                {/* Person */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">אדם:</span>
+                  <div className="flex items-center gap-1.5">
+                    {item.suggested_person_name ? (
+                      <>
+                        <span className="text-xs font-medium text-gray-800">{item.suggested_person_name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                          item.person_confidence >= 0.9
+                            ? 'bg-green-100 text-green-700'
+                            : item.person_confidence >= 0.5
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-red-100 text-red-600'
+                        }`}>
+                          {(item.person_confidence * 100).toFixed(0)}%
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-red-400">לא זוהה</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Organization */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">ארגון:</span>
+                  <div className="flex items-center gap-1.5">
+                    {item.suggested_org_name ? (
+                      <>
+                        <span className="text-xs font-medium text-gray-800">{item.suggested_org_name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                          item.org_confidence >= 0.9
+                            ? 'bg-green-100 text-green-700'
+                            : item.org_confidence >= 0.5
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-red-100 text-red-600'
+                        }`}>
+                          {(item.org_confidence * 100).toFixed(0)}%
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-gray-400">{item.organization || 'לא זוהה'}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Person confidence bar */}
+                <div className="pt-2 border-t border-gray-200">
+                  <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+                    <span>ביטחון זיהוי בעלים</span>
+                    <span className={`font-medium ${confidenceColor(item.person_confidence)}`}>
+                      {(item.person_confidence * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full transition-all ${
+                        item.person_confidence >= 0.9 ? 'bg-green-500'
+                          : item.person_confidence >= 0.5 ? 'bg-yellow-500'
+                            : 'bg-red-400'
+                      }`}
+                      style={{ width: `${Math.min(item.person_confidence * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* ODATA org info */}
+                {item.organization && (
+                  <div className="text-[10px] text-gray-400 pt-1">
+                    ארגון ב-ODATA: {item.organization}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
