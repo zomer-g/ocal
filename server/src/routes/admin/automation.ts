@@ -59,6 +59,47 @@ adminAutomationRouter.put('/settings', validate(settingsSchema, 'body'), async (
 // Scan
 // ──────────────────────────────────────────────
 
+// GET /api/admin/automation/test-ckan — Diagnostic: test CKAN connectivity from server
+adminAutomationRouter.get('/test-ckan', async (_req, res) => {
+  const results: Record<string, unknown> = {};
+  try {
+    // Test 1: Can we reach CKAN at all?
+    const startMs = Date.now();
+    const page = await ckan.searchDatasets('יומן', 3, 0);
+    results.searchOk = true;
+    results.searchMs = Date.now() - startMs;
+    results.totalCount = page.totalCount;
+    results.sampleTitles = page.packages.map(p => p.title);
+    results.sampleResources = page.packages.map(p => ({
+      title: p.title,
+      resourceCount: p.resources.length,
+      formats: p.resources.map(r => r.format),
+    }));
+  } catch (err) {
+    results.searchOk = false;
+    results.searchError = err instanceof Error ? err.message : String(err);
+    results.searchStack = err instanceof Error ? err.stack?.split('\n').slice(0, 5) : undefined;
+  }
+
+  try {
+    // Test 2: Check known IDs counts
+    const [sources, exceptions, queue] = await Promise.all([
+      db('diary_sources').count('id as cnt').first(),
+      db('diary_exceptions').count('id as cnt').first(),
+      db('auto_import_queue').count('id as cnt').first(),
+    ]);
+    results.knownCounts = {
+      diary_sources: Number(sources?.cnt ?? 0),
+      diary_exceptions: Number(exceptions?.cnt ?? 0),
+      auto_import_queue: Number(queue?.cnt ?? 0),
+    };
+  } catch (err) {
+    results.dbError = err instanceof Error ? err.message : String(err);
+  }
+
+  res.json(results);
+});
+
 // POST /api/admin/automation/scan — Trigger manual scan (runs in background)
 adminAutomationRouter.post('/scan', async (_req, res, next) => {
   try {
