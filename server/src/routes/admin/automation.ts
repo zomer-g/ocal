@@ -7,7 +7,7 @@ import { db } from '../../config/database.js';
 import { env } from '../../config/env.js';
 import { validate } from '../../middleware/validate.js';
 import { logger } from '../../utils/logger.js';
-import { getSettings, updateSettings } from '../../services/autoImport.js';
+import { getSettings, updateSettings, scanProgress } from '../../services/autoImport.js';
 import { registerSource, processSource } from '../../services/pipeline.js';
 import * as ckan from '../../services/ckan.js';
 import {
@@ -339,6 +339,7 @@ adminAutomationRouter.get('/status', async (_req, res, next) => {
     res.json({
       scheduler_running: isSchedulerRunning(),
       scan_in_progress: isScanActive(),
+      scan_progress: scanProgress,
       settings,
       pending_count: Number(pendingCount?.cnt ?? 0),
       last_scan: lastLog || null,

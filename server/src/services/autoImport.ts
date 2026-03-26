@@ -288,6 +288,21 @@ export async function evaluateResource(
 // Scanner
 // ──────────────────────────────────────────────
 
+// Live scan progress — exported so status endpoint can read it
+export let scanProgress: {
+  phase: string;
+  discovered: number;
+  knownSources: number;
+  knownExceptions: number;
+  knownQueue: number;
+  newResources: number;
+  processed: number;
+  totalToProcess: number;
+  autoImported: number;
+  queued: number;
+  errors: number;
+} | null = null;
+
 export async function runScan(): Promise<ScanResult> {
   const startTime = Date.now();
   const result: ScanResult = {
@@ -300,6 +315,14 @@ export async function runScan(): Promise<ScanResult> {
     durationMs: 0,
   };
 
+  // Reset progress
+  scanProgress = {
+    phase: 'starting',
+    discovered: 0, knownSources: 0, knownExceptions: 0, knownQueue: 0,
+    newResources: 0, processed: 0, totalToProcess: 0,
+    autoImported: 0, queued: 0, errors: 0,
+  };
+
   // Create scan log
   const [scanLog] = await db('auto_import_logs')
     .insert({ scan_started_at: new Date() })
@@ -309,6 +332,8 @@ export async function runScan(): Promise<ScanResult> {
     const settings = await getSettings();
 
     // Discover all diary resources
+    scanProgress.phase = 'discovering';
+    logger.info('Scan: Starting CKAN discovery...');
     const discovery = await ckan.discoverDiaryResources();
     const allResources: Array<{
       resourceId: string;
@@ -333,13 +358,27 @@ export async function runScan(): Promise<ScanResult> {
     }
 
     result.resourcesDiscovered = allResources.length;
+    scanProgress.discovered = allResources.length;
+    logger.info({ discovered: allResources.length, datasets: discovery.datasets.length },
+      'Scan: Discovery complete');
 
     // Filter out already known resources
+    scanProgress.phase = 'filtering';
     const [existingSources, existingExceptions, existingQueue] = await Promise.all([
       db('diary_sources').select('resource_id'),
       db('diary_exceptions').select('resource_id'),
       db('auto_import_queue').select('resource_id'),
     ]);
+
+    scanProgress.knownSources = existingSources.length;
+    scanProgress.knownExceptions = existingExceptions.length;
+    scanProgress.knownQueue = existingQueue.length;
+
+    logger.info({
+      knownSources: existingSources.length,
+      knownExceptions: existingExceptions.length,
+      knownQueue: existingQueue.length,
+    }, 'Scan: Known resource counts');
 
     const knownIds = new Set([
       ...existingSources.map((r) => r.resource_id),
@@ -349,10 +388,27 @@ export async function runScan(): Promise<ScanResult> {
 
     const newResources = allResources.filter((r) => !knownIds.has(r.resourceId));
     result.resourcesNew = newResources.length;
+    scanProgress.newResources = newResources.length;
+    scanProgress.totalToProcess = newResources.length;
+    scanProgress.phase = 'evaluating';
+
+    logger.info({
+      totalDiscovered: allResources.length,
+      knownTotal: knownIds.size,
+      newResources: newResources.length,
+      sampleNew: newResources.slice(0, 5).map(r => ({ id: r.resourceId, title: r.datasetTitle })),
+    }, 'Scan: Filtered to new resources');
 
     // Process each new resource sequentially with delay
-    for (const resource of newResources) {
+    for (let i = 0; i < newResources.length; i++) {
+      const resource = newResources[i];
+      if (scanProgress) {
+        scanProgress.processed = i;
+        scanProgress.phase = `evaluating ${i + 1}/${newResources.length}`;
+      }
       try {
+        logger.info({ i: i + 1, total: newResources.length, resourceId: resource.resourceId, title: resource.datasetTitle },
+          'Scan: Evaluating resource');
         const evaluation = await evaluateResource(resource.resourceId, settings);
 
         if (evaluation.canAutoImport) {
@@ -416,6 +472,7 @@ export async function runScan(): Promise<ScanResult> {
             });
 
             result.resourcesAutoImported++;
+            if (scanProgress) scanProgress.autoImported++;
             logger.info({ resourceId: evaluation.resourceId, sourceId }, 'Resource auto-imported');
           } catch (importErr) {
             const msg = importErr instanceof Error ? importErr.message : String(importErr);
@@ -480,12 +537,14 @@ export async function runScan(): Promise<ScanResult> {
             suggested_color: evaluation.suggestedColor,
           });
           result.resourcesQueued++;
+          if (scanProgress) scanProgress.queued++;
           logger.info({ resourceId: evaluation.resourceId, reasons: evaluation.reasons }, 'Resource queued for review');
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         result.errors.push(`Evaluation failed for ${resource.resourceId}: ${msg}`);
         result.resourcesSkipped++;
+        if (scanProgress) scanProgress.errors++;
         logger.warn({ resourceId: resource.resourceId, err: msg }, 'Resource evaluation failed');
 
         // Track failed evaluations so they don't reappear as "new" on every scan
@@ -519,6 +578,9 @@ export async function runScan(): Promise<ScanResult> {
     logger.error({ err: msg }, 'Auto-import scan failed');
   } finally {
     result.durationMs = Date.now() - startTime;
+
+    // Clear progress
+    scanProgress = null;
 
     // Log the result BEFORE the DB update (so we see it even if DB fails)
     logger.info({

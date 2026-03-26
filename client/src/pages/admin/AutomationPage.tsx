@@ -4,7 +4,6 @@ import {
   getAutomationStatus,
   updateAutomationSettings,
   triggerScan,
-  clearAndRescan,
   getAutomationQueue,
   approveQueueItem,
   rejectQueueItem,
@@ -19,7 +18,6 @@ import {
 import {
   Loader2,
   Play,
-  RefreshCw,
   Settings,
   CheckCircle,
   XCircle,
@@ -132,15 +130,6 @@ export function AutomationPage() {
     },
   });
 
-  const rescanMutation = useMutation({
-    mutationFn: clearAndRescan,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['automation-status'] });
-      queryClient.invalidateQueries({ queryKey: ['automation-queue'] });
-      queryClient.invalidateQueries({ queryKey: ['automation-logs'] });
-    },
-  });
-
   const approveMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Parameters<typeof approveQueueItem>[1] }) =>
       approveQueueItem(id, body),
@@ -198,10 +187,10 @@ export function AutomationPage() {
         settings={settings}
         isLoading={statusLoading}
         isSaving={settingsMutation.isPending}
-        isScanning={scanMutation.isPending || rescanMutation.isPending || scanInProgress}
+        isScanning={scanMutation.isPending || scanInProgress}
         onSave={(updates) => settingsMutation.mutate(updates)}
         onScan={() => scanMutation.mutate()}
-        onRescan={() => rescanMutation.mutate()}
+        scanProgress={status?.scan_progress}
       />
 
       {/* ── Flow explanation ── */}
@@ -289,7 +278,7 @@ function SettingsPanel({
   isScanning,
   onSave,
   onScan,
-  onRescan,
+  scanProgress,
 }: {
   settings: AutomationSettings | undefined;
   isLoading: boolean;
@@ -297,7 +286,16 @@ function SettingsPanel({
   isScanning: boolean;
   onSave: (updates: Record<string, unknown>) => void;
   onScan: () => void;
-  onRescan: () => void;
+  scanProgress?: {
+    phase: string;
+    discovered: number;
+    newResources: number;
+    processed: number;
+    totalToProcess: number;
+    autoImported: number;
+    queued: number;
+    errors: number;
+  } | null;
 }) {
   if (isLoading || !settings) {
     return (
@@ -377,31 +375,53 @@ function SettingsPanel({
       </div>
 
       {/* Manual scan */}
-      <div className="mt-4 flex items-center gap-3 flex-wrap">
-        <button
-          onClick={onScan}
-          disabled={isScanning}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 transition-colors"
-        >
-          {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          {isScanning ? 'סורק...' : 'סריקה רגילה'}
-        </button>
+      <div className="mt-4 flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onScan}
+            disabled={isScanning}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 transition-colors"
+          >
+            {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            {isScanning ? 'סורק...' : 'סריקה רגילה'}
+          </button>
+        </div>
 
-        <button
-          onClick={onRescan}
-          disabled={isScanning}
-          className="flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 disabled:opacity-50 transition-colors"
-          title="מוחק את כל הפריטים מהתור וסורק הכל מחדש"
-        >
-          {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          {isScanning ? 'סורק...' : 'נקה וסרוק מחדש'}
-        </button>
+        {/* Live scan progress */}
+        {isScanning && scanProgress && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm space-y-1.5">
+            <div className="flex items-center gap-2 text-blue-700 font-medium">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              סריקה פועלת ברקע
+            </div>
+            <div className="text-blue-600 text-xs space-y-0.5">
+              <div>שלב: {scanProgress.phase}</div>
+              {scanProgress.discovered > 0 && (
+                <div>נמצאו {scanProgress.discovered} משאבים ב-ODATA, מתוכם {scanProgress.newResources} חדשים</div>
+              )}
+              {scanProgress.totalToProcess > 0 && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span>מעבד: {scanProgress.processed}/{scanProgress.totalToProcess}</span>
+                    <div className="flex-1 bg-blue-200 rounded-full h-1.5 max-w-[200px]">
+                      <div
+                        className="bg-blue-600 h-1.5 rounded-full transition-all"
+                        style={{ width: `${Math.round((scanProgress.processed / scanProgress.totalToProcess) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div>✅ יובאו: {scanProgress.autoImported} | ⏳ בתור: {scanProgress.queued} | ❌ שגיאות: {scanProgress.errors}</div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
-        {isScanning && (
-          <span className="text-xs text-yellow-600 flex items-center gap-1.5 bg-yellow-50 px-3 py-1.5 rounded-full">
+        {isScanning && !scanProgress && (
+          <div className="flex items-center gap-2 text-yellow-600 text-xs bg-yellow-50 px-3 py-2 rounded-lg">
             <Loader2 className="w-3 h-3 animate-spin" />
-            סריקה פועלת ברקע — התוצאות יתעדכנו אוטומטית
-          </span>
+            סריקה פועלת ברקע...
+          </div>
         )}
       </div>
     </div>

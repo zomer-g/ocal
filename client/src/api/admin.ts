@@ -416,9 +416,21 @@ export interface AutomationSettings {
   [key: string]: unknown;
 }
 
+export interface ScanProgress {
+  phase: string;
+  discovered: number;
+  newResources: number;
+  processed: number;
+  totalToProcess: number;
+  autoImported: number;
+  queued: number;
+  errors: number;
+}
+
 export interface AutomationStatus {
   scheduler_running: boolean;
   scan_in_progress: boolean;
+  scan_progress: ScanProgress | null;
   settings: AutomationSettings;
   pending_count: number;
   last_scan: AutoImportLog | null;
