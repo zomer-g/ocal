@@ -323,10 +323,18 @@ export async function runScan(): Promise<ScanResult> {
     autoImported: 0, queued: 0, errors: 0,
   };
 
-  // Create scan log
-  const [scanLog] = await db('auto_import_logs')
-    .insert({ scan_started_at: new Date() })
-    .returning('*');
+  // Create scan log — inside try/catch so failure doesn't kill the scan
+  let scanLog: { id: string } | null = null;
+  try {
+    const [row] = await db('auto_import_logs')
+      .insert({ scan_started_at: new Date() })
+      .returning('*');
+    scanLog = row;
+    logger.info({ scanLogId: row?.id }, 'Scan: Log entry created');
+  } catch (logErr) {
+    logger.error({ err: logErr instanceof Error ? logErr.message : String(logErr) },
+      'Scan: Failed to create log entry — continuing without log');
+  }
 
   try {
     const settings = await getSettings();
@@ -568,7 +576,7 @@ export async function runScan(): Promise<ScanResult> {
       }
 
       // Delay between resources to avoid overwhelming ODATA
-      if (newResources.indexOf(resource) < newResources.length - 1) {
+      if (i < newResources.length - 1) {
         await new Promise((r) => setTimeout(r, 2000));
       }
     }
@@ -594,20 +602,22 @@ export async function runScan(): Promise<ScanResult> {
     }, 'Scan result (pre-DB-update)');
 
     // Always attempt to update the scan log, even if DB is under pressure
-    try {
-      await db('auto_import_logs').where({ id: scanLog.id }).update({
-        scan_completed_at: new Date(),
-        resources_discovered: result.resourcesDiscovered,
-        resources_new: result.resourcesNew,
-        resources_auto_imported: result.resourcesAutoImported,
-        resources_queued: result.resourcesQueued,
-        resources_skipped: result.resourcesSkipped,
-        errors: result.errors.length > 0 ? result.errors : null,
-        duration_ms: result.durationMs,
-      });
-    } catch (dbErr) {
-      logger.error({ dbErr, scanLogId: scanLog.id },
-        'Failed to update scan log — result will not be persisted');
+    if (scanLog) {
+      try {
+        await db('auto_import_logs').where({ id: scanLog.id }).update({
+          scan_completed_at: new Date(),
+          resources_discovered: result.resourcesDiscovered,
+          resources_new: result.resourcesNew,
+          resources_auto_imported: result.resourcesAutoImported,
+          resources_queued: result.resourcesQueued,
+          resources_skipped: result.resourcesSkipped,
+          errors: result.errors.length > 0 ? result.errors : null,
+          duration_ms: result.durationMs,
+        });
+      } catch (dbErr) {
+        logger.error({ dbErr, scanLogId: scanLog.id },
+          'Failed to update scan log — result will not be persisted');
+      }
     }
 
     logger.info({
