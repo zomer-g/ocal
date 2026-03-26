@@ -117,23 +117,40 @@ export async function identifyOwner(
   let bestPersonName: string | null = null;
   let bestPersonScore = 0;
 
-  const combined = `${datasetTitle} ${resourceName}`.toLowerCase();
+  const combinedLower = `${datasetTitle} ${resourceName}`.toLowerCase();
+  const titleLower = datasetTitle.toLowerCase();
+  const resourceLower = resourceName.toLowerCase();
 
   for (const person of people) {
-    const nameWords = person.name.toLowerCase();
-    const titleScore = jaccard(nameWords, datasetTitle.toLowerCase());
-    const resourceScore = jaccard(nameWords, resourceName.toLowerCase());
-    // Also check if person name appears as substring in combined text
-    const containsBonus = combined.includes(nameWords) ? 0.3 : 0;
-    const score = Math.max(titleScore, resourceScore) + containsBonus;
+    const personNameLower = person.name.toLowerCase().trim();
+    if (personNameLower.length < 2) continue; // skip empty/trivial names
+
+    // Primary signal: full name appears as substring (most reliable)
+    const inTitle = titleLower.includes(personNameLower);
+    const inResource = resourceLower.includes(personNameLower);
+
+    let score: number;
+    if (inTitle) {
+      // Full name found in dataset title → high confidence
+      score = 0.95;
+    } else if (inResource) {
+      // Full name found in resource name → good confidence
+      score = 0.90;
+    } else {
+      // Fallback: Jaccard similarity + contains bonus
+      const titleScore = jaccard(personNameLower, titleLower);
+      const resourceScore = jaccard(personNameLower, resourceLower);
+      const containsBonus = combinedLower.includes(personNameLower) ? 0.3 : 0;
+      score = Math.max(titleScore, resourceScore) + containsBonus;
+    }
 
     if (score > bestPersonScore) {
       bestPersonScore = score;
       bestPersonId = person.id;
       bestPersonName = person.name;
-      signals[`person:${person.name}:title`] = titleScore;
-      signals[`person:${person.name}:resource`] = resourceScore;
-      signals[`person:${person.name}:contains`] = containsBonus;
+      signals[`person:${person.name}:inTitle`] = inTitle ? 1 : 0;
+      signals[`person:${person.name}:inResource`] = inResource ? 1 : 0;
+      signals[`person:${person.name}:score`] = score;
     }
   }
 
@@ -502,6 +519,17 @@ export async function runScan(): Promise<ScanResult> {
     logger.error({ err: msg }, 'Auto-import scan failed');
   } finally {
     result.durationMs = Date.now() - startTime;
+
+    // Log the result BEFORE the DB update (so we see it even if DB fails)
+    logger.info({
+      discovered: result.resourcesDiscovered,
+      new: result.resourcesNew,
+      autoImported: result.resourcesAutoImported,
+      queued: result.resourcesQueued,
+      skipped: result.resourcesSkipped,
+      errors: result.errors.length,
+      durationMs: result.durationMs,
+    }, 'Scan result (pre-DB-update)');
 
     // Always attempt to update the scan log, even if DB is under pressure
     try {

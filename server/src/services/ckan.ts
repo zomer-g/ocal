@@ -152,7 +152,7 @@ export async function discoverDiaryResources(query: string = 'יומן'): Promis
   totalResources: number;
 }> {
   // Paginate through results with a cap to avoid CKAN API timeouts
-  // (search for "יומן" returns 1500+ results; most beyond ~300 are irrelevant)
+  // (search for "יומן" returns 1500+ results; most beyond ~500 are irrelevant)
   const MAX_DATASETS = 500;
   let allPackages: CKANPackage[] = [];
   let start = 0;
@@ -164,9 +164,25 @@ export async function discoverDiaryResources(query: string = 'יומן'): Promis
     try {
       page = await searchDatasets(query, pageSize, start);
     } catch (err) {
-      logger.warn({ start, pageSize, err: err instanceof Error ? err.message : String(err) },
-        'CKAN page fetch failed — proceeding with datasets fetched so far');
-      break;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (allPackages.length === 0) {
+        // First page failed — retry once after 5s
+        logger.warn({ start, pageSize, err: msg }, 'CKAN first page failed — retrying in 5s');
+        await new Promise((r) => setTimeout(r, 5000));
+        try {
+          page = await searchDatasets(query, pageSize, start);
+        } catch (retryErr) {
+          // Still fails — throw so the caller knows discovery failed entirely
+          const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+          logger.error({ err: retryMsg }, 'CKAN discovery failed after retry');
+          throw new Error(`CKAN discovery failed: ${retryMsg}`);
+        }
+      } else {
+        // Later page failed — proceed with what we have
+        logger.warn({ start, pageSize, fetched: allPackages.length, err: msg },
+          'CKAN page fetch failed — proceeding with datasets fetched so far');
+        break;
+      }
     }
     totalCount = page.totalCount;
     allPackages = allPackages.concat(page.packages);
@@ -177,6 +193,10 @@ export async function discoverDiaryResources(query: string = 'יומן'): Promis
     ) break;
     start += pageSize;
   }
+
+  logger.info({ fetched: allPackages.length, total: totalCount, query },
+    'CKAN discovery completed');
+
   if (allPackages.length >= MAX_DATASETS && allPackages.length < totalCount) {
     logger.info({ fetched: allPackages.length, total: totalCount },
       'Dataset cap reached — not all CKAN results were fetched');
@@ -186,6 +206,8 @@ export async function discoverDiaryResources(query: string = 'יומן'): Promis
   const datasets = allPackages.map(pkg => {
     let resources = pkg.resources
       .filter(r => {
+        // Skip resources with empty/missing URLs (cause download errors)
+        if (!r.url && !r.datastore_active) return false;
         const fmt = r.format.toUpperCase();
         return r.datastore_active || isSupportedFormat(fmt);
       });
