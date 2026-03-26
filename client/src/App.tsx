@@ -12,7 +12,7 @@ import { SyncPage } from '@/pages/admin/SyncPage';
 import { SourcesPage } from '@/pages/admin/SourcesPage';
 import { ContentPage } from '@/pages/admin/ContentPage';
 import { EntitiesPage } from '@/pages/admin/EntitiesPage';
-import { AutomationPage } from '@/pages/admin/AutomationPage';
+// AutomationPage removed — will be rebuilt from scratch
 
 export default function App() {
   return (
@@ -35,7 +35,7 @@ export default function App() {
         <Route path="sources" element={<SourcesPage />} />
         <Route path="entities" element={<EntitiesPage />} />
         <Route path="content" element={<ContentPage />} />
-        <Route path="automation" element={<AutomationPage />} />
+        {/* automation route removed — will be rebuilt */}
         {/* Redirects from old routes */}
         <Route path="people" element={<Navigate to="/admin/entities" replace />} />
         <Route path="organizations" element={<Navigate to="/admin/entities" replace />} />

@@ -9,7 +9,6 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { globalApiLimiter, publicApiLimiter } from './middleware/rateLimiter.js';
 import { publicRoutes } from './routes/public/index.js';
 import { adminRoutes } from './routes/admin/index.js';
-import { startScheduler } from './services/scheduler.js';
 import { warmEntityCache } from './routes/public/entities.js';
 
 const app = express();
@@ -48,7 +47,6 @@ app.use(errorHandler);
 
 app.listen(env.PORT, () => {
   logger.info(`Server running on port ${env.PORT}`);
-  startScheduler().catch((err) => logger.error({ err }, 'Failed to start auto-import scheduler'));
   warmEntityCache().catch(() => {});
 });
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare, Tags, Zap } from 'lucide-react';
+import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare, Tags } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const NAV_ITEMS = [
@@ -9,7 +9,6 @@ const NAV_ITEMS = [
   { path: '/admin/sources', label: 'מקורות', icon: Database, exact: false },
   { path: '/admin/entities', label: 'ישויות', icon: Tags, exact: false },
   { path: '/admin/content', label: 'תוכן', icon: PenSquare, exact: false },
-  { path: '/admin/automation', label: 'אוטומציה', icon: Zap, exact: false },
 ];
 
 export function AdminLayout() {
