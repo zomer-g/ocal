@@ -333,6 +333,15 @@ export async function runScan(): Promise<ScanResult> {
   // Create scan log — inside try/catch so failure doesn't kill the scan
   let scanLog: { id: string } | null = null;
   try {
+    // Clean up old incomplete logs (from crashed/killed scans) — keep last 5
+    await db.raw(`
+      DELETE FROM auto_import_logs
+      WHERE scan_completed_at IS NULL
+        AND id NOT IN (
+          SELECT id FROM auto_import_logs ORDER BY scan_started_at DESC LIMIT 5
+        )
+    `);
+
     const [row] = await db('auto_import_logs')
       .insert({ scan_started_at: new Date() })
       .returning('*');
@@ -404,8 +413,8 @@ export async function runScan(): Promise<ScanResult> {
     const newResources = allResources.filter((r) => !knownIds.has(r.resourceId));
     result.resourcesNew = newResources.length;
 
-    // Cap resources per scan to avoid extremely long runs (Render may restart the process)
-    const MAX_PER_SCAN = 50;
+    // Cap resources per scan — each takes ~5-10s, so 200 ≈ 20-30 min max
+    const MAX_PER_SCAN = 200;
     const toProcess = newResources.slice(0, MAX_PER_SCAN);
 
     scanProgress.newResources = newResources.length;
