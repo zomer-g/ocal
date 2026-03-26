@@ -205,6 +205,13 @@ export async function evaluateResource(
   const mappingThreshold = (settings.auto_import_confidence_threshold as number) ?? 0.9;
   const ownerThreshold = (settings.owner_confidence_threshold as number) ?? 0.9;
 
+  // Check resource size before downloading — skip huge files (> 5MB)
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const resourceMeta = await ckan.getResource(resourceId);
+  if (resourceMeta.size && resourceMeta.size > MAX_FILE_SIZE) {
+    throw new Error(`קובץ גדול מדי: ${(resourceMeta.size / 1024 / 1024).toFixed(1)}MB (מקסימום 5MB)`);
+  }
+
   // Profile the resource
   const profile = await profileSource(resourceId);
   const { resource, pkg, suggestedMapping, sampleRecords, fields, totalRecords, suggestedName } = profile;
@@ -396,26 +403,37 @@ export async function runScan(): Promise<ScanResult> {
 
     const newResources = allResources.filter((r) => !knownIds.has(r.resourceId));
     result.resourcesNew = newResources.length;
+
+    // Cap resources per scan to avoid extremely long runs (Render may restart the process)
+    const MAX_PER_SCAN = 50;
+    const toProcess = newResources.slice(0, MAX_PER_SCAN);
+
     scanProgress.newResources = newResources.length;
-    scanProgress.totalToProcess = newResources.length;
+    scanProgress.totalToProcess = toProcess.length;
     scanProgress.phase = 'evaluating';
 
     logger.info({
       totalDiscovered: allResources.length,
       knownTotal: knownIds.size,
       newResources: newResources.length,
-      sampleNew: newResources.slice(0, 5).map(r => ({ id: r.resourceId, title: r.datasetTitle })),
+      processing: toProcess.length,
+      sampleNew: toProcess.slice(0, 5).map(r => ({ id: r.resourceId, title: r.datasetTitle })),
     }, 'Scan: Filtered to new resources');
 
+    if (newResources.length > MAX_PER_SCAN) {
+      logger.info({ total: newResources.length, processing: MAX_PER_SCAN },
+        'Scan: Capped at max per scan — remaining will be picked up on next scan');
+    }
+
     // Process each new resource sequentially with delay
-    for (let i = 0; i < newResources.length; i++) {
-      const resource = newResources[i];
+    for (let i = 0; i < toProcess.length; i++) {
+      const resource = toProcess[i];
       if (scanProgress) {
         scanProgress.processed = i;
-        scanProgress.phase = `evaluating ${i + 1}/${newResources.length}`;
+        scanProgress.phase = `evaluating ${i + 1}/${toProcess.length}`;
       }
       try {
-        logger.info({ i: i + 1, total: newResources.length, resourceId: resource.resourceId, title: resource.datasetTitle },
+        logger.info({ i: i + 1, total: toProcess.length, resourceId: resource.resourceId, title: resource.datasetTitle },
           'Scan: Evaluating resource');
         const evaluation = await evaluateResource(resource.resourceId, settings);
 
@@ -576,8 +594,8 @@ export async function runScan(): Promise<ScanResult> {
       }
 
       // Delay between resources to avoid overwhelming ODATA
-      if (i < newResources.length - 1) {
-        await new Promise((r) => setTimeout(r, 2000));
+      if (i < toProcess.length - 1) {
+        await new Promise((r) => setTimeout(r, 1000));
       }
     }
   } catch (err) {

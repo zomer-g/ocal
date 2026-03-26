@@ -29,17 +29,19 @@ async function queryEntities(opts: {
   fromDate?: string;
   toDate?: string;
 }) {
-  // Step 1: Get enabled source IDs (small, fast query)
-  const enabledSources = await db('diary_sources').where('is_enabled', true).select('id');
-  const enabledIds = enabledSources.map(s => s.id);
-  if (enabledIds.length === 0) return [];
+  // Use subqueries to avoid passing hundreds of IDs as parameters
+  const enabledSourcesSubquery = db('diary_sources').where('is_enabled', true).select('id');
 
-  // Step 2: Build event filter — get event IDs matching source + date filters
-  let eventQuery = db('diary_events').whereIn('source_id', opts.sourceIds?.length ? opts.sourceIds : enabledIds);
+  // Build event filter as subquery
+  let eventQuery = db('diary_events')
+    .whereIn('source_id', opts.sourceIds?.length
+      ? opts.sourceIds  // user-specified filter (small)
+      : enabledSourcesSubquery  // subquery, not 421 inline IDs
+    );
   if (opts.fromDate) eventQuery = eventQuery.where('event_date', '>=', opts.fromDate);
   if (opts.toDate) eventQuery = eventQuery.where('event_date', '<=', opts.toDate);
 
-  // Step 3: Aggregate entities for those events only (single-table scan + filter)
+  // Aggregate entities for those events only
   let query = db('event_entities as ee')
     .where('ee.confidence', '>=', 0.5)
     .whereIn('ee.event_id', eventQuery.select('id'))
