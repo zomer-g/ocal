@@ -512,6 +512,11 @@ export async function triggerScan(): Promise<ScanResult> {
   return data;
 }
 
+export async function clearAndRescan(): Promise<{ cleared: number; scan: ScanResult }> {
+  const { data } = await api.post('/admin/automation/queue/clear-and-rescan');
+  return data;
+}
+
 export async function getAutomationQueue(
   params: { status?: string; page?: number; limit?: number } = {}
 ): Promise<QueueListResponse> {

@@ -115,6 +115,29 @@ adminAutomationRouter.get('/queue', async (req, res, next) => {
   }
 });
 
+// POST /api/admin/automation/queue/clear-and-rescan
+// Deletes all pending+error items so the next scan re-evaluates them with latest code
+adminAutomationRouter.post('/queue/clear-and-rescan', async (_req, res, next) => {
+  try {
+    const deleted = await db('auto_import_queue')
+      .whereIn('status', ['pending', 'error'])
+      .del();
+
+    logger.info({ deleted }, 'Cleared pending/error queue items for re-scan');
+
+    // Trigger a new scan
+    const result = await triggerManualScan();
+
+    res.json({ cleared: deleted, scan: result });
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('כבר מתבצעת')) {
+      res.status(409).json({ error: err.message });
+      return;
+    }
+    next(err);
+  }
+});
+
 // GET /api/admin/automation/queue/:id
 adminAutomationRouter.get('/queue/:id', async (req, res, next) => {
   try {

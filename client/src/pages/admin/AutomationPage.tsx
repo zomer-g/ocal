@@ -4,6 +4,7 @@ import {
   getAutomationStatus,
   updateAutomationSettings,
   triggerScan,
+  clearAndRescan,
   getAutomationQueue,
   approveQueueItem,
   rejectQueueItem,
@@ -18,6 +19,7 @@ import {
 import {
   Loader2,
   Play,
+  RefreshCw,
   Settings,
   CheckCircle,
   XCircle,
@@ -123,6 +125,15 @@ export function AutomationPage() {
     },
   });
 
+  const rescanMutation = useMutation({
+    mutationFn: clearAndRescan,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['automation-status'] });
+      queryClient.invalidateQueries({ queryKey: ['automation-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['automation-logs'] });
+    },
+  });
+
   const approveMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Parameters<typeof approveQueueItem>[1] }) =>
       approveQueueItem(id, body),
@@ -180,10 +191,12 @@ export function AutomationPage() {
         settings={settings}
         isLoading={statusLoading}
         isSaving={settingsMutation.isPending}
-        isScanning={scanMutation.isPending || !!status?.scan_in_progress}
+        isScanning={scanMutation.isPending || rescanMutation.isPending || !!status?.scan_in_progress}
         onSave={(updates) => settingsMutation.mutate(updates)}
         onScan={() => scanMutation.mutate()}
+        onRescan={() => rescanMutation.mutate()}
         scanResult={scanMutation.data}
+        rescanResult={rescanMutation.data}
       />
 
       {/* ── Flow explanation ── */}
@@ -271,7 +284,9 @@ function SettingsPanel({
   isScanning,
   onSave,
   onScan,
+  onRescan,
   scanResult,
+  rescanResult,
 }: {
   settings: AutomationSettings | undefined;
   isLoading: boolean;
@@ -279,7 +294,9 @@ function SettingsPanel({
   isScanning: boolean;
   onSave: (updates: Record<string, unknown>) => void;
   onScan: () => void;
+  onRescan: () => void;
   scanResult?: { resourcesNew: number; resourcesAutoImported: number; resourcesQueued: number; errors: string[] } | null;
+  rescanResult?: { cleared: number; scan: { resourcesNew: number; resourcesAutoImported: number; resourcesQueued: number; errors: string[] } } | null;
 }) {
   if (isLoading || !settings) {
     return (
@@ -359,14 +376,24 @@ function SettingsPanel({
       </div>
 
       {/* Manual scan */}
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-4 flex items-center gap-3 flex-wrap">
         <button
           onClick={onScan}
           disabled={isScanning}
           className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 transition-colors"
         >
           {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          {isScanning ? 'סורק...' : 'הפעל סריקה עכשיו'}
+          {isScanning ? 'סורק...' : 'סריקה רגילה'}
+        </button>
+
+        <button
+          onClick={onRescan}
+          disabled={isScanning}
+          className="flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 disabled:opacity-50 transition-colors"
+          title="מוחק את כל הפריטים בסטטוס ממתין/שגיאה וסורק מחדש — מועיל אחרי שינוי קוד"
+        >
+          {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          {isScanning ? 'סורק...' : 'נקה וסרוק מחדש'}
         </button>
 
         {scanResult && (
@@ -375,6 +402,15 @@ function SettingsPanel({
             {scanResult.resourcesAutoImported > 0 && ` ${scanResult.resourcesAutoImported} יובאו,`}
             {scanResult.resourcesQueued > 0 && ` ${scanResult.resourcesQueued} בתור,`}
             {scanResult.errors.length > 0 && ` ${scanResult.errors.length} שגיאות`}
+          </span>
+        )}
+
+        {rescanResult && (
+          <span className="text-xs text-gray-500">
+            נוקו {rescanResult.cleared} פריטים, נסרקו {rescanResult.scan.resourcesNew} חדשים —
+            {rescanResult.scan.resourcesAutoImported > 0 && ` ${rescanResult.scan.resourcesAutoImported} יובאו,`}
+            {rescanResult.scan.resourcesQueued > 0 && ` ${rescanResult.scan.resourcesQueued} בתור,`}
+            {rescanResult.scan.errors.length > 0 && ` ${rescanResult.scan.errors.length} שגיאות`}
           </span>
         )}
       </div>
