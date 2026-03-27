@@ -310,7 +310,7 @@ export let scanProgress: {
   errors: number;
 } | null = null;
 
-export async function runScan(): Promise<ScanResult> {
+export async function runScan(triggerType: 'manual' | 'auto' = 'manual'): Promise<ScanResult> {
   const startTime = Date.now();
   const result: ScanResult = {
     resourcesDiscovered: 0,
@@ -343,7 +343,7 @@ export async function runScan(): Promise<ScanResult> {
     `);
 
     const [row] = await db('auto_import_logs')
-      .insert({ scan_started_at: new Date() })
+      .insert({ scan_started_at: new Date(), trigger_type: triggerType })
       .returning('*');
     scanLog = row;
     logger.info({ scanLogId: row?.id }, 'Scan: Log entry created');

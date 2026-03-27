@@ -973,6 +973,7 @@ function LogsTable({ logs }: { logs: Array<{
   id: string;
   scan_started_at: string;
   scan_completed_at: string | null;
+  trigger_type?: 'manual' | 'auto';
   resources_discovered: number;
   resources_new: number;
   resources_auto_imported: number;
@@ -995,6 +996,7 @@ function LogsTable({ logs }: { logs: Array<{
         <thead>
           <tr className="bg-gray-50 text-right">
             <th className="px-3 py-2 text-xs font-medium text-gray-500">תאריך</th>
+            <th className="px-3 py-2 text-xs font-medium text-gray-500">סוג</th>
             <th className="px-3 py-2 text-xs font-medium text-gray-500">משך</th>
             <th className="px-3 py-2 text-xs font-medium text-gray-500">נסרקו</th>
             <th className="px-3 py-2 text-xs font-medium text-gray-500">חדשים</th>
@@ -1008,6 +1010,13 @@ function LogsTable({ logs }: { logs: Array<{
             <tr key={log.id} className="hover:bg-gray-50">
               <td className="px-3 py-2 text-gray-700">
                 {new Date(log.scan_started_at).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}
+              </td>
+              <td className="px-3 py-2">
+                {log.trigger_type === 'auto' ? (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-600">אוטו׳</span>
+                ) : (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">ידני</span>
+                )}
               </td>
               <td className="px-3 py-2 text-gray-500">
                 {log.duration_ms ? `${(log.duration_ms / 1000).toFixed(1)}s` : '—'}

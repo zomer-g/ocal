@@ -480,6 +480,7 @@ export interface AutoImportLog {
   id: string;
   scan_started_at: string;
   scan_completed_at: string | null;
+  trigger_type: 'manual' | 'auto';
   resources_discovered: number;
   resources_new: number;
   resources_auto_imported: number;
