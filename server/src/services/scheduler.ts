@@ -42,7 +42,7 @@ export async function startScheduler(): Promise<void> {
 
     const intervalMs = intervalHours * 60 * 60 * 1000;
 
-    intervalHandle = setInterval(async () => {
+    const doScan = async () => {
       if (isScanInProgress) {
         logger.info('Scan already in progress — skipping scheduled run');
         return;
@@ -57,10 +57,18 @@ export async function startScheduler(): Promise<void> {
       } finally {
         isScanInProgress = false;
       }
-    }, intervalMs);
+    };
+
+    // Run first scan 2 minutes after startup (let server warm up)
+    setTimeout(() => {
+      doScan();
+    }, 2 * 60 * 1000);
+
+    // Then repeat on the configured interval
+    intervalHandle = setInterval(doScan, intervalMs);
 
     isRunning = true;
-    logger.info({ intervalHours }, 'Auto-import scheduler started');
+    logger.info({ intervalHours, firstScanInMinutes: 2 }, 'Auto-import scheduler started');
   } catch (err) {
     logger.error({ err }, 'Failed to start scheduler');
     isRunning = false;
