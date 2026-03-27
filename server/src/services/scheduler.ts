@@ -50,23 +50,8 @@ export async function startScheduler(): Promise<void> {
       try {
         isScanInProgress = true;
         logger.info('Scheduled auto-import scan starting...');
-
-        // Quick connectivity check before starting a full scan
-        // (Render free tier may have just woken up from sleep)
-        try {
-          const { searchDatasets } = await import('./ckan.js');
-          const test = await searchDatasets('יומן', 1, 0);
-          if (!test.totalCount) {
-            logger.warn('Scheduled scan: CKAN returned 0 results — skipping');
-            return;
-          }
-        } catch (connectErr) {
-          logger.warn({ err: connectErr instanceof Error ? connectErr.message : String(connectErr) },
-            'Scheduled scan: CKAN connectivity check failed — skipping');
-          return;
-        }
-
         await runScan('auto');
+        logger.info('Scheduled auto-import scan completed');
       } catch (err) {
         logger.error({ err }, 'Scheduled scan failed');
       } finally {
