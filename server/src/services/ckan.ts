@@ -312,7 +312,7 @@ async function downloadFile(url: string): Promise<Buffer> {
 }
 
 /** Build a SheetJS workbook from a file buffer */
-function readWorkbook(buffer: Buffer, format?: string): XLSX.WorkBook {
+function readWorkbook(buffer: Buffer, format?: string, maxRows?: number): XLSX.WorkBook {
   if (format?.toUpperCase() === 'CSV') {
     let str = buffer.toString('utf-8');
     if (str.charCodeAt(0) === 0xFEFF) str = str.slice(1); // strip BOM
@@ -331,9 +331,9 @@ function readWorkbook(buffer: Buffer, format?: string): XLSX.WorkBook {
       }
     }
 
-    return XLSX.read(str, { type: 'string' });
+    return XLSX.read(str, { type: 'string', ...(maxRows ? { sheetRows: maxRows } : {}) });
   }
-  return XLSX.read(buffer, { type: 'buffer', codepage: 65001 });
+  return XLSX.read(buffer, { type: 'buffer', codepage: 65001, ...(maxRows ? { sheetRows: maxRows } : {}) });
 }
 
 /**
@@ -367,8 +367,9 @@ function parseSpreadsheet(
   buffer: Buffer,
   format?: string,
   targetSheet?: string,
+  maxRows?: number,
 ): { records: Record<string, unknown>[]; fields: string[]; sheetName: string } {
-  const workbook = readWorkbook(buffer, format);
+  const workbook = readWorkbook(buffer, format, maxRows);
 
   // Resolve which sheet to parse
   let sheetName = workbook.SheetNames[0];
@@ -737,6 +738,7 @@ export async function downloadAndParseFile(
   resourceUrl: string,
   format: string,
   sheetName?: string,
+  options?: { maxRows?: number },
 ): Promise<{ records: Record<string, unknown>[]; fields: string[]; sheetName?: string; availableSheets?: Array<{ name: string; columns: number; rows: number }> }> {
   const buffer = await downloadFile(resourceUrl);
   const fmt = format.toUpperCase();
@@ -746,7 +748,8 @@ export async function downloadAndParseFile(
   }
 
   // CSV, XLS, XLSX all handled by SheetJS
-  const result = parseSpreadsheet(buffer, format, sheetName);
+  // maxRows limits how many rows SheetJS parses — critical for memory on large files
+  const result = parseSpreadsheet(buffer, format, sheetName, options?.maxRows);
 
   // For multi-sheet workbooks, include metadata about all relevant sheets
   const availableSheets = ['XLS', 'XLSX'].includes(fmt)
@@ -831,12 +834,14 @@ export async function previewResource(resourceId: string, sheetName?: string): P
 
   // Use datastore API for preview — UNLESS it's a spreadsheet.
   // Spreadsheet datastore columns have mangled Hebrew names.
+  // For preview, limit to 30 rows to avoid OOM on large files (sheetRows option).
+  const PREVIEW_MAX_ROWS = 30; // header detection needs ~15 rows, then 10 sample rows
   if (resource.datastore_active && !isSpreadsheetFormat(fmt)) {
     const result = await datastoreSearch(resourceId, { limit: 10 });
     // If the datastore is active but empty (CKAN failed to ingest), fall back to file download.
     if (result.total === 0 && isSupportedFormat(fmt)) {
       logger.warn({ resourceId }, 'Datastore empty — falling back to file download for preview');
-      const parsed = await downloadAndParseFile(resource.url, resource.format, sheetName);
+      const parsed = await downloadAndParseFile(resource.url, resource.format, sheetName, { maxRows: PREVIEW_MAX_ROWS });
       sampleRecords = parsed.records.slice(0, 10);
       fields = parsed.fields;
       totalRecords = parsed.records.length;
@@ -850,7 +855,7 @@ export async function previewResource(resourceId: string, sheetName?: string): P
       fetchMethod = 'datastore';
     }
   } else {
-    const parsed = await downloadAndParseFile(resource.url, resource.format, sheetName);
+    const parsed = await downloadAndParseFile(resource.url, resource.format, sheetName, { maxRows: PREVIEW_MAX_ROWS });
     sampleRecords = parsed.records.slice(0, 10);
     fields = parsed.fields;
     totalRecords = parsed.records.length;
