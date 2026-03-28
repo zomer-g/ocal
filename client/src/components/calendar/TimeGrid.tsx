@@ -142,7 +142,7 @@ export function TimeGrid({ date, view, events, onEventClick }: TimeGridProps) {
       )}
 
       {/* Scrollable time grid */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
         <div className="flex relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
           {/* Time labels gutter */}
           <div className="w-10 sm:w-16 shrink-0 relative">
@@ -168,10 +168,10 @@ export function TimeGrid({ date, view, events, onEventClick }: TimeGridProps) {
               onEventClick={onEventClick}
             />
           ))}
-        </div>
 
-        {/* Current time indicator */}
-        <CurrentTimeIndicator days={days} />
+          {/* Current time indicator — inside the positioned container */}
+          <CurrentTimeIndicator days={days} />
+        </div>
       </div>
     </div>
   );

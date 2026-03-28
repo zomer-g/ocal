@@ -22,8 +22,12 @@ export function CalendarPage() {
     }
   }, [sources, sourcesInitialized, setAllSources]);
 
-  // Build source_ids param for API
-  const sourceIdsParam = enabledSourceIds.size > 0
+  // Build source_ids param for API.
+  // When all sources are enabled (or none toggled yet), omit the param entirely —
+  // the backend returns all enabled sources by default, and sending 600+ UUIDs
+  // as a query string exceeds URL length limits (~22KB).
+  const allEnabled = sources.length > 0 && enabledSourceIds.size === sources.length;
+  const sourceIdsParam = enabledSourceIds.size > 0 && !allEnabled
     ? Array.from(enabledSourceIds).join(',')
     : undefined;
 
