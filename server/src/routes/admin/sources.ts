@@ -194,6 +194,8 @@ adminSourcesRouter.post('/:id/extract-entities', async (req, res, next) => {
 
     const result = await extractEntitiesForSource(req.params.id, { skipAI, clearExisting });
     logger.info({ sourceId: req.params.id, result }, 'Entity extraction completed');
+    // Refresh entity matview in background so sidebar filters update
+    import('../public/entities.js').then((m) => m.refreshEntityMatView()).catch(() => {});
 
     let message = result.entitiesInserted > 0
       ? `נחלצו ${result.entitiesInserted} ישויות מתוך ${result.eventsProcessed} אירועים`

@@ -19,50 +19,102 @@ function setCache(key: string, data: unknown, ttl = CACHE_TTL): void {
   _cache.set(key, { data, expiresAt: Date.now() + ttl });
 }
 
-/** Run the entities aggregation query.
- *  Optimized: first get valid event IDs, then aggregate entities.
- *  Avoids expensive 3-way JOIN + GROUP BY that was timing out.
- */
-async function queryEntities(opts: {
+// ── Materialized view helpers ───────────────────────────────────────────
+
+/** Refresh the mv_entity_counts materialized view (non-blocking). */
+export async function refreshEntityMatView(): Promise<void> {
+  try {
+    // Run inside a transaction so SET LOCAL scopes the extended timeout
+    await db.transaction(async (trx) => {
+      await trx.raw('SET LOCAL statement_timeout = 120000');
+      await trx.raw('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_entity_counts');
+    });
+    logger.info('Materialized view mv_entity_counts refreshed');
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // If the matview doesn't exist yet (migration not run), log and move on
+    if (msg.includes('mv_entity_counts')) {
+      logger.warn('mv_entity_counts does not exist yet — skipping refresh');
+    } else {
+      logger.warn({ err }, 'Failed to refresh mv_entity_counts (non-fatal)');
+    }
+  }
+}
+
+// ── Query functions ─────────────────────────────────────────────────────
+
+/** Fast path: read pre-computed counts from the materialized view. */
+async function queryFromMatView(opts: { typeFilter?: string }) {
+  let query = db('mv_entity_counts').select('entity_name', 'entity_type', 'entity_id', 'event_count');
+  if (opts.typeFilter) {
+    query = query.where('entity_type', opts.typeFilter);
+  }
+  return query.orderBy('event_count', 'desc').limit(200);
+}
+
+/** Slow path: live query for filtered requests (specific sources or date range). */
+async function queryEntitiesLive(opts: {
   sourceIds?: string[];
   typeFilter?: string;
   fromDate?: string;
   toDate?: string;
 }) {
-  // Use subqueries to avoid passing hundreds of IDs as parameters
-  const enabledSourcesSubquery = db('diary_sources').where('is_enabled', true).select('id');
-
-  // Build event filter as subquery
-  let eventQuery = db('diary_events')
-    .whereIn('source_id', opts.sourceIds?.length
-      ? opts.sourceIds  // user-specified filter (small)
-      : enabledSourcesSubquery  // subquery, not 421 inline IDs
-    );
-  if (opts.fromDate) eventQuery = eventQuery.where('event_date', '>=', opts.fromDate);
-  if (opts.toDate) eventQuery = eventQuery.where('event_date', '<=', opts.toDate);
-
-  // Aggregate entities for those events only
+  // Use JOIN instead of nested whereIn — better query plan
   let query = db('event_entities as ee')
-    .where('ee.confidence', '>=', 0.5)
-    .whereIn('ee.event_id', eventQuery.select('id'))
+    .join('diary_events as de', 'de.id', 'ee.event_id')
+    .where('ee.confidence', '>=', 0.5);
+
+  if (opts.sourceIds?.length) {
+    query = query.whereIn('de.source_id', opts.sourceIds);
+  } else {
+    query = query.whereIn('de.source_id', db('diary_sources').where('is_enabled', true).select('id'));
+  }
+  if (opts.fromDate) query = query.where('de.event_date', '>=', opts.fromDate);
+  if (opts.toDate) query = query.where('de.event_date', '<=', opts.toDate);
+
+  if (opts.typeFilter) {
+    query = query.where('ee.entity_type', opts.typeFilter);
+  }
+
+  return query
     .select(
       'ee.entity_name',
       'ee.entity_type',
       db.raw('MAX(ee.entity_id::text)::uuid as entity_id'),
       db.raw('COUNT(DISTINCT ee.event_id) as event_count'),
     )
-    .groupBy('ee.entity_name', 'ee.entity_type');
+    .groupBy('ee.entity_name', 'ee.entity_type')
+    .orderBy('event_count', 'desc')
+    .limit(200);
+}
 
-  if (opts.typeFilter) {
-    query = query.where('ee.entity_type', opts.typeFilter);
+/** Route to the right query strategy. */
+async function queryEntities(opts: {
+  sourceIds?: string[];
+  typeFilter?: string;
+  fromDate?: string;
+  toDate?: string;
+}) {
+  const isUnfiltered = !opts.sourceIds?.length && !opts.fromDate && !opts.toDate;
+
+  if (isUnfiltered) {
+    // Fast path: use materialized view
+    try {
+      return await queryFromMatView({ typeFilter: opts.typeFilter });
+    } catch {
+      // Matview may not exist yet — fall through to live query
+      logger.warn('mv_entity_counts not available — falling back to live query');
+    }
   }
 
-  return query.orderBy('event_count', 'desc').limit(200);
+  return queryEntitiesLive(opts);
 }
 
 /** Pre-warm the "all" cache on startup so the first page load is fast. */
 export async function warmEntityCache(): Promise<void> {
   try {
+    // Refresh the matview first so the subsequent read is up to date
+    await refreshEntityMatView();
     const entities = await queryEntities({});
     setCache('all:::', entities, ALL_CACHE_TTL);
     logger.info(`Entity cache warmed: ${entities.length} entities`);

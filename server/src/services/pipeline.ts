@@ -507,6 +507,8 @@ export async function processSource(
       })
       .then((r) => {
         if (r) logger.info({ sourceId, confirmed: r.confirmed, unconfirmed: r.unconfirmed }, 'Cross-referencing done');
+        // Refresh entity matview so sidebar filters stay current
+        return import('../routes/public/entities.js').then((m) => m.refreshEntityMatView());
       })
       .catch((err) => logger.warn({ sourceId, err }, 'Entity extraction or cross-referencing failed (non-fatal)'));
 
