@@ -61,6 +61,8 @@ function SkeletonRows() {
 
 // ── Main FilterPanel ──────────────────────────────────────────────────
 
+const PAGE_SIZE = 10;
+
 export function FilterPanel() {
   const {
     from_date, to_date, source_ids, entity_names, cross_ref_status,
@@ -77,6 +79,12 @@ export function FilterPanel() {
   const [orgsSearch, setOrgsSearch] = useState('');
   const [placesSearch, setPlacesSearch] = useState('');
   const [sourcesSearch, setSourcesSearch] = useState('');
+
+  // ── Show-more counters ──
+  const [peopleVisible, setPeopleVisible] = useState(PAGE_SIZE);
+  const [orgsVisible, setOrgsVisible] = useState(PAGE_SIZE);
+  const [placesVisible, setPlacesVisible] = useState(PAGE_SIZE);
+  const [sourcesVisible, setSourcesVisible] = useState(PAGE_SIZE);
 
   // ── Year/Month data ──
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
@@ -319,15 +327,25 @@ export function FilterPanel() {
           {entitiesLoading && !entitiesData ? (
             <SkeletonRows />
           ) : people.length > 0 ? (
-            people.map((e) => (
-              <EntityRow
-                key={e.entity_name}
-                name={e.entity_name}
-                count={Number(e.event_count)}
-                checked={entity_names.includes(e.entity_name)}
-                onToggle={() => toggleEntity(e.entity_name)}
-              />
-            ))
+            <>
+              {(peopleSearch ? people : people.slice(0, peopleVisible)).map((e) => (
+                <EntityRow
+                  key={e.entity_name}
+                  name={e.entity_name}
+                  count={Number(e.event_count)}
+                  checked={entity_names.includes(e.entity_name)}
+                  onToggle={() => toggleEntity(e.entity_name)}
+                />
+              ))}
+              {!peopleSearch && people.length > peopleVisible && (
+                <button
+                  onClick={() => setPeopleVisible((v) => v + PAGE_SIZE)}
+                  className="text-xs text-primary-600 hover:text-primary-800 mt-1 w-full text-center py-1"
+                >
+                  הצג עוד ({people.length - peopleVisible})
+                </button>
+              )}
+            </>
           ) : (
             <p className="text-xs text-gray-400 text-center py-2">
               {peopleSearch ? 'לא נמצאו אנשים' : 'אין נתונים'}
@@ -352,15 +370,25 @@ export function FilterPanel() {
           {entitiesLoading && !entitiesData ? (
             <SkeletonRows />
           ) : orgs.length > 0 ? (
-            orgs.map((e) => (
-              <EntityRow
-                key={e.entity_name}
-                name={e.entity_name}
-                count={Number(e.event_count)}
-                checked={entity_names.includes(e.entity_name)}
-                onToggle={() => toggleEntity(e.entity_name)}
-              />
-            ))
+            <>
+              {(orgsSearch ? orgs : orgs.slice(0, orgsVisible)).map((e) => (
+                <EntityRow
+                  key={e.entity_name}
+                  name={e.entity_name}
+                  count={Number(e.event_count)}
+                  checked={entity_names.includes(e.entity_name)}
+                  onToggle={() => toggleEntity(e.entity_name)}
+                />
+              ))}
+              {!orgsSearch && orgs.length > orgsVisible && (
+                <button
+                  onClick={() => setOrgsVisible((v) => v + PAGE_SIZE)}
+                  className="text-xs text-primary-600 hover:text-primary-800 mt-1 w-full text-center py-1"
+                >
+                  הצג עוד ({orgs.length - orgsVisible})
+                </button>
+              )}
+            </>
           ) : (
             <p className="text-xs text-gray-400 text-center py-2">
               {orgsSearch ? 'לא נמצאו ארגונים' : 'אין נתונים'}
@@ -385,15 +413,25 @@ export function FilterPanel() {
           {entitiesLoading && !entitiesData ? (
             <SkeletonRows />
           ) : places.length > 0 ? (
-            places.map((e) => (
-              <EntityRow
-                key={e.entity_name}
-                name={e.entity_name}
-                count={Number(e.event_count)}
-                checked={entity_names.includes(e.entity_name)}
-                onToggle={() => toggleEntity(e.entity_name)}
-              />
-            ))
+            <>
+              {(placesSearch ? places : places.slice(0, placesVisible)).map((e) => (
+                <EntityRow
+                  key={e.entity_name}
+                  name={e.entity_name}
+                  count={Number(e.event_count)}
+                  checked={entity_names.includes(e.entity_name)}
+                  onToggle={() => toggleEntity(e.entity_name)}
+                />
+              ))}
+              {!placesSearch && places.length > placesVisible && (
+                <button
+                  onClick={() => setPlacesVisible((v) => v + PAGE_SIZE)}
+                  className="text-xs text-primary-600 hover:text-primary-800 mt-1 w-full text-center py-1"
+                >
+                  הצג עוד ({places.length - placesVisible})
+                </button>
+              )}
+            </>
           ) : (
             <p className="text-xs text-gray-400 text-center py-2">
               {placesSearch ? 'לא נמצאו מקומות' : 'אין נתונים'}
@@ -417,21 +455,31 @@ export function FilterPanel() {
             onClearAll={source_ids.length > 0 ? clearSources : undefined}
           >
             {filteredSources.length > 0 ? (
-              filteredSources.map((source) => (
-                <SourceRow
-                  key={source.id}
-                  name={source.name}
-                  color={source.color}
-                  count={source.total_events}
-                  checked={source_ids.includes(source.id)}
-                  onToggle={() => {
-                    const next = source_ids.includes(source.id)
-                      ? source_ids.filter((id) => id !== source.id)
-                      : [...source_ids, source.id];
-                    setSourceIds(next);
-                  }}
-                />
-              ))
+              <>
+                {(sourcesSearch ? filteredSources : filteredSources.slice(0, sourcesVisible)).map((source) => (
+                  <SourceRow
+                    key={source.id}
+                    name={source.name}
+                    color={source.color}
+                    count={source.total_events}
+                    checked={source_ids.includes(source.id)}
+                    onToggle={() => {
+                      const next = source_ids.includes(source.id)
+                        ? source_ids.filter((id) => id !== source.id)
+                        : [...source_ids, source.id];
+                      setSourceIds(next);
+                    }}
+                  />
+                ))}
+                {!sourcesSearch && filteredSources.length > sourcesVisible && (
+                  <button
+                    onClick={() => setSourcesVisible((v) => v + PAGE_SIZE)}
+                    className="text-xs text-primary-600 hover:text-primary-800 mt-1 w-full text-center py-1"
+                  >
+                    הצג עוד ({filteredSources.length - sourcesVisible})
+                  </button>
+                )}
+              </>
             ) : (
               <p className="text-xs text-gray-400 text-center py-2">
                 {sourcesSearch ? 'לא נמצאו יומנים' : 'אין נתונים'}

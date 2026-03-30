@@ -15,6 +15,8 @@ interface LayerPanelProps {
   viewSourceCounts?: Record<string, number>;
 }
 
+const PAGE_SIZE = 10;
+
 export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
   const { enabledSourceIds, selectedEntityNames, toggleSource, setAllSources, setEntityNames, date, setDate, setView } = useCalendarStore();
   const allEnabled = sources.length > 0 && sources.every((s) => enabledSourceIds.has(s.id));
@@ -24,6 +26,12 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
 
   // ── Entity search ──
   const [entitySearch, setEntitySearch] = useState('');
+
+  // ── Show-more counters ──
+  const [peopleVisible, setPeopleVisible] = useState(PAGE_SIZE);
+  const [orgsVisible, setOrgsVisible] = useState(PAGE_SIZE);
+  const [placesVisible, setPlacesVisible] = useState(PAGE_SIZE);
+  const [sourcesVisible, setSourcesVisible] = useState(PAGE_SIZE);
 
   const minDate = sources.reduce((min, s) => {
     if (!s.first_event_date) return min;
@@ -261,7 +269,15 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
             <div className="space-y-1 min-w-0">
               <h4 className="text-xs text-gray-500 font-medium">אנשים</h4>
               <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-                {personEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+                {(entitySearch ? personEntities : personEntities.slice(0, peopleVisible)).map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+                {!entitySearch && personEntities.length > peopleVisible && (
+                  <button
+                    onClick={() => setPeopleVisible((v) => v + PAGE_SIZE)}
+                    className="text-xs text-primary-600 hover:text-primary-800 mt-1 w-full text-center py-1"
+                  >
+                    הצג עוד ({personEntities.length - peopleVisible})
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -271,7 +287,15 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
             <div className="space-y-1 min-w-0">
               <h4 className="text-xs text-gray-500 font-medium">ארגונים</h4>
               <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-                {orgEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+                {(entitySearch ? orgEntities : orgEntities.slice(0, orgsVisible)).map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+                {!entitySearch && orgEntities.length > orgsVisible && (
+                  <button
+                    onClick={() => setOrgsVisible((v) => v + PAGE_SIZE)}
+                    className="text-xs text-primary-600 hover:text-primary-800 mt-1 w-full text-center py-1"
+                  >
+                    הצג עוד ({orgEntities.length - orgsVisible})
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -281,7 +305,15 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
             <div className="space-y-1 min-w-0">
               <h4 className="text-xs text-gray-500 font-medium">מקומות</h4>
               <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-                {placeEntities.map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+                {(entitySearch ? placeEntities : placeEntities.slice(0, placesVisible)).map((e) => <EntityRow key={e.entity_name} name={e.entity_name} count={Number(e.event_count)} />)}
+                {!entitySearch && placeEntities.length > placesVisible && (
+                  <button
+                    onClick={() => setPlacesVisible((v) => v + PAGE_SIZE)}
+                    className="text-xs text-primary-600 hover:text-primary-800 mt-1 w-full text-center py-1"
+                  >
+                    הצג עוד ({placeEntities.length - placesVisible})
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -307,7 +339,7 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
             </button>
           </div>
           <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1">
-            {sources.map((source) => {
+            {sources.slice(0, sourcesVisible).map((source) => {
               const isEnabled = enabledSourceIds.has(source.id);
               const viewCount = viewSourceCounts?.[source.id] ?? 0;
               const hasEventsInView = !viewSourceCounts || viewCount > 0;
@@ -343,6 +375,14 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
                 </label>
               );
             })}
+            {sources.length > sourcesVisible && (
+              <button
+                onClick={() => setSourcesVisible((v) => v + PAGE_SIZE)}
+                className="text-xs text-primary-600 hover:text-primary-800 mt-1 w-full text-center py-1"
+              >
+                הצג עוד ({sources.length - sourcesVisible})
+              </button>
+            )}
           </div>
         </div>
       )}
