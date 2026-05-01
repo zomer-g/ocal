@@ -8,7 +8,7 @@
     "start": "node --max-old-space-size=512 dist/index.js",
     "worker": "tsx src/jobs/worker.ts",
     "worker:prod": "node dist/jobs/worker.js",
-    "migrate": "knex --knexfile src/db/knexfile.ts migrate:latest",
+    "migrate": "knex --knexfile src/db/knexfile.ts migrate:unlock && knex --knexfile src/db/knexfile.ts migrate:latest",
     "migrate:rollback": "knex --knexfile src/db/knexfile.ts migrate:rollback",
     "migrate:unlock": "knex --knexfile src/db/knexfile.ts migrate:unlock",
     "migrate:make": "knex --knexfile src/db/knexfile.ts migrate:make",
