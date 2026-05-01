@@ -15,17 +15,29 @@ function stripGeresh(s: string): string {
  * Build a PostgreSQL tsquery string from the user's search query.
  * Supports boolean mode: words separated by AND/OR/NOT are converted
  * to tsquery operators (&, |, !). Otherwise falls back to prefix-AND mode.
+ *
+ * Per-token rule: if the user's token contained a geresh/gershayim/quote
+ * (i.e. it's a Hebrew abbreviation like מח"ש), match the exact normalized
+ * token — no `:*` prefix — so מח"ש matches only the abbreviation and not
+ * the unrelated stem `מחש` of words like מחשב, מחשבה, מחשוב. Normal words
+ * keep the prefix match so Hebrew word-form variants still work.
  */
+function buildToken(tok: string): string {
+  const stripped = stripGeresh(tok);
+  // Original had a geresh → exact match (abbreviation). Else → prefix match.
+  return stripped !== tok ? stripped : `${tok}:*`;
+}
+
 function buildTsQuery(q: string): string {
-  const trimmed = stripGeresh(q.trim());
+  const trimmed = q.trim();
   const hasBoolOps = /\b(AND|OR|NOT)\b/i.test(trimmed);
 
   if (!hasBoolOps) {
-    // Default: all words must appear (prefix match)
+    // Default: all words must appear
     return trimmed
       .split(/\s+/)
       .filter(Boolean)
-      .map((w) => `${w}:*`)
+      .map(buildToken)
       .join(' & ');
   }
 
@@ -38,7 +50,7 @@ function buildTsQuery(q: string): string {
       if (u === 'AND') return '&';
       if (u === 'OR') return '|';
       if (u === 'NOT') return '!';
-      return `${tok}:*`;
+      return buildToken(tok);
     })
     .join(' ');
 }
