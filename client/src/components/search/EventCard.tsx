@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, MapPin, Users, CalendarDays, ChevronDown, ChevronUp, ExternalLink, Tag, BookOpen, CheckCircle2, XCircle, ArrowLeftRight } from 'lucide-react';
+import { Clock, MapPin, Users, CalendarDays, ChevronDown, ChevronUp, ExternalLink, Tag, BookOpen, CheckCircle2, XCircle, ArrowLeftRight, BookUser } from 'lucide-react';
 import type { DiaryEvent } from '@/api/events';
 import { getEventEntities, getEventMatches, getEventCrossRefs } from '@/api/events';
 import { formatTime } from '@/lib/formatters';
@@ -90,6 +90,24 @@ export function EventCard({ event }: EventCardProps) {
             aria-hidden="true"
           />
           <div className="flex-1 min-w-0">
+            {/* Diary owner — prominent so the reader sees whose calendar this came from */}
+            {event.source_name && (
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <BookUser
+                  className="w-4 h-4 shrink-0"
+                  style={{ color: event.source_color || '#06607C' }}
+                  aria-hidden="true"
+                />
+                <span
+                  className="text-sm font-bold truncate"
+                  style={{ color: event.source_color || '#06607C' }}
+                  title={event.source_name}
+                >
+                  {event.source_name}
+                </span>
+              </div>
+            )}
+
             <div className="flex items-start justify-between gap-2">
               <h3 className="text-base font-medium text-gray-900 mb-1 flex-1">{event.title}</h3>
               <div className="flex items-center gap-1 shrink-0">
@@ -141,13 +159,13 @@ export function EventCard({ event }: EventCardProps) {
                   href={event.dataset_link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-gray-500 hover:text-primary-700 hover:underline inline-flex items-center gap-1"
+                  className="text-xs text-gray-400 hover:text-primary-700 hover:underline inline-flex items-center gap-1"
                 >
-                  {event.source_name || event.dataset_name}
+                  {event.dataset_name || event.source_name}
                   <ExternalLink className="w-3 h-3" />
                 </a>
               ) : (
-                <span className="text-sm text-gray-500">{event.source_name || event.dataset_name}</span>
+                <span className="text-xs text-gray-400">{event.dataset_name || event.source_name}</span>
               )}
               {(event.match_count ?? 0) > 1 && (
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
