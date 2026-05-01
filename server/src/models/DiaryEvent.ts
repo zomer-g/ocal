@@ -3,12 +3,21 @@ import { db } from '../config/database.js';
 const TABLE = 'diary_events';
 
 /**
+ * Strip Hebrew geresh/gershayim and ASCII apostrophe/quote so abbreviations
+ * like מח"ש collapse into a single token. Must mirror the regex used by the
+ * search_vector trigger (migration 021).
+ */
+function stripGeresh(s: string): string {
+  return s.replace(/[״׳"']/g, '');
+}
+
+/**
  * Build a PostgreSQL tsquery string from the user's search query.
  * Supports boolean mode: words separated by AND/OR/NOT are converted
  * to tsquery operators (&, |, !). Otherwise falls back to prefix-AND mode.
  */
 function buildTsQuery(q: string): string {
-  const trimmed = q.trim();
+  const trimmed = stripGeresh(q.trim());
   const hasBoolOps = /\b(AND|OR|NOT)\b/i.test(trimmed);
 
   if (!hasBoolOps) {
