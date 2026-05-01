@@ -12,6 +12,8 @@
     "build": "npm run build --workspace=shared && npm run build --workspace=client && npm run build --workspace=server",
     "migrate": "npm run migrate --workspace=server",
     "migrate:rollback": "npm run migrate:rollback --workspace=server",
+    "migrate:unlock": "npm run migrate:unlock --workspace=server",
+    "backfill:search-vectors": "npm run backfill:search-vectors --workspace=server",
     "seed": "npm run seed --workspace=server",
     "worker": "npm run worker --workspace=server"
   },
