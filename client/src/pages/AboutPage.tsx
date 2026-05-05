@@ -140,10 +140,10 @@ export function AboutPage() {
         <p>
           לדליפות מידע, בעיות נגישות, הארות, הערות, ושלל צרות —{' '}
           <a
-            href="mailto:zomer@octopus.org.il"
+            href="mailto:guy@z-g.co.il"
             className={linkClass}
           >
-            zomer@octopus.org.il
+            guy@z-g.co.il
           </a>
           .
         </p>
