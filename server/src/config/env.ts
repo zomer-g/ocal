@@ -18,6 +18,9 @@ const envSchema = z.object({
 
   OPENAI_API_KEY: z.string().default(''),
   DEEPSEEK_API_KEY: z.string().default(''),
+  ANTHROPIC_API_KEY: z.string().default(''),
+  ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-5'),
+  OPENAI_VISION_MODEL: z.string().default('gpt-4o'),
 
   CKAN_BASE_URL: z.string().url().default('https://www.odata.org.il'),
   ODATA_API_KEY: z.string().default(''),

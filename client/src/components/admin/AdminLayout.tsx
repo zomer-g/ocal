@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare, Tags, Zap } from 'lucide-react';
+import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare, Tags, Zap, FileUp } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const NAV_ITEMS = [
   { path: '/admin', label: 'סקירה', icon: Settings, exact: true },
   { path: '/admin/sync', label: 'ייבוא', icon: Download, exact: false },
+  { path: '/admin/manual-import', label: 'ייבוא PDF', icon: FileUp, exact: false },
   { path: '/admin/sources', label: 'מקורות', icon: Database, exact: false },
   { path: '/admin/entities', label: 'ישויות', icon: Tags, exact: false },
   { path: '/admin/content', label: 'תוכן', icon: PenSquare, exact: false },

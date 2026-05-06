@@ -16,7 +16,9 @@
     "zustand": "^5.0.0",
     "axios": "^1.7.0",
     "date-fns": "^4.1.0",
-    "lucide-react": "^0.468.0"
+    "lucide-react": "^0.468.0",
+    "pdfjs-dist": "^4.10.38",
+    "react-pdf": "^9.2.1"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

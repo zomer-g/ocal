@@ -13,6 +13,7 @@ import { SourcesPage } from '@/pages/admin/SourcesPage';
 import { ContentPage } from '@/pages/admin/ContentPage';
 import { EntitiesPage } from '@/pages/admin/EntitiesPage';
 import { AutomationPage } from '@/pages/admin/AutomationPage';
+import { ManualImportPage } from '@/pages/admin/ManualImportPage';
 
 export default function App() {
   return (
@@ -36,6 +37,8 @@ export default function App() {
         <Route path="entities" element={<EntitiesPage />} />
         <Route path="content" element={<ContentPage />} />
         <Route path="automation" element={<AutomationPage />} />
+        <Route path="manual-import" element={<ManualImportPage />} />
+        <Route path="manual-import/:uploadId" element={<ManualImportPage />} />
         {/* Redirects from old routes */}
         <Route path="people" element={<Navigate to="/admin/entities" replace />} />
         <Route path="organizations" element={<Navigate to="/admin/entities" replace />} />

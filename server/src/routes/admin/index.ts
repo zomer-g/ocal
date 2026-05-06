@@ -12,6 +12,7 @@ import { adminEntitiesRouter } from './entities.js';
 import { adminExportRouter } from './export.js';
 import { adminContentRouter } from './content.js';
 import { adminAutomationRouter } from './automation.js';
+import { adminManualUploadsRouter } from './manualUploads.js';
 
 export const adminRoutes = Router();
 
@@ -32,3 +33,4 @@ adminRoutes.use('/entities', adminEntitiesRouter);
 adminRoutes.use('/export', adminExportRouter);
 adminRoutes.use('/content', adminContentRouter);
 adminRoutes.use('/automation', adminAutomationRouter);
+adminRoutes.use('/manual-uploads', adminManualUploadsRouter);
