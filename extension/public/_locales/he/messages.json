@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Ocal — חיפוש פגישות של נבחרי ציבור",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "סימון שמות של נבחרי ציבור בכל דף, עם הצצה ל-5 הפגישות האחרונות שלהם מתוך ocal.org.il.",
+    "description": "Extension description"
+  },
+  "actionTitle": {
+    "message": "סרוק את הדף ל-Ocal",
+    "description": "Toolbar icon tooltip"
+  }
+}

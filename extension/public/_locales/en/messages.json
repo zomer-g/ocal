@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Ocal — Israeli Public Officials Lookup",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Highlights names of Israeli public officials on any page and shows their last 5 meetings from ocal.org.il on hover.",
+    "description": "Extension description"
+  },
+  "actionTitle": {
+    "message": "Scan page for Ocal officials",
+    "description": "Toolbar icon tooltip"
+  }
+}
