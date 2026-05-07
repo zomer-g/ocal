@@ -1,19 +1,32 @@
 import type { EventRow, Message, Response } from './types.js';
-import { hide, showEvents, showError, showSkeleton, getCardElement } from './tooltip.js';
+import {
+  hide,
+  showEvents,
+  showError,
+  showSkeleton,
+  showSearchResults,
+  showSearchSkeleton,
+  getCardElement,
+  getActiveNameLower,
+  newSearchToken,
+  isCurrentSearchToken,
+  setCallbacks,
+} from './tooltip.js';
 
 interface OcalGlobals {
   __ocalInjected?: boolean;
+  __ocalListenersAttached?: boolean;
   __ocalNameSpans?: Map<string, Set<HTMLSpanElement>>;
   __ocalEmptyNames?: Set<string>;
   __ocalEventsCache?: Map<string, EventRow[]>;
+  __ocalRawByName?: Map<string, string>;
 }
 
 const w = window as unknown as Window & OcalGlobals;
 
 const MARK_CLASS = 'ocal-mark';
 const HOVER_DEBOUNCE_MS = 150;
-const HIDE_GRACE_MS = 200;
-
+const HIDE_GRACE_MS = 250;
 const STYLE_ID = 'ocal-mark-style';
 
 function ensureMarkStyle(): void {
@@ -103,6 +116,9 @@ function wrapMatchesInNode(node: Text, re: RegExp, registry: Map<string, Set<HTM
       registry.set(canonical, set);
     }
     set.add(span);
+    if (!w.__ocalRawByName!.has(canonical)) {
+      w.__ocalRawByName!.set(canonical, match[0]);
+    }
 
     lastIndex = end;
   }
@@ -167,9 +183,21 @@ let hoverTimer: number | undefined;
 let hideTimer: number | undefined;
 let activeName: string | null = null;
 let activeTarget: HTMLElement | null = null;
+const inFlight = new Set<string>();
 
 function onMouseOver(ev: MouseEvent): void {
   const t = ev.target as Element | null;
+
+  // Cancel any pending hide if pointer entered the tooltip itself.
+  const card = getCardElement();
+  if (card && (t === card || (card.contains?.(t as Node) ?? false))) {
+    if (hideTimer) {
+      clearTimeout(hideTimer);
+      hideTimer = undefined;
+    }
+    return;
+  }
+
   const span = t?.closest?.(`.${MARK_CLASS}`) as HTMLSpanElement | null;
   if (!span) return;
   const name = span.dataset.ocalName;
@@ -193,11 +221,18 @@ function onMouseOver(ev: MouseEvent): void {
 
 function onMouseOut(ev: MouseEvent): void {
   const related = ev.relatedTarget as Element | null;
+  const card = getCardElement();
   if (related) {
-    const card = getCardElement();
+    // Stay open if cursor moved into the tooltip or another mark.
     if (card && (related === card || card.contains(related))) return;
     if (related.closest?.(`.${MARK_CLASS}`)) return;
   }
+
+  // Don't auto-hide while the search input is focused inside the card.
+  const sr = card?.getRootNode() as ShadowRoot | undefined;
+  const focused = sr?.activeElement;
+  if (focused && (focused as HTMLElement).classList?.contains('ocal-search-input')) return;
+
   if (hoverTimer) {
     clearTimeout(hoverTimer);
     hoverTimer = undefined;
@@ -210,9 +245,15 @@ function onMouseOut(ev: MouseEvent): void {
   }, HIDE_GRACE_MS);
 }
 
+function rawFor(nameLower: string, fallback: string): string {
+  return w.__ocalRawByName!.get(nameLower) ?? fallback;
+}
+
 async function showFor(target: HTMLElement, name: string): Promise<void> {
   const cache = w.__ocalEventsCache!;
   const cached = cache.get(name);
+  const raw = rawFor(name, target.dataset.ocalRaw ?? name);
+
   if (cached) {
     if (cached.length === 0) {
       w.__ocalEmptyNames!.add(name);
@@ -220,28 +261,72 @@ async function showFor(target: HTMLElement, name: string): Promise<void> {
       hide();
       return;
     }
-    showEvents(target, target.dataset.ocalRaw ?? name, cached);
+    showEvents(target, raw, name, cached);
     return;
   }
 
-  showSkeleton(target, target.dataset.ocalRaw ?? name);
-  const resp = await sendMessage<EventRow[]>({ type: 'getEvents', name });
+  showSkeleton(target, raw, name);
 
-  if (activeName !== name || activeTarget !== target) return;
+  // De-duplicate concurrent fetches for the same name.
+  if (inFlight.has(name)) return;
+  inFlight.add(name);
+
+  try {
+    const resp = await sendMessage<EventRow[]>({ type: 'getEvents', name });
+
+    if (!resp.ok) {
+      // Always cache success/failure decisions; only update UI if still active.
+      if (activeName === name && activeTarget === target) {
+        showError(target, raw, name, resp.error);
+      }
+      return;
+    }
+
+    // Always cache, regardless of whether the user is still hovering.
+    cache.set(name, resp.data);
+
+    if (resp.data.length === 0) {
+      w.__ocalEmptyNames!.add(name);
+      unwrapAllForName(name, w.__ocalNameSpans!);
+      if (activeName === name) hide();
+      return;
+    }
+
+    if (activeName === name && activeTarget === target) {
+      showEvents(target, raw, name, resp.data);
+    }
+  } finally {
+    inFlight.delete(name);
+  }
+}
+
+async function handleSearch(nameLower: string, query: string): Promise<void> {
+  const raw = rawFor(nameLower, nameLower);
+  const token = newSearchToken();
+  showSearchSkeleton(raw, nameLower, query);
+
+  const resp = await sendMessage<EventRow[]>({ type: 'searchEvents', name: nameLower, query });
+  if (!isCurrentSearchToken(token)) return;
+  if (getActiveNameLower() !== nameLower) return;
 
   if (!resp.ok) {
-    showError(target, target.dataset.ocalRaw ?? name, resp.error);
+    if (activeTarget) showError(activeTarget, raw, nameLower, resp.error);
     return;
   }
+  showSearchResults(raw, nameLower, query, resp.data);
+}
 
-  cache.set(name, resp.data);
-  if (resp.data.length === 0) {
-    w.__ocalEmptyNames!.add(name);
-    unwrapAllForName(name, w.__ocalNameSpans!);
-    hide();
-    return;
+function handleClearSearch(nameLower: string): void {
+  const raw = rawFor(nameLower, nameLower);
+  newSearchToken(); // invalidate any in-flight search
+  const cached = w.__ocalEventsCache!.get(nameLower);
+  if (cached) {
+    if (activeTarget) showEvents(activeTarget, raw, nameLower, cached);
+  } else if (activeTarget) {
+    // Fall back to skeleton + fetch.
+    showSkeleton(activeTarget, raw, nameLower);
+    showFor(activeTarget, nameLower).catch(() => undefined);
   }
-  showEvents(target, target.dataset.ocalRaw ?? name, resp.data);
 }
 
 function flashStatus(text: string): void {
@@ -301,17 +386,32 @@ async function scan(): Promise<void> {
 
 function init(): void {
   ensureMarkStyle();
-  document.body.addEventListener('mouseover', onMouseOver, true);
-  document.body.addEventListener('mouseout', onMouseOut, true);
+  if (!w.__ocalListenersAttached) {
+    document.body.addEventListener('mouseover', onMouseOver, true);
+    document.body.addEventListener('mouseout', onMouseOut, true);
+    w.__ocalListenersAttached = true;
+  }
+  setCallbacks({
+    onSearch: (nameLower, query) => {
+      void handleSearch(nameLower, query);
+    },
+    onClearSearch: (nameLower) => {
+      handleClearSearch(nameLower);
+    },
+  });
 }
 
 if (w.__ocalInjected) {
+  // Re-injection from a second toolbar click — re-bind callbacks (in case the
+  // old tooltip host was removed) and rescan for any newly added DOM.
+  init();
   scan().catch((err) => console.warn('[ocal] rescan failed', err));
 } else {
   w.__ocalInjected = true;
   w.__ocalNameSpans = new Map();
   w.__ocalEmptyNames = new Set();
   w.__ocalEventsCache = new Map();
+  w.__ocalRawByName = new Map();
   init();
   scan().catch((err) => console.warn('[ocal] initial scan failed', err));
 }

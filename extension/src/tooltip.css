@@ -4,8 +4,8 @@
 .ocal-card {
   position: fixed;
   z-index: 2147483647;
-  max-width: 360px;
-  min-width: 240px;
+  width: 360px;
+  max-width: calc(100vw - 16px);
   background: #ffffff;
   color: #1f2937;
   border: 1px solid #e5e7eb;
@@ -25,13 +25,51 @@
 .ocal-name {
   font-weight: 600;
   font-size: 14px;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   color: #111827;
+}
+.ocal-search {
+  margin-bottom: 8px;
+}
+.ocal-search-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  direction: rtl;
+  text-align: right;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #f9fafb;
+  color: #111827;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.ocal-search-input::placeholder {
+  color: #9ca3af;
+}
+.ocal-search-input:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 .ocal-sub {
   color: #6b7280;
   font-size: 11px;
   margin-bottom: 8px;
+}
+.ocal-body {
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.ocal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.ocal-body::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
 }
 .ocal-list {
   margin: 0;
@@ -78,6 +116,12 @@
 .ocal-error {
   color: #b91c1c;
   font-size: 12px;
+}
+.ocal-empty {
+  color: #6b7280;
+  font-size: 12px;
+  padding: 8px 0;
+  text-align: center;
 }
 .ocal-footer {
   margin-top: 10px;

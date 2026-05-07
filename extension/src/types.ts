@@ -17,6 +17,7 @@ export interface EventRow {
 
 export type Message =
   | { type: 'getPeople' }
-  | { type: 'getEvents'; name: string };
+  | { type: 'getEvents'; name: string }
+  | { type: 'searchEvents'; name: string; query: string };
 
 export type Response<T> = { ok: true; data: T } | { ok: false; error: string };
