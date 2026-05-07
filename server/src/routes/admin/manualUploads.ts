@@ -188,19 +188,27 @@ adminManualUploadsRouter.post('/:id/extract', validate(extractQuerySchema, 'quer
 // ──────────────────────────────────────────────
 // PATCH /api/admin/manual-uploads/:id/draft-events — autosave
 // ──────────────────────────────────────────────
-const draftEventSchema = z.object({
-  title: z.string().min(1),
-  start_time: z.string().min(1),
+// Loose schema: autosave runs on every keystroke; an event with an empty
+// title or empty time is a normal mid-edit state, not an error. Strict
+// validation happens at commit instead.
+const draftEventLooseSchema = z.object({
+  title: z.string().default(''),
+  start_time: z.string().default(''),
   end_time: z.string().optional().nullable(),
   location: z.string().optional().nullable(),
   participants: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   source_page: z.number().int().optional().nullable(),
-  provider: z.enum(['claude', 'gpt4o', 'manual']).optional(), // visual tag in UI
+  provider: z.enum(['claude', 'gpt4o', 'manual']).optional(),
 }).passthrough();
 
+const draftEventStrictSchema = draftEventLooseSchema.extend({
+  title: z.string().min(1),
+  start_time: z.string().min(1),
+});
+
 const draftEventsSchema = z.object({
-  draft_events: z.array(draftEventSchema),
+  draft_events: z.array(draftEventLooseSchema),
 });
 
 adminManualUploadsRouter.patch('/:id/draft-events', validate(draftEventsSchema, 'body'), async (req, res, next) => {
@@ -236,12 +244,24 @@ const commitSchema = z.object({
     organization_id: z.string().uuid().optional().nullable(),
     dataset_link: z.string().url().optional().nullable(),
   }).optional(),
-  events: z.array(draftEventSchema).min(1),
+  events: z.array(draftEventStrictSchema).min(1),
   run_entity_extraction: z.boolean().default(true),
 }).refine(
   (b) => !!b.source_id || !!b.source,
   { message: 'Either source_id or source must be provided' },
 );
+
+/**
+ * Wrap a naive datetime (no TZ) so PG interprets it as Asia/Jerusalem
+ * local time and stores the correct UTC instant. If the value already
+ * carries an explicit TZ, pass through untouched.
+ */
+function israelTs(value: string | null | undefined) {
+  if (!value) return null;
+  const hasTz = /([+-]\d{2}:?\d{2}|Z)$/.test(value);
+  if (hasTz) return db.raw('?::timestamptz', [value]);
+  return db.raw(`?::timestamp AT TIME ZONE 'Asia/Jerusalem'`, [value]);
+}
 
 adminManualUploadsRouter.post('/:id/commit', validate(commitSchema, 'body'), async (req, res, next) => {
   try {
@@ -287,12 +307,13 @@ adminManualUploadsRouter.post('/:id/commit', validate(commitSchema, 'body'), asy
         throw new Error('Unreachable — schema guarantees source_id or source');
       }
 
-      // Insert events
+      // Insert events. Naive timestamps (no TZ) are interpreted as
+      // Asia/Jerusalem local time so they store the correct UTC instant.
       const rows = body.events.map((e) => ({
         source_id: resolvedSourceId,
         title: e.title,
-        start_time: e.start_time,
-        end_time: e.end_time ?? null,
+        start_time: israelTs(e.start_time),
+        end_time: israelTs(e.end_time),
         location: e.location ?? null,
         participants: e.participants ?? null,
         dataset_name: datasetName,
