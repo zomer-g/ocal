@@ -42,10 +42,14 @@ adminManualUploadsRouter.post('/', upload.single('file'), async (req, res, next)
       return;
     }
 
+    // multer leaves originalname in latin1; recode to UTF-8 so Hebrew
+    // (and any non-ASCII) names round-trip correctly.
+    const filename = Buffer.from(file.originalname, 'latin1').toString('utf8');
+
     const [row] = await db('manual_diary_uploads')
       .insert({
         uploaded_by: req.adminUser?.id ?? null,
-        filename: file.originalname,
+        filename,
         mime_type: file.mimetype,
         file_size: file.size,
         file_data: file.buffer,
