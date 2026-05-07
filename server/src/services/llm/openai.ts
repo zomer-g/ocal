@@ -24,7 +24,10 @@ const MAX_PAGES = 20; // safety cap — keep request size bounded
 const RENDER_SCALE = 2; // DPI multiplier for legible OCR-ish output
 
 export async function extractWithOpenAI(pdfBuffer: Buffer): Promise<ExtractResult> {
-  if (!env.OPENAI_API_KEY) {
+  // Prefer the PDF-feature-dedicated key; fall back to the entity-extractor's
+  // shared OPENAI_API_KEY if no dedicated one was provisioned.
+  const apiKey = env.OPENAI_VISION_KEY || env.OPENAI_API_KEY;
+  if (!apiKey) {
     throw new LLMNotConfiguredError('gpt4o');
   }
 
@@ -58,7 +61,7 @@ export async function extractWithOpenAI(pdfBuffer: Buffer): Promise<ExtractResul
     },
     {
       headers: {
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       timeout: 120_000,

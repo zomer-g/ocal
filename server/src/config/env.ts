@@ -21,6 +21,12 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().default(''),
   ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-5'),
   OPENAI_VISION_MODEL: z.string().default('gpt-4o'),
+  // Dedicated keys for the PDF-extraction feature. Prefer these over the
+  // generic *_API_KEY values when set, so the user can keep PDF spend on a
+  // separate key from entity extraction. If empty, code falls back to the
+  // generic ones above.
+  OPENAI_VISION_KEY: z.string().default(''),
+  ANTHROPIC_MODEL_KEY: z.string().default(''),
 
   CKAN_BASE_URL: z.string().url().default('https://www.odata.org.il'),
   ODATA_API_KEY: z.string().default(''),

@@ -14,11 +14,13 @@ import { PDF_EXTRACTION_SYSTEM, PDF_EXTRACTION_USER } from './prompt.js';
 const MAX_OUTPUT_TOKENS = 8192;
 
 export async function extractWithClaude(pdfBuffer: Buffer): Promise<ExtractResult> {
-  if (!env.ANTHROPIC_API_KEY) {
+  // Prefer the PDF-feature-dedicated key; fall back to the canonical one.
+  const apiKey = env.ANTHROPIC_MODEL_KEY || env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
     throw new LLMNotConfiguredError('claude');
   }
 
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = new Anthropic({ apiKey });
 
   const response = await client.messages.create({
     model: env.ANTHROPIC_MODEL,
