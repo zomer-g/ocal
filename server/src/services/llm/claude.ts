@@ -54,38 +54,68 @@ export async function extractWithClaude(pdfBuffer: Buffer): Promise<ExtractResul
     .join('\n')
     .trim();
 
-  const events = parseEventsJson(text);
+  const events = parseEventsJson(text, 'claude');
+
+  logger.info(
+    { provider: 'claude', model: response.model, eventCount: events.length, textPreview: text.slice(0, 1500) },
+    'Claude PDF extraction parsed',
+  );
 
   return {
     events,
-    raw_response: { id: response.id, model: response.model, content: response.content, usage: response.usage },
+    raw_response: { id: response.id, model: response.model, content: response.content, usage: response.usage, text },
     tokens_used: response.usage.input_tokens + response.usage.output_tokens,
     provider: 'claude',
   };
 }
 
-function parseEventsJson(text: string): ExtractedEvent[] {
-  // Strip a markdown fence if Claude added one despite the system prompt
+/**
+ * Permissive parser — keeps every event-shaped object the LLM returned,
+ * coercing missing/typed fields rather than dropping them. Earlier we
+ * silently filtered out events without `title` or `start_time`, which
+ * meant a half-correct LLM response surfaced as "0 results" with no
+ * visible error. Better to show the partial events and let the admin fix
+ * them in the editor.
+ */
+export function parseEventsJson(text: string, provider: string): ExtractedEvent[] {
   const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(stripped);
   } catch (err) {
-    logger.error({ err, preview: stripped.slice(0, 500) }, 'Claude returned non-JSON');
-    throw new Error('Claude response was not valid JSON');
+    logger.error({ err, provider, preview: stripped.slice(0, 800) }, 'LLM returned non-JSON');
+    throw new Error(`${provider} response was not valid JSON: ${stripped.slice(0, 200)}`);
   }
 
-  const obj = parsed as { events?: unknown };
-  if (!obj || !Array.isArray(obj.events)) {
-    throw new Error('Claude response missing "events" array');
+  const obj = parsed as { events?: unknown; event?: unknown };
+  // Accept either {events:[...]} or {event:[...]} (some models singularize)
+  const arr: unknown = Array.isArray(obj?.events) ? obj.events
+    : Array.isArray(obj?.event) ? obj.event
+    : Array.isArray(parsed) ? parsed
+    : null;
+
+  if (!arr || !Array.isArray(arr)) {
+    throw new Error(`${provider} response missing "events" array — got: ${stripped.slice(0, 200)}`);
   }
 
-  return obj.events.filter(isValidEvent);
-}
-
-function isValidEvent(e: unknown): e is ExtractedEvent {
-  if (!e || typeof e !== 'object') return false;
-  const r = e as Record<string, unknown>;
-  return typeof r.title === 'string' && r.title.trim().length > 0 && typeof r.start_time === 'string';
+  return (arr as unknown[])
+    .filter((e): e is Record<string, unknown> => !!e && typeof e === 'object')
+    .map((e): ExtractedEvent => ({
+      title: typeof e.title === 'string' ? e.title : '',
+      start_time: typeof e.start_time === 'string' ? e.start_time
+        : typeof e.start === 'string' ? e.start
+        : typeof e.datetime === 'string' ? e.datetime
+        : '',
+      end_time: typeof e.end_time === 'string' ? e.end_time
+        : typeof e.end === 'string' ? e.end
+        : undefined,
+      location: typeof e.location === 'string' ? e.location : undefined,
+      participants: typeof e.participants === 'string' ? e.participants : undefined,
+      notes: typeof e.notes === 'string' ? e.notes : undefined,
+      confidence: typeof e.confidence === 'number' ? e.confidence : undefined,
+      source_page: typeof e.source_page === 'number' ? e.source_page
+        : typeof e.page === 'number' ? e.page
+        : undefined,
+    }));
 }

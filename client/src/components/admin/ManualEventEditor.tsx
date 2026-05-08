@@ -9,6 +9,7 @@ import {
   extractFromPdf,
   commitManualUpload,
   type DraftEvent,
+  type ExtractResponse,
   type LLMProvider,
   type ManualUpload,
 } from '@/api/manualUploads';
@@ -155,6 +156,8 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
   const [runEntityExtraction, setRunEntityExtraction] = useState(true);
   const [error, setError] = useState<string>('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [lastExtraction, setLastExtraction] = useState<ExtractResponse | null>(null);
+  const [showRawText, setShowRawText] = useState(false);
 
   // Reset on upload swap
   useEffect(() => {
@@ -202,6 +205,8 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
   const extractMutation = useMutation({
     mutationFn: (provider: LLMProvider) => extractFromPdf(upload.id, provider),
     onSuccess: (resp) => {
+      setLastExtraction(resp);
+      setShowRawText(false);
       setEvents((prev) => [
         ...prev,
         ...resp.events.map((e) => ({ ...e, provider: resp.provider })),
@@ -214,7 +219,10 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
       if (earliest) setViewDate(earliest);
       setError('');
     },
-    onError: (err: Error) => setError(`חילוץ נכשל: ${err.message}`),
+    onError: (err: Error) => {
+      setLastExtraction(null);
+      setError(`חילוץ נכשל: ${err.message}`);
+    },
   });
 
   const commitMutation = useMutation({
@@ -391,6 +399,53 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
           {orphanEvents.length > 0 && <span className="px-1.5 py-0.5 rounded border bg-amber-50 text-amber-800 border-amber-200">בלי תאריך: {orphanEvents.length}</span>}
         </div>
       </div>
+
+      {/* Extraction status banner */}
+      {lastExtraction && (
+        <div
+          className={`px-3 py-2 text-sm border-b ${
+            lastExtraction.event_count > 0
+              ? 'bg-blue-50 border-blue-200 text-blue-900'
+              : 'bg-amber-50 border-amber-200 text-amber-900'
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <strong>{lastExtraction.provider === 'claude' ? 'Claude' : 'GPT-4o'}:</strong>{' '}
+              {lastExtraction.event_count > 0
+                ? `חולצו ${lastExtraction.event_count} אירועים והוספו לרשימה.`
+                : 'לא חולצו אירועים. ייתכן שהמודל לא הצליח לקרוא את הקובץ או שהפלט אינו בפורמט הנדרש.'}
+              {typeof lastExtraction.tokens_used === 'number' && (
+                <span className="text-xs text-gray-500 mx-2">({lastExtraction.tokens_used} tokens)</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {lastExtraction.raw_text_preview && (
+                <button
+                  type="button"
+                  onClick={() => setShowRawText((v) => !v)}
+                  className="text-xs underline hover:no-underline"
+                >
+                  {showRawText ? 'הסתר תשובת מודל' : 'הצג תשובת מודל'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setLastExtraction(null)}
+                className="text-xs opacity-60 hover:opacity-100"
+                aria-label="סגור"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          {showRawText && lastExtraction.raw_text_preview && (
+            <pre className="mt-2 max-h-48 overflow-auto bg-white border border-gray-200 rounded p-2 text-[11px] whitespace-pre-wrap" dir="ltr">
+              {lastExtraction.raw_text_preview}
+            </pre>
+          )}
+        </div>
+      )}
 
       {/* Body — view-mode specific */}
       <div className="flex-1 overflow-auto">

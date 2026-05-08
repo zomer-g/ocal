@@ -17,8 +17,9 @@
 import axios from 'axios';
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
-import { LLMNotConfiguredError, type ExtractResult, type ExtractedEvent } from './index.js';
+import { LLMNotConfiguredError, type ExtractResult } from './index.js';
 import { PDF_EXTRACTION_SYSTEM, PDF_EXTRACTION_USER } from './prompt.js';
+import { parseEventsJson } from './claude.js';
 
 const MAX_PAGES = 20; // safety cap — keep request size bounded
 const RENDER_SCALE = 2; // DPI multiplier for legible OCR-ish output
@@ -73,11 +74,16 @@ export async function extractWithOpenAI(pdfBuffer: Buffer): Promise<ExtractResul
     throw new Error('GPT-4o response missing content');
   }
 
-  const events = parseEventsJson(content);
+  const events = parseEventsJson(content, 'gpt4o');
+
+  logger.info(
+    { provider: 'gpt4o', model: env.OPENAI_VISION_MODEL, eventCount: events.length, textPreview: content.slice(0, 1500) },
+    'GPT-4o PDF extraction parsed',
+  );
 
   return {
     events,
-    raw_response: response.data,
+    raw_response: { ...response.data, text: content },
     tokens_used: response.data?.usage?.total_tokens,
     provider: 'gpt4o',
   };
@@ -130,24 +136,4 @@ async function rasterizePdf(pdfBuffer: Buffer): Promise<string[]> {
   return dataUrls;
 }
 
-function parseEventsJson(text: string): ExtractedEvent[] {
-  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stripped);
-  } catch (err) {
-    logger.error({ err, preview: stripped.slice(0, 500) }, 'GPT-4o returned non-JSON');
-    throw new Error('GPT-4o response was not valid JSON');
-  }
-  const obj = parsed as { events?: unknown };
-  if (!obj || !Array.isArray(obj.events)) {
-    throw new Error('GPT-4o response missing "events" array');
-  }
-  return obj.events.filter(isValidEvent);
-}
-
-function isValidEvent(e: unknown): e is ExtractedEvent {
-  if (!e || typeof e !== 'object') return false;
-  const r = e as Record<string, unknown>;
-  return typeof r.title === 'string' && r.title.trim().length > 0 && typeof r.start_time === 'string';
-}
+// parseEventsJson is shared with claude.ts (imported above)

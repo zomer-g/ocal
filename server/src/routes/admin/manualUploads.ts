@@ -161,11 +161,16 @@ adminManualUploadsRouter.post('/:id/extract', validate(extractQuerySchema, 'quer
         { uploadId: row.id, provider, eventCount: result.events.length, tokens: result.tokens_used },
         'PDF extraction complete',
       );
+      // Surface a text preview so the UI can show *why* an extraction
+      // returned zero events (e.g. LLM said "no readable text") instead of
+      // silently appearing inert.
+      const rawText = (result.raw_response as { text?: string } | undefined)?.text;
       res.json({
         provider,
         events: result.events,
         tokens_used: result.tokens_used,
         event_count: result.events.length,
+        raw_text_preview: typeof rawText === 'string' ? rawText.slice(0, 1500) : null,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

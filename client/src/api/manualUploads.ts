@@ -45,6 +45,7 @@ export interface ExtractResponse {
   events: DraftEvent[];
   tokens_used?: number;
   event_count: number;
+  raw_text_preview?: string | null;
 }
 
 export interface CommitBody {
