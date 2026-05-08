@@ -8,16 +8,41 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
-import { LLMNotConfiguredError, type ExtractResult, type ExtractedEvent } from './index.js';
+import { LLMNotConfiguredError, type ExtractOptions, type ExtractResult, type ExtractedEvent } from './index.js';
 import { PDF_EXTRACTION_SYSTEM, PDF_EXTRACTION_USER } from './prompt.js';
 
 const MAX_OUTPUT_TOKENS = 8192;
 
-export async function extractWithClaude(pdfBuffer: Buffer): Promise<ExtractResult> {
+/**
+ * Extract one page from a PDF buffer into a new single-page PDF buffer.
+ * Used when the admin chooses "extract this page only" — keeps token cost
+ * proportional to the visible page rather than the full document.
+ */
+async function slicePdfPage(pdfBuffer: Buffer, page: number): Promise<Buffer> {
+  const { PDFDocument } = await import('pdf-lib');
+  const src = await PDFDocument.load(pdfBuffer);
+  const total = src.getPageCount();
+  if (page < 1 || page > total) {
+    throw new Error(`Page ${page} out of range (PDF has ${total} pages)`);
+  }
+  const dest = await PDFDocument.create();
+  const [copied] = await dest.copyPages(src, [page - 1]);
+  dest.addPage(copied);
+  const bytes = await dest.save();
+  return Buffer.from(bytes);
+}
+
+export async function extractWithClaude(pdfBuffer: Buffer, opts: ExtractOptions = {}): Promise<ExtractResult> {
   // Prefer the PDF-feature-dedicated key; fall back to the canonical one.
   const apiKey = env.ANTHROPIC_MODEL_KEY || env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new LLMNotConfiguredError('claude');
+  }
+
+  // Slice down to one page if requested (cheaper + scoped extraction)
+  let buffer = pdfBuffer;
+  if (opts.page) {
+    buffer = await slicePdfPage(pdfBuffer, opts.page);
   }
 
   const client = new Anthropic({ apiKey });
@@ -35,7 +60,7 @@ export async function extractWithClaude(pdfBuffer: Buffer): Promise<ExtractResul
             source: {
               type: 'base64',
               media_type: 'application/pdf',
-              data: pdfBuffer.toString('base64'),
+              data: buffer.toString('base64'),
             },
           },
           {
@@ -54,10 +79,16 @@ export async function extractWithClaude(pdfBuffer: Buffer): Promise<ExtractResul
     .join('\n')
     .trim();
 
-  const events = parseEventsJson(text, 'claude');
+  let events = parseEventsJson(text, 'claude');
+
+  // When only one page was sent, the LLM sees it as page 1 — rewrite that
+  // back to the original page number so source_page stays meaningful.
+  if (opts.page) {
+    events = events.map((e) => ({ ...e, source_page: opts.page }));
+  }
 
   logger.info(
-    { provider: 'claude', model: response.model, eventCount: events.length, textPreview: text.slice(0, 1500) },
+    { provider: 'claude', model: response.model, eventCount: events.length, page: opts.page, textPreview: text.slice(0, 1500) },
     'Claude PDF extraction parsed',
   );
 

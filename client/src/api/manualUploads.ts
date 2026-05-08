@@ -90,9 +90,18 @@ export function manualUploadFileUrl(id: string): string {
   return `/api/admin/manual-uploads/${id}/file`;
 }
 
-export async function extractFromPdf(id: string, provider: LLMProvider): Promise<ExtractResponse> {
+/**
+ * Extract events from the uploaded PDF via the chosen LLM.
+ * Pass `page` to scope extraction to a single page (1-based); omit for the
+ * whole document.
+ */
+export async function extractFromPdf(
+  id: string,
+  provider: LLMProvider,
+  page?: number,
+): Promise<ExtractResponse> {
   const { data } = await api.post(`/admin/manual-uploads/${id}/extract`, undefined, {
-    params: { provider },
+    params: page ? { provider, page } : { provider },
   });
   return data;
 }

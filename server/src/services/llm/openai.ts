@@ -17,14 +17,14 @@
 import axios from 'axios';
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
-import { LLMNotConfiguredError, type ExtractResult } from './index.js';
+import { LLMNotConfiguredError, type ExtractOptions, type ExtractResult } from './index.js';
 import { PDF_EXTRACTION_SYSTEM, PDF_EXTRACTION_USER } from './prompt.js';
 import { parseEventsJson } from './claude.js';
 
 const MAX_PAGES = 20; // safety cap — keep request size bounded
 const RENDER_SCALE = 2; // DPI multiplier for legible OCR-ish output
 
-export async function extractWithOpenAI(pdfBuffer: Buffer): Promise<ExtractResult> {
+export async function extractWithOpenAI(pdfBuffer: Buffer, opts: ExtractOptions = {}): Promise<ExtractResult> {
   // Prefer the PDF-feature-dedicated key; fall back to the entity-extractor's
   // shared OPENAI_API_KEY if no dedicated one was provisioned.
   const apiKey = env.OPENAI_VISION_KEY || env.OPENAI_API_KEY;
@@ -32,7 +32,7 @@ export async function extractWithOpenAI(pdfBuffer: Buffer): Promise<ExtractResul
     throw new LLMNotConfiguredError('gpt4o');
   }
 
-  const pageImages = await rasterizePdf(pdfBuffer);
+  const pageImages = await rasterizePdf(pdfBuffer, opts.page);
 
   const response = await axios.post(
     'https://api.openai.com/v1/chat/completions',
@@ -74,10 +74,15 @@ export async function extractWithOpenAI(pdfBuffer: Buffer): Promise<ExtractResul
     throw new Error('GPT-4o response missing content');
   }
 
-  const events = parseEventsJson(content, 'gpt4o');
+  let events = parseEventsJson(content, 'gpt4o');
+  // When only one page was sent, the LLM may label it as page 1 — rewrite
+  // back to the original PDF page number for traceability.
+  if (opts.page) {
+    events = events.map((e) => ({ ...e, source_page: opts.page }));
+  }
 
   logger.info(
-    { provider: 'gpt4o', model: env.OPENAI_VISION_MODEL, eventCount: events.length, textPreview: content.slice(0, 1500) },
+    { provider: 'gpt4o', model: env.OPENAI_VISION_MODEL, eventCount: events.length, page: opts.page, textPreview: content.slice(0, 1500) },
     'GPT-4o PDF extraction parsed',
   );
 
@@ -89,7 +94,7 @@ export async function extractWithOpenAI(pdfBuffer: Buffer): Promise<ExtractResul
   };
 }
 
-async function rasterizePdf(pdfBuffer: Buffer): Promise<string[]> {
+async function rasterizePdf(pdfBuffer: Buffer, singlePage?: number): Promise<string[]> {
   // Lazy import — pdfjs-dist + canvas are large; only loaded when GPT-4o path runs.
   // canvas binding is optional; if it fails we let the error propagate so the
   // caller can show a useful message rather than silently sending zero images.
@@ -102,10 +107,17 @@ async function rasterizePdf(pdfBuffer: Buffer): Promise<string[]> {
     useSystemFonts: false,
   });
   const pdf = await loadingTask.promise;
-  const pageCount = Math.min(pdf.numPages, MAX_PAGES);
+
+  // If a single page was requested, restrict iteration to it. Otherwise
+  // fall back to MAX_PAGES from the start of the document.
+  const startPage = singlePage ?? 1;
+  const endPage = singlePage ?? Math.min(pdf.numPages, MAX_PAGES);
+  if (singlePage && (singlePage < 1 || singlePage > pdf.numPages)) {
+    throw new Error(`Page ${singlePage} out of range (PDF has ${pdf.numPages} pages)`);
+  }
 
   const dataUrls: string[] = [];
-  for (let i = 1; i <= pageCount; i++) {
+  for (let i = startPage; i <= endPage; i++) {
     const page = await pdf.getPage(i);
     const viewport = page.getViewport({ scale: RENDER_SCALE });
     const canvas = createCanvas(viewport.width, viewport.height);
@@ -126,9 +138,9 @@ async function rasterizePdf(pdfBuffer: Buffer): Promise<string[]> {
   }
   await pdf.destroy();
 
-  if (pageCount < pdf.numPages) {
+  if (!singlePage && endPage < pdf.numPages) {
     logger.warn(
-      { totalPages: pdf.numPages, sentPages: pageCount },
+      { totalPages: pdf.numPages, sentPages: endPage },
       'PDF truncated for GPT-4o extraction (over MAX_PAGES limit)',
     );
   }

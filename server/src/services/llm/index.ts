@@ -40,11 +40,17 @@ export class LLMNotConfiguredError extends Error {
   }
 }
 
+export interface ExtractOptions {
+  /** 1-based page number; if set, only this page is sent to the LLM. */
+  page?: number;
+}
+
 export async function extractDiaryFromPdf(
   pdfBuffer: Buffer,
   provider: LLMProvider,
+  opts: ExtractOptions = {},
 ): Promise<ExtractResult> {
-  if (provider === 'claude') return extractWithClaude(pdfBuffer);
-  if (provider === 'gpt4o') return extractWithOpenAI(pdfBuffer);
+  if (provider === 'claude') return extractWithClaude(pdfBuffer, opts);
+  if (provider === 'gpt4o') return extractWithOpenAI(pdfBuffer, opts);
   throw new Error(`Unknown LLM provider: ${provider}`);
 }

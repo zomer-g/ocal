@@ -126,15 +126,17 @@ adminManualUploadsRouter.get('/:id/file', async (req, res, next) => {
 });
 
 // ──────────────────────────────────────────────
-// POST /api/admin/manual-uploads/:id/extract?provider=claude|gpt4o
+// POST /api/admin/manual-uploads/:id/extract?provider=claude|gpt4o&page=N
 // ──────────────────────────────────────────────
 const extractQuerySchema = z.object({
   provider: z.enum(['claude', 'gpt4o']),
+  page: z.coerce.number().int().min(1).optional(),
 });
 
 adminManualUploadsRouter.post('/:id/extract', validate(extractQuerySchema, 'query'), async (req, res, next) => {
   try {
     const provider = (req.query.provider as LLMProvider);
+    const page = req.query.page ? Number(req.query.page) : undefined;
     const row = await db('manual_diary_uploads')
       .select('id', 'file_data', 'committed_at')
       .where({ id: req.params.id })
@@ -152,7 +154,7 @@ adminManualUploadsRouter.post('/:id/extract', validate(extractQuerySchema, 'quer
     });
 
     try {
-      const result = await extractDiaryFromPdf(row.file_data, provider);
+      const result = await extractDiaryFromPdf(row.file_data, provider, { page });
       await db('manual_diary_uploads').where({ id: row.id }).update({
         extraction_status: 'completed',
         extraction_result: JSON.stringify(result),

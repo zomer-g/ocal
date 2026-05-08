@@ -203,7 +203,8 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
   }, [events, upload.id]);
 
   const extractMutation = useMutation({
-    mutationFn: (provider: LLMProvider) => extractFromPdf(upload.id, provider),
+    mutationFn: (params: { provider: LLMProvider; page?: number }) =>
+      extractFromPdf(upload.id, params.provider, params.page),
     onSuccess: (resp) => {
       setLastExtraction(resp);
       setShowRawText(false);
@@ -312,8 +313,9 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
     <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 overflow-hidden">
       {/* Toolbar */}
       <div className="flex flex-col gap-2 p-3 bg-gray-50 border-b border-gray-200 shrink-0">
+        {/* Extraction controls — provider + scoped/full extraction */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={selectedProvider}
               onChange={(e) => setSelectedProvider(e.target.value as LLMProvider)}
@@ -326,12 +328,23 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
             </select>
             <button
               type="button"
-              onClick={() => extractMutation.mutate(selectedProvider)}
-              disabled={extractMutation.isPending || isCommitted}
+              onClick={() => extractMutation.mutate({ provider: selectedProvider, page: currentPdfPage })}
+              disabled={extractMutation.isPending || isCommitted || !currentPdfPage}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary-700 text-white rounded hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="שלח רק את העמוד המוצג כעת ל-LLM"
             >
               {extractMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {extractMutation.isPending ? 'מחלץ...' : 'מלא אוטומטית'}
+              קטלג עמוד {currentPdfPage > 0 ? currentPdfPage : ''}
+            </button>
+            <button
+              type="button"
+              onClick={() => extractMutation.mutate({ provider: selectedProvider })}
+              disabled={extractMutation.isPending || isCommitted}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary-100 text-primary-800 border border-primary-300 rounded hover:bg-primary-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="שלח את כל הקובץ ל-LLM (יקר יותר ועלול לקחת זמן)"
+            >
+              <Sparkles className="w-4 h-4" />
+              קטלג את כל הקובץ
             </button>
           </div>
 
@@ -341,7 +354,10 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
           </div>
         </div>
 
-        {/* View mode + date pager */}
+        {/* View mode + date pager.
+            Layout: [view-mode pills] ··· [today] [←] [date-input] [→] [Hebrew label]
+            Arrows are pinned in fixed-width slots so the date input changing
+            label width can't shove them around. */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="inline-flex rounded-md border border-gray-300 bg-white">
             {VIEW_MODES.map((m) => (
@@ -357,31 +373,43 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
               </button>
             ))}
           </div>
+
           <div className="inline-flex items-center gap-1 text-sm">
             <button
               type="button"
-              onClick={() => setViewDate(shiftViewDate(viewMode, viewDate, -1))}
-              className="p-1 rounded hover:bg-gray-200"
-              aria-label="קודם"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
               onClick={() => setViewDate(new Date())}
-              className="px-2 py-0.5 text-xs rounded hover:bg-gray-200 inline-flex items-center gap-1"
+              className="px-2 py-1 text-xs rounded hover:bg-gray-200 inline-flex items-center gap-1"
             >
               <CalendarDays className="w-3.5 h-3.5" /> היום
             </button>
             <button
               type="button"
+              onClick={() => setViewDate(shiftViewDate(viewMode, viewDate, -1))}
+              className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-200 shrink-0"
+              aria-label="קודם"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <input
+              type="date"
+              value={format(viewDate, 'yyyy-MM-dd')}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                const parsed = parseISO(v);
+                if (isValid(parsed)) setViewDate(parsed);
+              }}
+              className="w-[150px] text-sm border border-gray-300 rounded px-2 py-1 bg-white text-center font-medium"
+            />
+            <button
+              type="button"
               onClick={() => setViewDate(shiftViewDate(viewMode, viewDate, 1))}
-              className="p-1 rounded hover:bg-gray-200"
+              className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-200 shrink-0"
               aria-label="הבא"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="font-medium text-gray-900 mr-2 ml-1">
+            <span className="text-xs text-gray-500 mx-1 hidden sm:inline">
               {viewMode === 'monthly'
                 ? format(viewDate, 'MMMM yyyy', { locale: he })
                 : viewMode === 'daily'
