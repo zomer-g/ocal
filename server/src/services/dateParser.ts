@@ -77,30 +77,71 @@ export function parseDate(value: unknown): Date | null {
     if (!isNaN(date.getTime())) return date;
   }
 
-  // DD.MM.YYYY or DD/MM/YYYY
+  // DD.MM.YYYY or DD/MM/YYYY  — Israeli convention is day-first, but Outlook
+  // exports running on a US-locale machine emit M/D/YYYY with the same
+  // separators. Naively assuming day-first lets a value like "1/16/2025"
+  // become new Date(2025, 15, 1) which JS silently wraps to 2026-04-01,
+  // producing ghost-year events. Use makeStrictDate to validate, and if the
+  // day-first reading is impossible (month > 12) but the swapped reading is
+  // valid, accept it as US-format.
   const dmyMatch = str.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
   if (dmyMatch) {
-    const date = new Date(+dmyMatch[3], +dmyMatch[2] - 1, +dmyMatch[1]);
-    if (!isNaN(date.getTime())) return date;
+    const a = +dmyMatch[1];
+    const b = +dmyMatch[2];
+    const y = +dmyMatch[3];
+    const dayFirst = makeStrictDate(y, b, a);   // a=day, b=month
+    if (dayFirst) return dayFirst;
+    const monthFirst = makeStrictDate(y, a, b); // a=month, b=day
+    if (monthFirst) return monthFirst;
   }
 
   // DD.MM.YY or DD/MM/YY
   const dmyShortMatch = str.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2})$/);
   if (dmyShortMatch) {
     const year = +dmyShortMatch[3] + 2000;
-    const date = new Date(year, +dmyShortMatch[2] - 1, +dmyShortMatch[1]);
-    if (!isNaN(date.getTime())) return date;
+    const a = +dmyShortMatch[1];
+    const b = +dmyShortMatch[2];
+    const dayFirst = makeStrictDate(year, b, a);
+    if (dayFirst) return dayFirst;
+    const monthFirst = makeStrictDate(year, a, b);
+    if (monthFirst) return monthFirst;
   }
 
   // Embedded DD/MM/YYYY within a longer string (e.g. "יום ב 01/04/2024 11:30")
   // Strips Hebrew day-of-week prefix and trailing time
   const embeddedMatch = str.match(/(\d{1,2})[./](\d{1,2})[./](\d{4})/);
   if (embeddedMatch) {
-    const date = new Date(+embeddedMatch[3], +embeddedMatch[2] - 1, +embeddedMatch[1]);
-    if (!isNaN(date.getTime())) return date;
+    const a = +embeddedMatch[1];
+    const b = +embeddedMatch[2];
+    const y = +embeddedMatch[3];
+    const dayFirst = makeStrictDate(y, b, a);
+    if (dayFirst) return dayFirst;
+    const monthFirst = makeStrictDate(y, a, b);
+    if (monthFirst) return monthFirst;
   }
 
   return null;
+}
+
+/**
+ * Build a Date from (year, month, day) and verify the JS Date constructor
+ * didn't silently wrap an invalid month/day into the next month/year. JS
+ * happily turns new Date(2025, 15, 1) into 2026-04-01 — the bug that caused
+ * 195 ghost events in 2026/2027 for an Outlook M/D/YYYY-exported diary.
+ * Returns null if month/day are out of range or the round-trip mismatches.
+ */
+function makeStrictDate(year: number, month: number, day: number): Date | null {
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
 }
 
 /**
