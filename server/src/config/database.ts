@@ -8,9 +8,25 @@ import { env } from './env.js';
 // to JSON (UTC) shifts the date by one day for non-UTC timezones (e.g., Israel → UTC-2/3).
 pg.types.setTypeParser(1082, (val: string) => val);
 
+// Managed Postgres providers (Render, Supabase, etc.) require TLS even from
+// trusted networks. Local docker-compose Postgres doesn't speak TLS at all,
+// so forcing SSL there errors out the handshake. Toggle by hostname.
+function needsTls(databaseUrl: string): boolean {
+  try {
+    const h = new URL(databaseUrl).hostname;
+    return !(h === 'localhost' || h === '127.0.0.1' || h === '::1');
+  } catch {
+    return false;
+  }
+}
+
+const tls = needsTls(env.DATABASE_URL)
+  ? { rejectUnauthorized: false } // Render's cert isn't in Node's default CA bundle; matches their docs
+  : false;
+
 export const db = knex({
   client: 'pg',
-  connection: env.DATABASE_URL,
+  connection: { connectionString: env.DATABASE_URL, ssl: tls },
   pool: {
     min: 2,
     max: 20,
