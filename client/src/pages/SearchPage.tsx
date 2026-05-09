@@ -38,18 +38,10 @@ export function SearchPage() {
           .join(' ')
       : filters.q || undefined;
 
-  // When the expenses layer is on, paginating events gives a confusing
-  // result: the unified date list is dominated by expense dates spanning
-  // the full filter range, so each events page shows the same date headers
-  // with different events tucked under them. To match the user's mental
-  // model ("show me everything this MK did and spent on for the period"),
-  // we request a single page of up to 500 events when the layer is on
-  // and hide the events paginator entirely. For typical MK-scoped queries
-  // (~200-300 events) this fits comfortably; an overflow banner appears
-  // if there are more events than the cap.
+  // Events drive pagination at a fixed 50/page regardless of whether the
+  // expense layer is on. The expense layer is purely additive content
+  // beside the events on the current page (see expense fetch below).
   const expensesEnabled = filters.includeExpenses;
-  const eventsPerPage = expensesEnabled ? 500 : 50;
-  const eventsPage = expensesEnabled ? 1 : filters.page;
 
   const { data, isLoading, isError } = useEvents({
     q: combinedQ,
@@ -61,31 +53,63 @@ export function SearchPage() {
     participants: filters.participants || undefined,
     cross_ref_status: filters.cross_ref_status || undefined,
     sort: filters.sort,
-    page: eventsPage,
-    per_page: eventsPerPage,
+    page: filters.page,
+    per_page: 50,
   });
 
-  // Expense feed — fetches once for the full filter range (single page,
-  // up to 500 rows). Inherits the same date range and entity_names as the
-  // diary feed, so picking an MK on the side panel narrows both feeds.
+  // Expense feed for the current events page. Scoped to the date range of
+  // the events on this page so paginating the events also moves the
+  // expense window forward/back — the user sees, for the days on this
+  // page, what was happening AND what was being spent. Falls back to the
+  // user's full filter range when the events page is empty.
   const expenseSort: 'date_asc' | 'date_desc' =
     filters.sort === 'date_asc' ? 'date_asc' : 'date_desc';
+  const eventDateBounds = (() => {
+    const dates = data?.data.map((e) => e.event_date).sort() ?? [];
+    if (dates.length === 0) return null;
+    return { min: dates[0], max: dates[dates.length - 1] };
+  })();
+  const expenseFromDate = eventDateBounds?.min ?? filters.from_date ?? undefined;
+  const expenseToDate = eventDateBounds?.max ?? effectiveTo;
+
   const { data: expensesResp } = useQuery({
     queryKey: [
       'public-expenses-search',
+      expenseFromDate,
+      expenseToDate,
+      filters.entity_names,
+      expenseSort,
+    ],
+    queryFn: () =>
+      searchExpenses({
+        from_date: expenseFromDate,
+        to_date: expenseToDate,
+        entity_names: filters.entity_names.length ? filters.entity_names : undefined,
+        sort: expenseSort,
+        page: 1,
+        per_page: 500,
+      }),
+    enabled: expensesEnabled,
+    staleTime: 60_000,
+  });
+
+  // Separate fetch for the FULL filter range — used purely to show "X total
+  // expenses for this filter" alongside the page-window count, so the user
+  // understands more expenses exist beyond this page. 1 row payload (cheap).
+  const { data: expensesTotalResp } = useQuery({
+    queryKey: [
+      'public-expenses-total',
       filters.from_date,
       effectiveTo,
       filters.entity_names,
-      expenseSort,
     ],
     queryFn: () =>
       searchExpenses({
         from_date: filters.from_date || undefined,
         to_date: effectiveTo,
         entity_names: filters.entity_names.length ? filters.entity_names : undefined,
-        sort: expenseSort,
         page: 1,
-        per_page: 500,
+        per_page: 1,
       }),
     enabled: expensesEnabled,
     staleTime: 60_000,
@@ -228,27 +252,24 @@ export function SearchPage() {
                     )}
                   </div>
                 )}
-                {/* Overflow notice — when the expenses layer is on we
-                    request a single page of up to 500 events. If the
-                    filter has more than that, warn the user to refine. */}
-                {expensesEnabled && data.pagination.total > eventsPerPage && (
+                {/* When the layer is on, expenses are shown for the same
+                    date range as the events on this page. If the filter
+                    has more total expenses than this page covers, hint
+                    the user that paginating events will move the window. */}
+                {expensesEnabled && expensesTotalResp && expensesResp && expensesTotalResp.pagination.total > expensesResp.data.length && (
                   <div className="mb-3 px-3 py-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded">
-                    מוצגים {eventsPerPage.toLocaleString('he-IL')} אירועים מתוך {data.pagination.total.toLocaleString('he-IL')}.
-                    כדי לראות את כל האירועים בשכבת ההוצאות, צמצם את חיפוש האירועים (תאריכים / חבר כנסת / יומנים).
+                    מוצגות {expensesResp.data.length.toLocaleString('he-IL')} הוצאות מתוך {expensesTotalResp.pagination.total.toLocaleString('he-IL')} בחתך החיפוש.
+                    כדי לראות הוצאות בתאריכים אחרים, דפדף בעמודי האירועים.
                   </div>
                 )}
                 <SearchResults
                   events={data.data}
                   total={data.pagination.total}
                   expenses={expensesEnabled ? expensesResp?.data : undefined}
-                  expensesTotal={expensesEnabled ? expensesResp?.pagination.total : undefined}
+                  expensesTotal={expensesEnabled ? expensesTotalResp?.pagination.total : undefined}
                   sortDirection={filters.sort === 'date_asc' ? 'asc' : 'desc'}
                 />
-                {/* Hide events paginator when the expenses layer is on —
-                    the merged view is rendered in a single sweep. */}
-                {!expensesEnabled && (
-                  <Pagination pagination={data.pagination} onPageChange={filters.setPage} />
-                )}
+                <Pagination pagination={data.pagination} onPageChange={filters.setPage} />
               </>
             )}
           </div>
