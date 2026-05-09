@@ -72,6 +72,13 @@ function transformRecord(
       ckan_row_id: ckanRowId,
     };
   } catch (err) {
+    // Surface why a record was rejected — earlier this swallowed errors
+    // silently, so a bad field_mapping or a date-parser regression would
+    // produce "0 records" with no breadcrumb.
+    logger.warn(
+      { sourceId, err: err instanceof Error ? err.message : String(err) },
+      'transformRecord threw; record skipped',
+    );
     return null;
   }
 }
@@ -104,10 +111,18 @@ export async function syncSource(options: SyncOptions): Promise<SyncResult> {
     // Get resource metadata
     const resource = await ckan.getResource(resourceId);
 
-    // If resync, clear existing events
+    // If resync, soft-delete existing events. Hard DELETE used to be the
+    // policy here but lost the audit trail — when a sync brought back bad
+    // data (e.g. M/D/YYYY year-shift fix Q2 2026) there was no way to
+    // compare or roll back. is_active=false hides them from public views
+    // while keeping forensic history. Subsequent resyncs continue to
+    // overlap so this isn't a leak — old soft-deleted rows can be culled
+    // by a periodic vacuum if storage matters.
     if (isResync) {
-      const deleted = await db('diary_events').where({ source_id: sourceId }).del();
-      logger.info({ sourceId, deleted }, 'Cleared existing events for resync');
+      const deactivated = await db('diary_events')
+        .where({ source_id: sourceId, is_active: true })
+        .update({ is_active: false });
+      logger.info({ sourceId, deactivated }, 'Deactivated existing events for resync (soft-delete)');
     }
 
     // Fetch all records (auto-detects datastore vs file download)
