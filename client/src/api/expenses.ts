@@ -22,6 +22,9 @@ export interface ExpenseSearchParams {
   from_date?: string;
   to_date?: string;
   person_ids?: string[];
+  /** Names to match against person.name OR mk_name_raw — same shape the
+   * events endpoint uses for cross-filtering by selected people/entities. */
+  entity_names?: string[];
   category?: string;
   page?: number;
   per_page?: number;
@@ -52,6 +55,7 @@ export async function searchExpenses(params: ExpenseSearchParams): Promise<Expen
   if (params.from_date) qs.from_date = params.from_date;
   if (params.to_date) qs.to_date = params.to_date;
   if (params.person_ids?.length) qs.person_ids = params.person_ids.join(',');
+  if (params.entity_names?.length) qs.entity_names = params.entity_names.join('||');
   if (params.category) qs.category = params.category;
   if (params.page) qs.page = params.page;
   if (params.per_page) qs.per_page = params.per_page;
@@ -63,10 +67,11 @@ export async function searchExpenses(params: ExpenseSearchParams): Promise<Expen
 export async function getExpenseSummary(
   fromDate: string,
   toDate: string,
-  personIds?: string[],
+  options?: { personIds?: string[]; entityNames?: string[] },
 ): Promise<ExpenseSummaryRow[]> {
   const qs: Record<string, string> = { from_date: fromDate, to_date: toDate };
-  if (personIds?.length) qs.person_ids = personIds.join(',');
+  if (options?.personIds?.length) qs.person_ids = options.personIds.join(',');
+  if (options?.entityNames?.length) qs.entity_names = options.entityNames.join('||');
   const { data } = await api.get('/public/expenses/summary', { params: qs });
   return data.data;
 }

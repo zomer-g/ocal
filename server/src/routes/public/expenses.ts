@@ -16,6 +16,10 @@ const searchSchema = z.object({
   from_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   to_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   person_ids: z.string().optional(),     // comma-separated UUIDs
+  // double-pipe separated names matched against people.name OR mk_name_raw,
+  // case-insensitive, exact-string. Mirrors the events endpoint's filter so
+  // selecting "בן-גביר" on the search page filters the expense layer too.
+  entity_names: z.string().optional(),
   category: z.string().optional(),
   page: z.coerce.number().optional(),
   per_page: z.coerce.number().optional(),
@@ -28,6 +32,9 @@ expensesRouter.get('/', validate(searchSchema, 'query'), async (req, res, next) 
     const q = req.query as z.infer<typeof searchSchema>;
     const { page, per_page, offset } = parsePagination(q);
     const personIds = q.person_ids ? q.person_ids.split(',').filter(Boolean) : undefined;
+    const entityNames = q.entity_names
+      ? q.entity_names.split('||').map((n) => n.trim()).filter(Boolean)
+      : undefined;
 
     let query = db('mk_expenses as e')
       .leftJoin('people as p', 'p.id', 'e.person_id');
@@ -45,6 +52,16 @@ expensesRouter.get('/', validate(searchSchema, 'query'), async (req, res, next) 
     if (q.to_date)   query = query.where('e.expense_date', '<=', q.to_date);
     if (q.category)  query = query.where('e.category', q.category);
     if (personIds?.length) query = query.whereIn('e.person_id', personIds);
+    if (entityNames?.length) {
+      // Case-insensitive: match either the linked person.name or the
+      // verbatim mk_name_raw — accommodates expenses whose MK was matched
+      // to a person row (use p.name) and ones still pending match.
+      const lowered = entityNames.map((n) => n.toLowerCase());
+      query = query.where((b) => {
+        b.whereRaw(`LOWER(p.name) IN (${lowered.map(() => '?').join(',')})`, lowered)
+          .orWhereRaw(`LOWER(e.mk_name_raw) IN (${lowered.map(() => '?').join(',')})`, lowered);
+      });
+    }
 
     const countQuery = query.clone().clearSelect().clearOrder().count('* as total').first();
 
@@ -93,12 +110,16 @@ const summarySchema = z.object({
   from_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   person_ids: z.string().optional(),
+  entity_names: z.string().optional(),
 });
 
 expensesRouter.get('/summary', validate(summarySchema, 'query'), async (req, res, next) => {
   try {
     const q = req.query as z.infer<typeof summarySchema>;
     const personIds = q.person_ids ? q.person_ids.split(',').filter(Boolean) : undefined;
+    const entityNames = q.entity_names
+      ? q.entity_names.split('||').map((n) => n.trim()).filter(Boolean)
+      : undefined;
 
     let query = db('mk_expenses as e')
       .leftJoin('people as p', 'p.id', 'e.person_id')
@@ -111,6 +132,13 @@ expensesRouter.get('/summary', validate(summarySchema, 'query'), async (req, res
       .orderBy('e.expense_date', 'asc');
 
     if (personIds?.length) query = query.whereIn('e.person_id', personIds);
+    if (entityNames?.length) {
+      const lowered = entityNames.map((n) => n.toLowerCase());
+      query = query.where((b) => {
+        b.whereRaw(`LOWER(p.name) IN (${lowered.map(() => '?').join(',')})`, lowered)
+          .orWhereRaw(`LOWER(e.mk_name_raw) IN (${lowered.map(() => '?').join(',')})`, lowered);
+      });
+    }
 
     const rows = (await query) as Array<{
       expense_date: string | Date;

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { SearchBar } from '@/components/search/SearchBar';
 import { AdvancedSearchBuilder } from '@/components/search/AdvancedSearchBuilder';
 import { FilterPanel } from '@/components/search/FilterPanel';
@@ -10,7 +11,7 @@ import { useEvents } from '@/hooks/useEvents';
 import { useStats } from '@/hooks/useStats';
 import { useUrlSync } from '@/hooks/useUrlSync';
 import { Loader2, SlidersHorizontal, X, ArrowUpDown, Receipt } from 'lucide-react';
-import { ExpensesPanel } from '@/components/expenses/ExpensesPanel';
+import { searchExpenses } from '@/api/expenses';
 
 export function SearchPage() {
   useUrlSync();
@@ -49,6 +50,34 @@ export function SearchPage() {
     sort: filters.sort,
     page: filters.page,
     per_page: 50,
+  });
+
+  // Expense layer — fired only when the toggle is on. Date range and selected
+  // person/entity names are inherited from the same filter store so picking
+  // an MK in the side panel narrows expenses to that MK alongside their events.
+  const expensesEnabled = filters.includeExpenses;
+  const expenseSort: 'date_asc' | 'date_desc' =
+    filters.sort === 'date_asc' ? 'date_asc' : 'date_desc';
+  const { data: expensesResp } = useQuery({
+    queryKey: [
+      'public-expenses-search',
+      filters.from_date,
+      effectiveTo,
+      filters.entity_names,
+      expenseSort,
+      filters.page,
+    ],
+    queryFn: () =>
+      searchExpenses({
+        from_date: filters.from_date || undefined,
+        to_date: effectiveTo,
+        entity_names: filters.entity_names.length ? filters.entity_names : undefined,
+        sort: expenseSort,
+        page: 1,
+        per_page: 200,
+      }),
+    enabled: expensesEnabled,
+    staleTime: 60_000,
   });
 
   return (
@@ -188,22 +217,13 @@ export function SearchPage() {
                     )}
                   </div>
                 )}
-                <SearchResults events={data.data} total={data.pagination.total} />
+                <SearchResults
+                  events={data.data}
+                  total={data.pagination.total}
+                  expenses={expensesEnabled ? expensesResp?.data : undefined}
+                  expensesTotal={expensesEnabled ? expensesResp?.pagination.total : undefined}
+                />
                 <Pagination pagination={data.pagination} onPageChange={filters.setPage} />
-
-                {filters.includeExpenses && (
-                  <div className="mt-6 pt-4 border-t-2 border-amber-200">
-                    <ExpensesPanel
-                      title="הוצאות קשר עם הציבור (שכבה נוספת)"
-                      params={{
-                        from_date: filters.from_date || undefined,
-                        to_date: effectiveTo,
-                        sort: 'date_desc',
-                        per_page: 100,
-                      }}
-                    />
-                  </div>
-                )}
               </>
             )}
           </div>

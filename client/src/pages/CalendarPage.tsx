@@ -197,7 +197,9 @@ export function CalendarPage() {
         </div>
       </div>
 
-      {/* Expenses overlay panel — visible when the layer toggle is on */}
+      {/* Expenses overlay panel — visible when the layer toggle is on.
+          Inherits the same person/entity filter as the diary side, so
+          selecting an MK on the side panel narrows expenses to that MK. */}
       {includeExpenses && (
         <div className="mt-6 pt-4 border-t-2 border-amber-200">
           <ExpensesPanel
@@ -205,6 +207,7 @@ export function CalendarPage() {
             params={{
               from_date: visibleRange.from,
               to_date: visibleRange.to,
+              entity_names: selectedEntityNames.length ? selectedEntityNames : undefined,
               sort: 'date_desc',
               per_page: 100,
             }}
