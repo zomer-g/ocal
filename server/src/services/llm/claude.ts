@@ -9,7 +9,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
 import { LLMNotConfiguredError, type ExtractOptions, type ExtractResult, type ExtractedEvent } from './index.js';
-import { PDF_EXTRACTION_SYSTEM, PDF_EXTRACTION_USER } from './prompt.js';
+import { PDF_EXTRACTION_SYSTEM, buildExtractionUserPrompt } from './prompt.js';
 
 const MAX_OUTPUT_TOKENS = 8192;
 
@@ -65,7 +65,7 @@ export async function extractWithClaude(pdfBuffer: Buffer, opts: ExtractOptions 
           },
           {
             type: 'text',
-            text: PDF_EXTRACTION_USER,
+            text: buildExtractionUserPrompt({ filename: opts.filename, page: opts.page }),
           },
         ],
       },

@@ -18,7 +18,7 @@ import axios from 'axios';
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
 import { LLMNotConfiguredError, type ExtractOptions, type ExtractResult } from './index.js';
-import { PDF_EXTRACTION_SYSTEM, PDF_EXTRACTION_USER } from './prompt.js';
+import { PDF_EXTRACTION_SYSTEM, buildExtractionUserPrompt } from './prompt.js';
 import { parseEventsJson } from './claude.js';
 
 const MAX_PAGES = 20; // safety cap — keep request size bounded
@@ -44,7 +44,7 @@ export async function extractWithOpenAI(pdfBuffer: Buffer, opts: ExtractOptions 
         {
           role: 'user',
           content: [
-            { type: 'text', text: PDF_EXTRACTION_USER },
+            { type: 'text', text: buildExtractionUserPrompt({ filename: opts.filename, page: opts.page }) },
             ...pageImages.map((dataUrl, idx) => ({
               type: 'image_url' as const,
               image_url: { url: dataUrl, detail: 'high' as const },
