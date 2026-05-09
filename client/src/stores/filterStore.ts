@@ -62,7 +62,9 @@ export const initialState = {
   page: 1,
   advancedMode: false,
   extraConditions: [] as ExtraCondition[],
-  includeExpenses: false,
+  // Default ON — the expenses layer is treated as just another diary in
+  // the filter list. Toggling it off mutes those rows.
+  includeExpenses: true,
 };
 
 export const useFilterStore = create<FilterState>((set) => ({

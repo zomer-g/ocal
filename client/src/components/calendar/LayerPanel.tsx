@@ -2,7 +2,7 @@ import { useState, useMemo, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useCalendarStore } from '@/stores/calendarStore';
 import { getPublicEntities } from '@/api/events';
-import { Eye, EyeOff, ChevronDown, ChevronRight, Search, X } from 'lucide-react';
+import { Eye, EyeOff, ChevronDown, ChevronRight, Search, X, Receipt } from 'lucide-react';
 import type { DiarySource } from '@/api/sources';
 
 const HEBREW_MONTHS = [
@@ -18,7 +18,7 @@ interface LayerPanelProps {
 const PAGE_SIZE = 10;
 
 export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
-  const { enabledSourceIds, selectedEntityNames, toggleSource, setAllSources, setEntityNames, date, setDate, setView } = useCalendarStore();
+  const { enabledSourceIds, selectedEntityNames, includeExpenses, toggleSource, setAllSources, setEntityNames, setIncludeExpenses, date, setDate, setView } = useCalendarStore();
   const allEnabled = sources.length > 0 && sources.every((s) => enabledSourceIds.has(s.id));
 
   // ── Year / Month accordion ──
@@ -339,6 +339,33 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
             </button>
           </div>
           <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1">
+            {/* Expenses layer — pinned at the top of the layers list, styled
+                like a regular source row but with the amber Receipt accent.
+                Default ON; toggling off mutes the expense overlay. */}
+            <label className="flex items-start gap-2 text-sm cursor-pointer min-w-0">
+              <input
+                type="checkbox"
+                checked={includeExpenses}
+                onChange={(e) => setIncludeExpenses(e.target.checked)}
+                className="sr-only"
+                aria-label={`הוצאות קשר עם הציבור — ${includeExpenses ? 'מוצג' : 'מוסתר'}`}
+              />
+              <div
+                className="w-3.5 h-3.5 mt-0.5 rounded-sm border-2 shrink-0 flex items-center justify-center"
+                style={{ borderColor: '#F59E0B', backgroundColor: includeExpenses ? '#F59E0B' : undefined }}
+                aria-hidden="true"
+              >
+                {includeExpenses && (
+                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+              <Receipt className="w-3 h-3 shrink-0 text-amber-500 mt-1" aria-hidden="true" />
+              <span className="min-w-0 flex-1 font-medium" style={{ overflowWrap: 'anywhere' }}>
+                הוצאות קשר עם הציבור
+              </span>
+            </label>
             {sources.slice(0, sourcesVisible).map((source) => {
               const isEnabled = enabledSourceIds.has(source.id);
               const viewCount = viewSourceCounts?.[source.id] ?? 0;

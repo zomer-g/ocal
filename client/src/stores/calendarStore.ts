@@ -26,7 +26,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   enabledSourceIds: new Set<string>(),
   selectedEntityNames: [] as string[],
   sourcesInitialized: false,
-  includeExpenses: false,
+  // Default ON — expenses appear as another row in the calendar layer list.
+  includeExpenses: true,
 
   setDate: (date) => set({ date }),
   setView: (view) => set({ view }),

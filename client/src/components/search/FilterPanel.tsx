@@ -4,7 +4,7 @@ import { useFilterStore } from '@/stores/filterStore';
 import { useSources } from '@/hooks/useSources';
 import { getPublicEntities } from '@/api/events';
 import { FilterSection } from './FilterSection';
-import { Calendar, Users, Building2, MapPin, BookOpen, ChevronDown, ChevronRight, ArrowLeftRight } from 'lucide-react';
+import { Calendar, Users, Building2, MapPin, BookOpen, ChevronDown, ChevronRight, ArrowLeftRight, Receipt } from 'lucide-react';
 
 const HEBREW_MONTHS = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
@@ -66,6 +66,7 @@ const PAGE_SIZE = 10;
 export function FilterPanel() {
   const {
     from_date, to_date, source_ids, entity_names, cross_ref_status,
+    includeExpenses, setIncludeExpenses,
     setDateRange, setSourceIds, setEntityNames, setCrossRefStatus,
     clearDateRange, clearEntities, clearSources, reset,
   } = useFilterStore();
@@ -454,6 +455,23 @@ export function FilterPanel() {
             onSelectAll={() => setSourceIds(filteredSources.map((s) => s.id))}
             onClearAll={source_ids.length > 0 ? clearSources : undefined}
           >
+            {/* Expenses layer — pinned at the top of the diaries list, styled
+                like a regular SourceRow but with the amber Receipt accent so
+                the user reads it as just another toggleable diary. The state
+                lives in filterStore.includeExpenses (default ON). */}
+            <label className="flex items-center gap-2 text-sm cursor-pointer min-w-0 py-0.5 mb-1">
+              <input
+                type="checkbox"
+                checked={includeExpenses}
+                onChange={(e) => setIncludeExpenses(e.target.checked)}
+                className="rounded border-gray-300 text-amber-500 shrink-0"
+              />
+              <Receipt className="w-3 h-3 shrink-0 text-amber-500" aria-hidden="true" />
+              <span className="min-w-0 flex-1 text-xs text-gray-700 truncate font-medium">
+                הוצאות קשר עם הציבור
+              </span>
+            </label>
+
             {filteredSources.length > 0 ? (
               <>
                 {(sourcesSearch ? filteredSources : filteredSources.slice(0, sourcesVisible)).map((source) => (

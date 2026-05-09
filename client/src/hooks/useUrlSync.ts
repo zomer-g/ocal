@@ -58,8 +58,11 @@ function parseUrlToState(search: string) {
   const adv = params.get(PARAM_MAP.advancedMode);
   if (adv === '1') state.advancedMode = true;
 
+  // includeExpenses default is ON now; URL omits the param at default,
+  // and writes `expenses=0` only when the user explicitly turned it off.
   const exp = params.get(PARAM_MAP.includeExpenses);
-  if (exp === '1') state.includeExpenses = true;
+  if (exp === '0') state.includeExpenses = false;
+  else if (exp === '1') state.includeExpenses = true;
 
   const conds = params.getAll('cond');
   if (conds.length > 0) {
@@ -96,7 +99,8 @@ function stateToUrl(store: ReturnType<typeof useFilterStore.getState>): string {
   if (store.sort !== initialState.sort) params.set(PARAM_MAP.sort, store.sort);
   if (store.page > 1) params.set(PARAM_MAP.page, String(store.page));
   if (store.advancedMode) params.set(PARAM_MAP.advancedMode, '1');
-  if (store.includeExpenses) params.set(PARAM_MAP.includeExpenses, '1');
+  // Only encode when user has explicitly turned off the (default-on) layer.
+  if (!store.includeExpenses) params.set(PARAM_MAP.includeExpenses, '0');
 
   for (const cond of store.extraConditions) {
     if (cond.term.trim()) {

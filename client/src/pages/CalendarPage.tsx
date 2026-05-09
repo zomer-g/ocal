@@ -4,12 +4,12 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useCalendar } from '@/hooks/useCalendar';
 import { useSources } from '@/hooks/useSources';
 import { CalendarHeader, TimeGrid, MonthGrid, LayerPanel, EventDetailModal } from '@/components/calendar';
-import { Loader2, Layers, X, Receipt } from 'lucide-react';
+import { Loader2, Layers, X } from 'lucide-react';
 import type { DiaryEvent } from '@/api/events';
 import { ExpensesPanel } from '@/components/expenses/ExpensesPanel';
 
 export function CalendarPage() {
-  const { date, view, setDate, setView, enabledSourceIds, selectedEntityNames, setAllSources, sourcesInitialized, includeExpenses, setIncludeExpenses } = useCalendarStore();
+  const { date, view, setDate, setView, enabledSourceIds, selectedEntityNames, setAllSources, sourcesInitialized, includeExpenses } = useCalendarStore();
   const { hideFutureEvents } = useSettingsStore();
   const { data: sourcesData } = useSources();
   const sources = sourcesData?.data ?? [];
@@ -114,19 +114,8 @@ export function CalendarPage() {
       {/* Calendar Header with navigation & view switcher */}
       <CalendarHeader />
 
-      {/* Expenses-layer toggle row */}
-      <div className="flex items-center justify-end mb-2">
-        <label className="inline-flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={includeExpenses}
-            onChange={(e) => setIncludeExpenses(e.target.checked)}
-            className="rounded border-gray-300 text-amber-500"
-          />
-          <Receipt className="w-3.5 h-3.5 text-amber-500" />
-          שכבת הוצאות קשר עם הציבור
-        </label>
-      </div>
+      {/* (Expense-layer toggle has moved into LayerPanel's "שכבות" list,
+          alongside the per-source toggles. Default ON.) */}
 
       {/* Mobile layers toggle */}
       {sources.length > 0 && (
