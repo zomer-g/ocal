@@ -6,6 +6,7 @@ import { statsRouter } from './stats.js';
 import { contentRouter } from './content.js';
 import { entitiesRouter } from './entities.js';
 import { downloadRouter } from './download.js';
+import { expensesRouter } from './expenses.js';
 import { downloadLimiter } from '../../middleware/rateLimiter.js';
 
 export const publicRoutes = Router();
@@ -16,4 +17,5 @@ publicRoutes.use('/calendar', calendarRouter);
 publicRoutes.use('/stats', statsRouter);
 publicRoutes.use('/content', contentRouter);
 publicRoutes.use('/entities', entitiesRouter);
+publicRoutes.use('/expenses', expensesRouter);
 publicRoutes.use('/download', downloadLimiter, downloadRouter);

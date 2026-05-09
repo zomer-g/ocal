@@ -4,11 +4,12 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useCalendar } from '@/hooks/useCalendar';
 import { useSources } from '@/hooks/useSources';
 import { CalendarHeader, TimeGrid, MonthGrid, LayerPanel, EventDetailModal } from '@/components/calendar';
-import { Loader2, Layers, X } from 'lucide-react';
+import { Loader2, Layers, X, Receipt } from 'lucide-react';
 import type { DiaryEvent } from '@/api/events';
+import { ExpensesPanel } from '@/components/expenses/ExpensesPanel';
 
 export function CalendarPage() {
-  const { date, view, setDate, setView, enabledSourceIds, selectedEntityNames, setAllSources, sourcesInitialized } = useCalendarStore();
+  const { date, view, setDate, setView, enabledSourceIds, selectedEntityNames, setAllSources, sourcesInitialized, includeExpenses, setIncludeExpenses } = useCalendarStore();
   const { hideFutureEvents } = useSettingsStore();
   const { data: sourcesData } = useSources();
   const sources = sourcesData?.data ?? [];
@@ -61,6 +62,34 @@ export function CalendarPage() {
     return counts;
   }, [allEvents]);
 
+  // Compute the visible date range so the expense layer fetches the same window.
+  const visibleRange = useMemo(() => {
+    const d = new Date(date + 'T12:00:00');
+    if (view === 'day') {
+      return { from: date, to: date };
+    }
+    if (view === '4day') {
+      const end = new Date(d);
+      end.setDate(d.getDate() + 3);
+      return { from: date, to: end.toISOString().slice(0, 10) };
+    }
+    if (view === 'week') {
+      // Sunday-aligned in he-IL
+      const start = new Date(d);
+      start.setDate(d.getDate() - d.getDay());
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
+    }
+    // month
+    const first = new Date(d.getFullYear(), d.getMonth(), 1);
+    const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return {
+      from: first.toISOString().slice(0, 10),
+      to: last.toISOString().slice(0, 10),
+    };
+  }, [date, view]);
+
   const handleDateClick = (clickedDate: string) => {
     setDate(clickedDate);
     setView('day');
@@ -84,6 +113,20 @@ export function CalendarPage() {
     <div className="max-w-full mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-4">
       {/* Calendar Header with navigation & view switcher */}
       <CalendarHeader />
+
+      {/* Expenses-layer toggle row */}
+      <div className="flex items-center justify-end mb-2">
+        <label className="inline-flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={includeExpenses}
+            onChange={(e) => setIncludeExpenses(e.target.checked)}
+            className="rounded border-gray-300 text-amber-500"
+          />
+          <Receipt className="w-3.5 h-3.5 text-amber-500" />
+          שכבת הוצאות קשר עם הציבור
+        </label>
+      </div>
 
       {/* Mobile layers toggle */}
       {sources.length > 0 && (
@@ -153,6 +196,21 @@ export function CalendarPage() {
           )}
         </div>
       </div>
+
+      {/* Expenses overlay panel — visible when the layer toggle is on */}
+      {includeExpenses && (
+        <div className="mt-6 pt-4 border-t-2 border-amber-200">
+          <ExpensesPanel
+            title={`הוצאות קשר עם הציבור (${visibleRange.from} עד ${visibleRange.to})`}
+            params={{
+              from_date: visibleRange.from,
+              to_date: visibleRange.to,
+              sort: 'date_desc',
+              per_page: 100,
+            }}
+          />
+        </div>
+      )}
 
       {/* Event detail modal */}
       {selectedEvent && (

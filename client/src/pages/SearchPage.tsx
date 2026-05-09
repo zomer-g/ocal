@@ -9,7 +9,8 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useEvents } from '@/hooks/useEvents';
 import { useStats } from '@/hooks/useStats';
 import { useUrlSync } from '@/hooks/useUrlSync';
-import { Loader2, SlidersHorizontal, X, ArrowUpDown } from 'lucide-react';
+import { Loader2, SlidersHorizontal, X, ArrowUpDown, Receipt } from 'lucide-react';
+import { ExpensesPanel } from '@/components/expenses/ExpensesPanel';
 
 export function SearchPage() {
   useUrlSync();
@@ -152,32 +153,57 @@ export function SearchPage() {
 
             {data && (
               <>
-                {/* Sort toggle — show when search query is active */}
-                {data.pagination.total > 0 && (
-                  <div className="flex items-center justify-between mb-1">
-                    <div />
-                    <div className="flex items-center gap-1">
-                      <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
-                      {(['relevance', 'date_desc', 'date_asc'] as const)
-                        .filter((s) => s === 'relevance' ? !!combinedQ : true)
-                        .map((s) => (
-                        <button
-                          key={s}
-                          onClick={() => filters.setSort(s)}
-                          className={`text-xs px-2 py-1 rounded transition-colors ${
-                            filters.sort === s
-                              ? 'bg-primary-100 text-primary-700 font-medium'
-                              : 'text-gray-500 hover:bg-gray-100'
-                          }`}
-                        >
-                          {s === 'relevance' ? 'רלוונטיות' : s === 'date_desc' ? 'חדש → ישן' : 'ישן → חדש'}
-                        </button>
-                      ))}
-                    </div>
+                {/* Sort toggle + expenses-layer toggle */}
+                {(data.pagination.total > 0 || filters.includeExpenses) && (
+                  <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                    <label className="inline-flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={filters.includeExpenses}
+                        onChange={(e) => filters.setIncludeExpenses(e.target.checked)}
+                        className="rounded border-gray-300 text-amber-500"
+                      />
+                      <Receipt className="w-3.5 h-3.5 text-amber-500" />
+                      שכבת הוצאות קשר עם הציבור
+                    </label>
+                    {data.pagination.total > 0 && (
+                      <div className="flex items-center gap-1">
+                        <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+                        {(['relevance', 'date_desc', 'date_asc'] as const)
+                          .filter((s) => s === 'relevance' ? !!combinedQ : true)
+                          .map((s) => (
+                          <button
+                            key={s}
+                            onClick={() => filters.setSort(s)}
+                            className={`text-xs px-2 py-1 rounded transition-colors ${
+                              filters.sort === s
+                                ? 'bg-primary-100 text-primary-700 font-medium'
+                                : 'text-gray-500 hover:bg-gray-100'
+                            }`}
+                          >
+                            {s === 'relevance' ? 'רלוונטיות' : s === 'date_desc' ? 'חדש → ישן' : 'ישן → חדש'}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 <SearchResults events={data.data} total={data.pagination.total} />
                 <Pagination pagination={data.pagination} onPageChange={filters.setPage} />
+
+                {filters.includeExpenses && (
+                  <div className="mt-6 pt-4 border-t-2 border-amber-200">
+                    <ExpensesPanel
+                      title="הוצאות קשר עם הציבור (שכבה נוספת)"
+                      params={{
+                        from_date: filters.from_date || undefined,
+                        to_date: effectiveTo,
+                        sort: 'date_desc',
+                        per_page: 100,
+                      }}
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>

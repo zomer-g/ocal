@@ -22,6 +22,9 @@ interface FilterState {
   advancedMode: boolean;
   extraConditions: ExtraCondition[];
 
+  // Layer toggles
+  includeExpenses: boolean;
+
   setQuery: (q: string) => void;
   setDateRange: (from: string, to: string) => void;
   setSourceIds: (ids: string[]) => void;
@@ -41,6 +44,9 @@ interface FilterState {
   addExtraCondition: () => void;
   updateExtraCondition: (id: string, field: 'term' | 'operator', value: string) => void;
   removeExtraCondition: (id: string) => void;
+
+  // Layer toggle setter
+  setIncludeExpenses: (on: boolean) => void;
 }
 
 export const initialState = {
@@ -56,6 +62,7 @@ export const initialState = {
   page: 1,
   advancedMode: false,
   extraConditions: [] as ExtraCondition[],
+  includeExpenses: false,
 };
 
 export const useFilterStore = create<FilterState>((set) => ({
@@ -108,4 +115,6 @@ export const useFilterStore = create<FilterState>((set) => ({
       extraConditions: state.extraConditions.filter((c) => c.id !== id),
       page: 1,
     })),
+
+  setIncludeExpenses: (on) => set({ includeExpenses: on, page: 1 }),
 }));

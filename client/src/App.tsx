@@ -14,6 +14,7 @@ import { ContentPage } from '@/pages/admin/ContentPage';
 import { EntitiesPage } from '@/pages/admin/EntitiesPage';
 import { AutomationPage } from '@/pages/admin/AutomationPage';
 import { ManualImportPage } from '@/pages/admin/ManualImportPage';
+import { ExpenseImportsPage } from '@/pages/admin/ExpenseImportsPage';
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="automation" element={<AutomationPage />} />
         <Route path="manual-import" element={<ManualImportPage />} />
         <Route path="manual-import/:uploadId" element={<ManualImportPage />} />
+        <Route path="expense-imports" element={<ExpenseImportsPage />} />
         {/* Redirects from old routes */}
         <Route path="people" element={<Navigate to="/admin/entities" replace />} />
         <Route path="organizations" element={<Navigate to="/admin/entities" replace />} />

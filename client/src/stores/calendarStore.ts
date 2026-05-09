@@ -8,6 +8,7 @@ interface CalendarState {
   enabledSourceIds: Set<string>;
   selectedEntityNames: string[];
   sourcesInitialized: boolean;
+  includeExpenses: boolean; // toggle for the MK expenses overlay layer
 
   setDate: (date: string) => void;
   setView: (view: CalendarView) => void;
@@ -16,6 +17,7 @@ interface CalendarState {
   toggleSource: (id: string) => void;
   setAllSources: (ids: string[], enabled: boolean) => void;
   setEntityNames: (names: string[]) => void;
+  setIncludeExpenses: (on: boolean) => void;
 }
 
 export const useCalendarStore = create<CalendarState>((set, get) => ({
@@ -24,6 +26,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   enabledSourceIds: new Set<string>(),
   selectedEntityNames: [] as string[],
   sourcesInitialized: false,
+  includeExpenses: false,
 
   setDate: (date) => set({ date }),
   setView: (view) => set({ view }),
@@ -52,4 +55,5 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     set({ enabledSourceIds: new Set(enabled ? ids : []), sourcesInitialized: true }),
 
   setEntityNames: (names) => set({ selectedEntityNames: names }),
+  setIncludeExpenses: (on) => set({ includeExpenses: on }),
 }));
