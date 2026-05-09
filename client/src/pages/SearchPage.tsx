@@ -52,42 +52,32 @@ export function SearchPage() {
     per_page: 50,
   });
 
-  // Expense layer — fired only when the toggle is on.
-  //
-  // Date window: we deliberately scope expenses to the date range of the
-  // *visible events page* (not the user's whole filter range). Events are
-  // paginated 50 per page; if we showed expenses for the entire selected
-  // range, the user would see expenses on dates with no corresponding event
-  // on screen, defeating the "what did they do AND spend on the same day"
-  // goal. As the user paginates through events, the expense window follows.
+  // Expense layer — fired only when the toggle is on. Inherits the same
+  // date range and entity_names as the diary feed, so toggling the layer
+  // gives a parallel view of "what this MK spent on during the same period".
+  // The expense feed is intentionally NOT scoped to the events-page window:
+  // events are paginated 50 per page, but the user expects to see the full
+  // year of expenses regardless of which event page they're on. Per-day
+  // matching happens in SearchResults via shared date headers — days with
+  // both feeds render together; days with only one render alone.
   const expensesEnabled = filters.includeExpenses;
-  const eventDateBounds = (() => {
-    const dates = data?.data.map((e) => e.event_date).sort() ?? [];
-    if (dates.length === 0) return null;
-    return { min: dates[0], max: dates[dates.length - 1] };
-  })();
-  const expenseFromDate = eventDateBounds?.min ?? filters.from_date ?? undefined;
-  const expenseToDate = eventDateBounds?.max ?? effectiveTo;
   const expenseSort: 'date_asc' | 'date_desc' =
     filters.sort === 'date_asc' ? 'date_asc' : 'date_desc';
   const { data: expensesResp } = useQuery({
     queryKey: [
       'public-expenses-search',
-      expenseFromDate,
-      expenseToDate,
+      filters.from_date,
+      effectiveTo,
       filters.entity_names,
       expenseSort,
     ],
     queryFn: () =>
       searchExpenses({
-        from_date: expenseFromDate,
-        to_date: expenseToDate,
+        from_date: filters.from_date || undefined,
+        to_date: effectiveTo,
         entity_names: filters.entity_names.length ? filters.entity_names : undefined,
         sort: expenseSort,
         page: 1,
-        // 500 is a hard upper bound; with the date window narrowed to the
-        // events page (~30-day window for 50 daily events), real-world usage
-        // is well under 100 rows per fetch.
         per_page: 500,
       }),
     enabled: expensesEnabled,

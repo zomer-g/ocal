@@ -13,6 +13,7 @@ const PARAM_MAP = {
   sort: 'sort',
   page: 'page',
   advancedMode: 'adv',
+  includeExpenses: 'expenses',
 } as const;
 
 type FilterKeys = keyof typeof PARAM_MAP;
@@ -57,6 +58,9 @@ function parseUrlToState(search: string) {
   const adv = params.get(PARAM_MAP.advancedMode);
   if (adv === '1') state.advancedMode = true;
 
+  const exp = params.get(PARAM_MAP.includeExpenses);
+  if (exp === '1') state.includeExpenses = true;
+
   const conds = params.getAll('cond');
   if (conds.length > 0) {
     const extraConditions: ExtraCondition[] = conds
@@ -92,6 +96,7 @@ function stateToUrl(store: ReturnType<typeof useFilterStore.getState>): string {
   if (store.sort !== initialState.sort) params.set(PARAM_MAP.sort, store.sort);
   if (store.page > 1) params.set(PARAM_MAP.page, String(store.page));
   if (store.advancedMode) params.set(PARAM_MAP.advancedMode, '1');
+  if (store.includeExpenses) params.set(PARAM_MAP.includeExpenses, '1');
 
   for (const cond of store.extraConditions) {
     if (cond.term.trim()) {
