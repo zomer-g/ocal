@@ -15,6 +15,9 @@ interface SearchResultsProps {
    * section below the list. */
   expenses?: MkExpense[];
   expensesTotal?: number;
+  /** Direction in which to render dates. Both feeds get merged and the unified
+   * date list is sorted accordingly. Defaults to 'desc' (newest first). */
+  sortDirection?: 'asc' | 'desc';
 }
 
 /**
@@ -25,7 +28,7 @@ type Row =
   | { kind: 'event'; date: string; sortKey: string; event: DiaryEvent }
   | { kind: 'expense'; date: string; sortKey: string; expense: MkExpense };
 
-export function SearchResults({ events, total, expenses, expensesTotal }: SearchResultsProps) {
+export function SearchResults({ events, total, expenses, expensesTotal, sortDirection = 'desc' }: SearchResultsProps) {
   const navigate = useNavigate();
   const setDate = useCalendarStore((s) => s.setDate);
 
@@ -76,26 +79,13 @@ export function SearchResults({ events, total, expenses, expensesTotal }: Search
     arr.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   }
 
-  // Sort the dates in the same order as the underlying event ordering —
-  // i.e. preserve descending or ascending as the API returned. We can't
-  // know the API sort here, so use the order in which dates first appeared
-  // in `events` (with any expense-only dates appended in their natural
-  // descending order).
-  const dateOrder: string[] = [];
-  const seen = new Set<string>();
-  for (const e of events) {
-    if (!seen.has(e.event_date)) {
-      seen.add(e.event_date);
-      dateOrder.push(e.event_date);
-    }
-  }
-  // Append any expense-only dates, sorted desc by default
-  const extra = (expenses ?? [])
-    .map((x) => x.expense_date)
-    .filter((d) => !seen.has(d));
-  for (const d of [...new Set(extra)].sort((a, b) => b.localeCompare(a))) {
-    dateOrder.push(d);
-  }
+  // Merge ALL dates from both feeds into one chronological timeline so a
+  // day with both events and expenses shows them side by side, and gaps
+  // (event-only days, expense-only days) are placed in their correct
+  // positions instead of clustered at the end.
+  const dateOrder = Array.from(grouped.keys()).sort((a, b) =>
+    sortDirection === 'asc' ? a.localeCompare(b) : b.localeCompare(a),
+  );
 
   const totalLabel =
     expensesTotal != null
