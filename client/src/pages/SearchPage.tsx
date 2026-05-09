@@ -38,6 +38,19 @@ export function SearchPage() {
           .join(' ')
       : filters.q || undefined;
 
+  // When the expenses layer is on, paginating events gives a confusing
+  // result: the unified date list is dominated by expense dates spanning
+  // the full filter range, so each events page shows the same date headers
+  // with different events tucked under them. To match the user's mental
+  // model ("show me everything this MK did and spent on for the period"),
+  // we request a single page of up to 500 events when the layer is on
+  // and hide the events paginator entirely. For typical MK-scoped queries
+  // (~200-300 events) this fits comfortably; an overflow banner appears
+  // if there are more events than the cap.
+  const expensesEnabled = filters.includeExpenses;
+  const eventsPerPage = expensesEnabled ? 500 : 50;
+  const eventsPage = expensesEnabled ? 1 : filters.page;
+
   const { data, isLoading, isError } = useEvents({
     q: combinedQ,
     from_date: filters.from_date || undefined,
@@ -48,19 +61,13 @@ export function SearchPage() {
     participants: filters.participants || undefined,
     cross_ref_status: filters.cross_ref_status || undefined,
     sort: filters.sort,
-    page: filters.page,
-    per_page: 50,
+    page: eventsPage,
+    per_page: eventsPerPage,
   });
 
-  // Expense layer — fired only when the toggle is on. Inherits the same
-  // date range and entity_names as the diary feed, so toggling the layer
-  // gives a parallel view of "what this MK spent on during the same period".
-  // The expense feed is intentionally NOT scoped to the events-page window:
-  // events are paginated 50 per page, but the user expects to see the full
-  // year of expenses regardless of which event page they're on. Per-day
-  // matching happens in SearchResults via shared date headers — days with
-  // both feeds render together; days with only one render alone.
-  const expensesEnabled = filters.includeExpenses;
+  // Expense feed — fetches once for the full filter range (single page,
+  // up to 500 rows). Inherits the same date range and entity_names as the
+  // diary feed, so picking an MK on the side panel narrows both feeds.
   const expenseSort: 'date_asc' | 'date_desc' =
     filters.sort === 'date_asc' ? 'date_asc' : 'date_desc';
   const { data: expensesResp } = useQuery({
@@ -221,6 +228,15 @@ export function SearchPage() {
                     )}
                   </div>
                 )}
+                {/* Overflow notice — when the expenses layer is on we
+                    request a single page of up to 500 events. If the
+                    filter has more than that, warn the user to refine. */}
+                {expensesEnabled && data.pagination.total > eventsPerPage && (
+                  <div className="mb-3 px-3 py-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded">
+                    מוצגים {eventsPerPage.toLocaleString('he-IL')} אירועים מתוך {data.pagination.total.toLocaleString('he-IL')}.
+                    כדי לראות את כל האירועים בשכבת ההוצאות, צמצם את חיפוש האירועים (תאריכים / חבר כנסת / יומנים).
+                  </div>
+                )}
                 <SearchResults
                   events={data.data}
                   total={data.pagination.total}
@@ -228,7 +244,11 @@ export function SearchPage() {
                   expensesTotal={expensesEnabled ? expensesResp?.pagination.total : undefined}
                   sortDirection={filters.sort === 'date_asc' ? 'asc' : 'desc'}
                 />
-                <Pagination pagination={data.pagination} onPageChange={filters.setPage} />
+                {/* Hide events paginator when the expenses layer is on —
+                    the merged view is rendered in a single sweep. */}
+                {!expensesEnabled && (
+                  <Pagination pagination={data.pagination} onPageChange={filters.setPage} />
+                )}
               </>
             )}
           </div>
