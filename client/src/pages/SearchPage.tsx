@@ -75,6 +75,7 @@ export function SearchPage() {
   const { data: expensesResp } = useQuery({
     queryKey: [
       'public-expenses-search',
+      combinedQ,
       expenseFromDate,
       expenseToDate,
       filters.entity_names,
@@ -82,6 +83,9 @@ export function SearchPage() {
     ],
     queryFn: () =>
       searchExpenses({
+        // Same text search as the events feed. The server matches against
+        // category, vendor, notes, and mk_name_raw via ILIKE.
+        q: combinedQ,
         from_date: expenseFromDate,
         to_date: expenseToDate,
         entity_names: filters.entity_names.length ? filters.entity_names : undefined,
@@ -99,12 +103,14 @@ export function SearchPage() {
   const { data: expensesTotalResp } = useQuery({
     queryKey: [
       'public-expenses-total',
+      combinedQ,
       filters.from_date,
       effectiveTo,
       filters.entity_names,
     ],
     queryFn: () =>
       searchExpenses({
+        q: combinedQ,
         from_date: filters.from_date || undefined,
         to_date: effectiveTo,
         entity_names: filters.entity_names.length ? filters.entity_names : undefined,
