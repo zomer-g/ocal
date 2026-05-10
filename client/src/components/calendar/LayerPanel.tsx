@@ -325,7 +325,37 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
         </>
       )}
 
-      {/* ── שכבות ── */}
+      {/* ── שכבות נוספות ── separate from "שכבות" (diaries) so the
+          expense layer's URL param doesn't get conflated with source IDs. */}
+      <div className="space-y-2 min-w-0">
+        <h4 className="text-xs text-gray-500 font-medium">שכבות נוספות</h4>
+        <label className="flex items-start gap-2 text-sm cursor-pointer min-w-0">
+          <input
+            type="checkbox"
+            checked={includeExpenses}
+            onChange={(e) => setIncludeExpenses(e.target.checked)}
+            className="sr-only"
+            aria-label={`הוצאות קשר עם הציבור — ${includeExpenses ? 'מוצג' : 'מוסתר'}`}
+          />
+          <div
+            className="w-3.5 h-3.5 mt-0.5 rounded-sm border-2 shrink-0 flex items-center justify-center"
+            style={{ borderColor: '#F59E0B', backgroundColor: includeExpenses ? '#F59E0B' : undefined }}
+            aria-hidden="true"
+          >
+            {includeExpenses && (
+              <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </div>
+          <Receipt className="w-3 h-3 shrink-0 text-amber-500 mt-1" aria-hidden="true" />
+          <span className="min-w-0 flex-1 font-medium" style={{ overflowWrap: 'anywhere' }}>
+            הוצאות קשר עם הציבור
+          </span>
+        </label>
+      </div>
+
+      {/* ── שכבות (יומנים) ── */}
       {sources.length > 0 && (
         <div className="space-y-2 min-w-0">
           <div className="flex items-center justify-between">
@@ -339,33 +369,6 @@ export function LayerPanel({ sources, viewSourceCounts }: LayerPanelProps) {
             </button>
           </div>
           <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1">
-            {/* Expenses layer — pinned at the top of the layers list, styled
-                like a regular source row but with the amber Receipt accent.
-                Default ON; toggling off mutes the expense overlay. */}
-            <label className="flex items-start gap-2 text-sm cursor-pointer min-w-0">
-              <input
-                type="checkbox"
-                checked={includeExpenses}
-                onChange={(e) => setIncludeExpenses(e.target.checked)}
-                className="sr-only"
-                aria-label={`הוצאות קשר עם הציבור — ${includeExpenses ? 'מוצג' : 'מוסתר'}`}
-              />
-              <div
-                className="w-3.5 h-3.5 mt-0.5 rounded-sm border-2 shrink-0 flex items-center justify-center"
-                style={{ borderColor: '#F59E0B', backgroundColor: includeExpenses ? '#F59E0B' : undefined }}
-                aria-hidden="true"
-              >
-                {includeExpenses && (
-                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </div>
-              <Receipt className="w-3 h-3 shrink-0 text-amber-500 mt-1" aria-hidden="true" />
-              <span className="min-w-0 flex-1 font-medium" style={{ overflowWrap: 'anywhere' }}>
-                הוצאות קשר עם הציבור
-              </span>
-            </label>
             {sources.slice(0, sourcesVisible).map((source) => {
               const isEnabled = enabledSourceIds.has(source.id);
               const viewCount = viewSourceCounts?.[source.id] ?? 0;

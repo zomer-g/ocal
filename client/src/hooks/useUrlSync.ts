@@ -99,8 +99,9 @@ function stateToUrl(store: ReturnType<typeof useFilterStore.getState>): string {
   if (store.sort !== initialState.sort) params.set(PARAM_MAP.sort, store.sort);
   if (store.page > 1) params.set(PARAM_MAP.page, String(store.page));
   if (store.advancedMode) params.set(PARAM_MAP.advancedMode, '1');
-  // Only encode when user has explicitly turned off the (default-on) layer.
-  if (!store.includeExpenses) params.set(PARAM_MAP.includeExpenses, '0');
+  // Always emit the expenses flag (1 or 0) so shared URLs are explicit
+  // about whether the layer is on, not relying on a default.
+  params.set(PARAM_MAP.includeExpenses, store.includeExpenses ? '1' : '0');
 
   for (const cond of store.extraConditions) {
     if (cond.term.trim()) {

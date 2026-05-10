@@ -441,6 +441,29 @@ export function FilterPanel() {
         </FilterSection>
       </div>
 
+      {/* ── שכבות נוספות ── separate from יומנים so the URL/state for
+          the expense layer doesn't get conflated with the source-id list. */}
+      <div className="px-4">
+        <FilterSection
+          title="שכבות נוספות"
+          icon={<Receipt className="w-3.5 h-3.5" />}
+          defaultExpanded
+        >
+          <label className="flex items-center gap-2 text-sm cursor-pointer min-w-0 py-0.5">
+            <input
+              type="checkbox"
+              checked={includeExpenses}
+              onChange={(e) => setIncludeExpenses(e.target.checked)}
+              className="rounded border-gray-300 text-amber-500 shrink-0"
+            />
+            <Receipt className="w-3 h-3 shrink-0 text-amber-500" aria-hidden="true" />
+            <span className="min-w-0 flex-1 text-xs text-gray-700 truncate font-medium">
+              הוצאות קשר עם הציבור
+            </span>
+          </label>
+        </FilterSection>
+      </div>
+
       {/* ── יומנים ── */}
       {sources.length > 0 && (
         <div className="px-4">
@@ -455,23 +478,6 @@ export function FilterPanel() {
             onSelectAll={() => setSourceIds(filteredSources.map((s) => s.id))}
             onClearAll={source_ids.length > 0 ? clearSources : undefined}
           >
-            {/* Expenses layer — pinned at the top of the diaries list, styled
-                like a regular SourceRow but with the amber Receipt accent so
-                the user reads it as just another toggleable diary. The state
-                lives in filterStore.includeExpenses (default ON). */}
-            <label className="flex items-center gap-2 text-sm cursor-pointer min-w-0 py-0.5 mb-1">
-              <input
-                type="checkbox"
-                checked={includeExpenses}
-                onChange={(e) => setIncludeExpenses(e.target.checked)}
-                className="rounded border-gray-300 text-amber-500 shrink-0"
-              />
-              <Receipt className="w-3 h-3 shrink-0 text-amber-500" aria-hidden="true" />
-              <span className="min-w-0 flex-1 text-xs text-gray-700 truncate font-medium">
-                הוצאות קשר עם הציבור
-              </span>
-            </label>
-
             {filteredSources.length > 0 ? (
               <>
                 {(sourcesSearch ? filteredSources : filteredSources.slice(0, sourcesVisible)).map((source) => (
