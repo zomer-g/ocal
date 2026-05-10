@@ -43,6 +43,13 @@ export class LLMNotConfiguredError extends Error {
 export interface ExtractOptions {
   /** 1-based page number; if set, only this page is sent to the LLM. */
   page?: number;
+  /**
+   * Original uploaded filename. Surfaced in the user prompt as a year hint —
+   * Israeli FOI calendar PDFs typically carry the year only on the cover
+   * sheet, so per-page extraction otherwise leaves the LLM free to
+   * hallucinate one (commonly the current year).
+   */
+  filename?: string;
 }
 
 export async function extractDiaryFromPdf(

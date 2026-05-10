@@ -138,7 +138,7 @@ adminManualUploadsRouter.post('/:id/extract', validate(extractQuerySchema, 'quer
     const provider = (req.query.provider as LLMProvider);
     const page = req.query.page ? Number(req.query.page) : undefined;
     const row = await db('manual_diary_uploads')
-      .select('id', 'file_data', 'committed_at')
+      .select('id', 'file_data', 'filename', 'committed_at')
       .where({ id: req.params.id })
       .first();
     if (!row) { res.status(404).json({ error: 'Upload not found' }); return; }
@@ -154,7 +154,7 @@ adminManualUploadsRouter.post('/:id/extract', validate(extractQuerySchema, 'quer
     });
 
     try {
-      const result = await extractDiaryFromPdf(row.file_data, provider, { page });
+      const result = await extractDiaryFromPdf(row.file_data, provider, { page, filename: row.filename });
       await db('manual_diary_uploads').where({ id: row.id }).update({
         extraction_status: 'completed',
         extraction_result: JSON.stringify(result),
