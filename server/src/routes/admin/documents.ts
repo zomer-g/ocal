@@ -1,9 +1,9 @@
 /**
  * Unified read-only listing of every "document" in the system —
- * manual PDF diaries, expense imports, CKAN diary sources, COI
- * arrangements — with filter chips for kind / origin / reviewed.
+ * manual PDF diaries, expense imports, CKAN diary sources — with
+ * filter chips for kind / origin / reviewed.
  *
- * Implementation: UNION ALL across the four tables, cast to a common
+ * Implementation: UNION ALL across the three tables, cast to a common
  * shape, then filter + paginate via an outer CTE.
  */
 

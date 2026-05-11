@@ -60,7 +60,7 @@ export function DocumentsPage() {
         </h1>
         <p className="text-sm text-gray-600">
           תצוגה מאוחדת של כל המסמכים במערכת: יומני PDF, ייבואי הוצאות חברי כנסת,
-          יומני CKAN, והסדרי ניגוד עניינים.
+          ויומני CKAN.
         </p>
       </div>
 

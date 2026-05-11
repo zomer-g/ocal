@@ -13,8 +13,7 @@ interface Props {
 /**
  * Visual indicator that this row descends from a source document a
  * content manager has marked as "reviewed". The same component renders
- * across diary events, MK expenses, COI arrangements, and any future
- * document-derived data.
+ * across diary events, MK expenses, and any future document-derived data.
  */
 export function ReviewedBadge({ reviewed, variant = 'chip', className = '' }: Props) {
   if (!reviewed) return null;
