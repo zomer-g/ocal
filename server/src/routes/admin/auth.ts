@@ -66,31 +66,28 @@ authRouter.get('/google/callback', async (req, res) => {
     const name = payload.name || email;
     const pictureUrl = payload.picture || null;
 
-    // Check if email is in the allowed admin list
-    if (authConfig.adminEmails.length > 0 && !authConfig.adminEmails.includes(email)) {
-      logger.warn({ email }, 'Login denied — email not in ADMIN_EMAILS');
-      res.status(403).send(`
-        <html dir="rtl"><body style="font-family:sans-serif;text-align:center;padding:60px;">
-          <h2>אין הרשאה</h2>
-          <p>הכתובת <strong>${email}</strong> לא מורשית לגשת לממשק הניהול.</p>
-          <a href="/">חזרה לעמוד הראשי</a>
-        </body></html>
-      `);
-      return;
-    }
-
-    // Upsert admin user
+    // Two-tier authorization:
+    //   1. If the email already has an admin_users row → allow (the admin
+    //      invited them via the UI; their role is stored there).
+    //   2. Otherwise fall back to ADMIN_EMAILS env var for first-time
+    //      bootstrap — auto-creates an admin_users row with role='admin'.
+    //   3. Anyone not in either tier is rejected.
     let user = await db('admin_users').where({ email }).first();
-    if (user) {
-      await db('admin_users').where({ id: user.id }).update({
-        google_id: googleId,
-        name,
-        picture_url: pictureUrl,
-        last_login: new Date(),
-        updated_at: new Date(),
-      });
-      user = await db('admin_users').where({ id: user.id }).first();
-    } else {
+
+    if (!user) {
+      const inEnvAllowList =
+        authConfig.adminEmails.length === 0 || authConfig.adminEmails.includes(email);
+      if (!inEnvAllowList) {
+        logger.warn({ email }, 'Login denied — not in admin_users and not in ADMIN_EMAILS');
+        res.status(403).send(`
+          <html dir="rtl"><body style="font-family:sans-serif;text-align:center;padding:60px;">
+            <h2>אין הרשאה</h2>
+            <p>הכתובת <strong>${email}</strong> לא מורשית לגשת לממשק הניהול.</p>
+            <a href="/">חזרה לעמוד הראשי</a>
+          </body></html>
+        `);
+        return;
+      }
       [user] = await db('admin_users').insert({
         email,
         google_id: googleId,
@@ -99,6 +96,15 @@ authRouter.get('/google/callback', async (req, res) => {
         last_login: new Date(),
         is_active: true,
       }).returning('*');
+    } else {
+      await db('admin_users').where({ id: user.id }).update({
+        google_id: googleId,
+        name,
+        picture_url: pictureUrl,
+        last_login: new Date(),
+        updated_at: new Date(),
+      });
+      user = await db('admin_users').where({ id: user.id }).first();
     }
 
     if (!user.is_active) {

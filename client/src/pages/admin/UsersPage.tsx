@@ -115,7 +115,7 @@ export function UsersPage() {
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          המשתמש המוזמן חייב להיות גם ברשימת <code>ADMIN_EMAILS</code> של השרת כדי שיוכל להיכנס דרך Google.
+          המשתמש יוכל להיכנס דרך Google ברגע שיוסיף לעצמו את הכתובת — אין צורך לשנות הגדרות שרת.
         </p>
       </div>
 
