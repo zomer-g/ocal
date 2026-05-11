@@ -37,7 +37,8 @@ expensesRouter.get('/', validate(searchSchema, 'query'), async (req, res, next) 
       : undefined;
 
     let query = db('mk_expenses as e')
-      .leftJoin('people as p', 'p.id', 'e.person_id');
+      .leftJoin('people as p', 'p.id', 'e.person_id')
+      .leftJoin('mk_expense_imports as i', 'i.id', 'e.import_id');
 
     if (q.q) {
       const like = `%${q.q}%`;
@@ -77,6 +78,7 @@ expensesRouter.get('/', validate(searchSchema, 'query'), async (req, res, next) 
         'e.notes', 'e.credit', 'e.receipt_url',
         'e.mk_name_raw', 'e.source_year', 'e.source_row_index',
         'p.id as person_id', 'p.name as person_name',
+        db.raw('(i.reviewed_at IS NOT NULL) as import_reviewed'),
       )
       .offset(offset)
       .limit(per_page);

@@ -1,5 +1,6 @@
 import { Receipt, ExternalLink } from 'lucide-react';
 import type { MkExpense } from '@/api/expenses';
+import { ReviewedBadge } from '@/components/shared/ReviewedBadge';
 
 const EXPENSE_ACCENT = '#F59E0B'; // amber — visually distinct from any source color
 
@@ -36,6 +37,7 @@ export function ExpenseCard({ expense: e, hideDate = false }: Props) {
             <span className="text-xs font-bold uppercase tracking-wide" style={{ color: EXPENSE_ACCENT }}>
               הוצאה
             </span>
+            <ReviewedBadge reviewed={e.import_reviewed} />
             {!hideDate && (
               <>
                 <span className="text-xs text-gray-400">·</span>

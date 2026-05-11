@@ -15,6 +15,8 @@ export interface MkExpense {
   source_row_index: number;
   person_id: string | null;
   person_name: string | null;
+  /** True when the originating mk_expense_imports row is marked reviewed. */
+  import_reviewed?: boolean;
 }
 
 export interface ExpenseSearchParams {

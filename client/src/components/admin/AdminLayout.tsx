@@ -1,23 +1,40 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare, Tags, Zap, FileUp, Receipt } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare, Tags, Zap, FileUp, Receipt, FileCheck, Files, Users } from 'lucide-react';
+import { useAuth, type AdminUserRole } from '@/hooks/useAuth';
 
-const NAV_ITEMS = [
+type NavItem = {
+  path: string;
+  label: string;
+  icon: typeof Settings;
+  exact: boolean;
+  // If omitted, item is visible to all logged-in admins regardless of role.
+  // Otherwise the user's role must appear in this list.
+  allowedRoles?: AdminUserRole[];
+};
+
+const NAV_ITEMS: NavItem[] = [
   { path: '/admin', label: 'סקירה', icon: Settings, exact: true },
-  { path: '/admin/sync', label: 'ייבוא', icon: Download, exact: false },
+  { path: '/admin/documents', label: 'מסמכים', icon: Files, exact: false },
+  { path: '/admin/sync', label: 'ייבוא', icon: Download, exact: false, allowedRoles: ['admin'] },
   { path: '/admin/manual-import', label: 'ייבוא PDF', icon: FileUp, exact: false },
   { path: '/admin/expense-imports', label: 'הוצאות ח"כ', icon: Receipt, exact: false },
+  { path: '/admin/coi-imports', label: 'ניגוד עניינים', icon: FileCheck, exact: false },
   { path: '/admin/sources', label: 'מקורות', icon: Database, exact: false },
   { path: '/admin/entities', label: 'ישויות', icon: Tags, exact: false },
-  { path: '/admin/content', label: 'תוכן', icon: PenSquare, exact: false },
-  { path: '/admin/automation', label: 'אוטומציה', icon: Zap, exact: false },
+  { path: '/admin/content', label: 'תוכן', icon: PenSquare, exact: false, allowedRoles: ['admin'] },
+  { path: '/admin/automation', label: 'אוטומציה', icon: Zap, exact: false, allowedRoles: ['admin'] },
+  { path: '/admin/users', label: 'משתמשים', icon: Users, exact: false, allowedRoles: ['admin'] },
 ];
 
 export function AdminLayout() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, role, logout } = useAuth();
+
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => !item.allowedRoles || (role && item.allowedRoles.includes(role)),
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -37,7 +54,7 @@ export function AdminLayout() {
 
             {/* Desktop nav */}
             <nav className="hidden sm:flex items-center gap-1">
-              {NAV_ITEMS.map((item) => {
+              {visibleNavItems.map((item) => {
                 const isActive = item.exact
                   ? location.pathname === item.path
                   : location.pathname.startsWith(item.path);
@@ -94,7 +111,7 @@ export function AdminLayout() {
         {mobileOpen && (
           <div className="sm:hidden border-t border-gray-700 bg-gray-800">
             <nav className="px-4 py-2 space-y-1">
-              {NAV_ITEMS.map((item) => {
+              {visibleNavItems.map((item) => {
                 const isActive = item.exact
                   ? location.pathname === item.path
                   : location.pathname.startsWith(item.path);

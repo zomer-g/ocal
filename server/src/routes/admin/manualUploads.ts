@@ -19,6 +19,7 @@ import { validate } from '../../middleware/validate.js';
 import { logger } from '../../utils/logger.js';
 import { extractDiaryFromPdf, LLMNotConfiguredError, type LLMProvider } from '../../services/llm/index.js';
 import { extractEntitiesForSource } from '../../services/entityExtractor.js';
+import { requireRole } from '../../middleware/auth.js';
 
 export const adminManualUploadsRouter = Router();
 
@@ -379,7 +380,46 @@ adminManualUploadsRouter.post('/:id/commit', validate(commitSchema, 'body'), asy
 // ──────────────────────────────────────────────
 // DELETE /api/admin/manual-uploads/:id — discard (only if not committed)
 // ──────────────────────────────────────────────
-adminManualUploadsRouter.delete('/:id', async (req, res, next) => {
+// ──────────────────────────────────────────────
+// POST /:id/review and /:id/unreview — mark/unmark as content-checked
+// ──────────────────────────────────────────────
+const reviewSchema = z.object({ notes: z.string().optional() });
+
+adminManualUploadsRouter.post('/:id/review', validate(reviewSchema, 'body'), async (req, res, next) => {
+  try {
+    const body = req.body as z.infer<typeof reviewSchema>;
+    const [row] = await db('manual_diary_uploads')
+      .where({ id: req.params.id })
+      .update({
+        reviewed_at: new Date(),
+        reviewed_by: req.adminUser?.id ?? null,
+        review_notes: body.notes ?? null,
+        updated_at: new Date(),
+      })
+      .returning(['id', 'reviewed_at', 'reviewed_by', 'review_notes']);
+    if (!row) { res.status(404).json({ error: 'Upload not found' }); return; }
+    // The committed source also gets marked — propagation is by JOIN at
+    // read time so no extra writes needed.
+    res.json(row);
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminManualUploadsRouter.post('/:id/unreview', async (req, res, next) => {
+  try {
+    const [row] = await db('manual_diary_uploads')
+      .where({ id: req.params.id })
+      .update({ reviewed_at: null, reviewed_by: null, review_notes: null, updated_at: new Date() })
+      .returning(['id']);
+    if (!row) { res.status(404).json({ error: 'Upload not found' }); return; }
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminManualUploadsRouter.delete('/:id', requireRole('admin'), async (req, res, next) => {
   try {
     const row = await db('manual_diary_uploads').select('committed_at').where({ id: req.params.id }).first();
     if (!row) { res.status(404).json({ error: 'Upload not found' }); return; }

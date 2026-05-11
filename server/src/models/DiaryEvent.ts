@@ -80,6 +80,7 @@ export const DiaryEventModel = {
       'e.*',
       's.name as source_name',
       's.color as source_color',
+      db.raw('(s.reviewed_at IS NOT NULL) as source_reviewed'),
       db.raw('(SELECT total_events FROM similar_events WHERE id = e.match_group_id) as match_count'),
       db.raw(`(SELECT json_agg(sub) FROM (SELECT ee.entity_name AS name, ee.entity_type AS type FROM event_entities ee WHERE ee.event_id = e.id AND ee.confidence >= 0.5 GROUP BY ee.entity_name, ee.entity_type ORDER BY MAX(ee.confidence) DESC LIMIT 5) sub) AS top_entities`),
       db.raw(`(SELECT json_build_object('confirmed', COUNT(*) FILTER (WHERE status='confirmed'), 'unconfirmed', COUNT(*) FILTER (WHERE status='unconfirmed'), 'total', COUNT(*)) FROM entity_cross_refs WHERE source_event_id = e.id) AS cross_ref_summary`),
@@ -168,7 +169,12 @@ export const DiaryEventModel = {
   async findById(id: string) {
     return db(TABLE + ' as e')
       .join('diary_sources as s', 'e.source_id', 's.id')
-      .select('e.*', 's.name as source_name', 's.color as source_color')
+      .select(
+        'e.*',
+        's.name as source_name',
+        's.color as source_color',
+        db.raw('(s.reviewed_at IS NOT NULL) as source_reviewed'),
+      )
       .where('e.id', id)
       .first();
   },

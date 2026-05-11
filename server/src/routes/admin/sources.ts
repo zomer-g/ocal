@@ -3,6 +3,7 @@ import { db } from '../../config/database.js';
 import { extractEntitiesForSource } from '../../services/entityExtractor.js';
 import { findMatchesForSource } from '../../services/eventMatcher.js';
 import { logger } from '../../utils/logger.js';
+import { requireRole } from '../../middleware/auth.js';
 
 export const adminSourcesRouter = Router();
 
@@ -83,8 +84,42 @@ adminSourcesRouter.patch('/:id', async (req, res, next) => {
   }
 });
 
+// POST /api/admin/sources/:id/review — mark reviewed
+adminSourcesRouter.post('/:id/review', async (req, res, next) => {
+  try {
+    const notes = typeof req.body?.notes === 'string' ? req.body.notes : null;
+    const [row] = await db('diary_sources')
+      .where({ id: req.params.id })
+      .update({
+        reviewed_at: new Date(),
+        reviewed_by: req.adminUser?.id ?? null,
+        review_notes: notes,
+        updated_at: new Date(),
+      })
+      .returning(['id', 'reviewed_at', 'reviewed_by', 'review_notes']);
+    if (!row) { res.status(404).json({ error: 'Source not found' }); return; }
+    res.json(row);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/sources/:id/unreview
+adminSourcesRouter.post('/:id/unreview', async (req, res, next) => {
+  try {
+    const [row] = await db('diary_sources')
+      .where({ id: req.params.id })
+      .update({ reviewed_at: null, reviewed_by: null, review_notes: null, updated_at: new Date() })
+      .returning(['id']);
+    if (!row) { res.status(404).json({ error: 'Source not found' }); return; }
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // DELETE /api/admin/sources/:id — delete source and all its events
-adminSourcesRouter.delete('/:id', async (req, res, next) => {
+adminSourcesRouter.delete('/:id', requireRole('admin'), async (req, res, next) => {
   try {
     const source = await db('diary_sources').where({ id: req.params.id }).first();
     if (!source) {

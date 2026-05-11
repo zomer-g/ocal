@@ -15,6 +15,11 @@ import { EntitiesPage } from '@/pages/admin/EntitiesPage';
 import { AutomationPage } from '@/pages/admin/AutomationPage';
 import { ManualImportPage } from '@/pages/admin/ManualImportPage';
 import { ExpenseImportsPage } from '@/pages/admin/ExpenseImportsPage';
+import { UsersPage } from '@/pages/admin/UsersPage';
+import { CoiImportsPage } from '@/pages/admin/CoiImportsPage';
+import { CoiArrangementsPage } from '@/pages/admin/CoiArrangementsPage';
+import { CoiArrangementDetailPage } from '@/pages/admin/CoiArrangementDetailPage';
+import { DocumentsPage } from '@/pages/admin/DocumentsPage';
 
 export default function App() {
   return (
@@ -41,6 +46,11 @@ export default function App() {
         <Route path="manual-import" element={<ManualImportPage />} />
         <Route path="manual-import/:uploadId" element={<ManualImportPage />} />
         <Route path="expense-imports" element={<ExpenseImportsPage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="coi-imports" element={<CoiImportsPage />} />
+        <Route path="coi-arrangements" element={<CoiArrangementsPage />} />
+        <Route path="coi-arrangements/:id" element={<CoiArrangementDetailPage />} />
+        <Route path="documents" element={<DocumentsPage />} />
         {/* Redirects from old routes */}
         <Route path="people" element={<Navigate to="/admin/entities" replace />} />
         <Route path="organizations" element={<Navigate to="/admin/entities" replace />} />

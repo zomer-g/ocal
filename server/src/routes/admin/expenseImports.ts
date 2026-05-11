@@ -17,6 +17,9 @@ import {
   commitImport,
   UnsupportedSchemaError,
 } from '../../services/expenseImporter.js';
+import { requireRole } from '../../middleware/auth.js';
+import { z } from 'zod';
+import { validate } from '../../middleware/validate.js';
 
 export const adminExpenseImportsRouter = Router();
 
@@ -134,7 +137,41 @@ adminExpenseImportsRouter.get('/:id', async (req, res, next) => {
 // ──────────────────────────────────────────────
 // DELETE /:id — cascade deletes mk_expenses rows
 // ──────────────────────────────────────────────
-adminExpenseImportsRouter.delete('/:id', async (req, res, next) => {
+// ── POST /:id/review and /:id/unreview ──────────────────────────
+const reviewSchema = z.object({ notes: z.string().optional() });
+
+adminExpenseImportsRouter.post('/:id/review', validate(reviewSchema, 'body'), async (req, res, next) => {
+  try {
+    const body = req.body as z.infer<typeof reviewSchema>;
+    const [row] = await db('mk_expense_imports')
+      .where({ id: req.params.id })
+      .update({
+        reviewed_at: new Date(),
+        reviewed_by: req.adminUser?.id ?? null,
+        review_notes: body.notes ?? null,
+      })
+      .returning(['id', 'reviewed_at', 'reviewed_by', 'review_notes']);
+    if (!row) { res.status(404).json({ error: 'Import not found' }); return; }
+    res.json(row);
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminExpenseImportsRouter.post('/:id/unreview', async (req, res, next) => {
+  try {
+    const [row] = await db('mk_expense_imports')
+      .where({ id: req.params.id })
+      .update({ reviewed_at: null, reviewed_by: null, review_notes: null })
+      .returning(['id']);
+    if (!row) { res.status(404).json({ error: 'Import not found' }); return; }
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminExpenseImportsRouter.delete('/:id', requireRole('admin'), async (req, res, next) => {
   try {
     const deleted = await db('mk_expense_imports').where({ id: req.params.id }).del();
     if (!deleted) {

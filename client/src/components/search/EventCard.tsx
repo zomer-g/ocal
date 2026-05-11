@@ -7,6 +7,7 @@ import { getEventEntities, getEventMatches, getEventCrossRefs } from '@/api/even
 import { formatTime } from '@/lib/formatters';
 import { useCalendarStore } from '@/stores/calendarStore';
 import { useFilterStore } from '@/stores/filterStore';
+import { ReviewedBadge } from '@/components/shared/ReviewedBadge';
 
 interface EventCardProps {
   event: DiaryEvent;
@@ -105,6 +106,7 @@ export function EventCard({ event }: EventCardProps) {
                 >
                   {event.source_name}
                 </span>
+                <ReviewedBadge reviewed={event.source_reviewed} />
               </div>
             )}
 

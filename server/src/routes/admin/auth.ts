@@ -106,9 +106,11 @@ authRouter.get('/google/callback', async (req, res) => {
       return;
     }
 
-    // Issue JWT (7 days)
+    // Issue JWT (7 days) — include role so middleware can gate without
+    // a DB lookup on every request (though it still does one for the
+    // is_active check; the claim is informational/audit-friendly).
     const token = jwt.sign(
-      { sub: user.id, email: user.email },
+      { sub: user.id, email: user.email, role: user.role ?? 'admin' },
       authConfig.jwtSecret,
       { expiresIn: 7 * 24 * 60 * 60 }
     );
@@ -146,7 +148,7 @@ authRouter.get('/me', async (req, res) => {
     const payload = jwt.verify(token, authConfig.jwtSecret) as { sub: string; email: string };
     const user = await db('admin_users')
       .where({ id: payload.sub, is_active: true })
-      .select('id', 'email', 'name', 'picture_url')
+      .select('id', 'email', 'name', 'picture_url', 'role')
       .first();
 
     if (!user) {
@@ -154,7 +156,9 @@ authRouter.get('/me', async (req, res) => {
       return;
     }
 
-    res.json({ user });
+    // Normalize: rows from before migration 025 (or freshly inserted before
+    // a default takes effect) may have NULL role — treat as 'admin'.
+    res.json({ user: { ...user, role: user.role ?? 'admin' } });
   } catch {
     res.status(401).json({ user: null });
   }

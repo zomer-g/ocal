@@ -35,6 +35,9 @@ export interface DiaryEvent {
   match_group_id?: string | null;
   source_name?: string;
   source_color?: string;
+  /** True when the source document (diary_source) has been marked reviewed
+   * by a content manager. Surfaces as a ✓ נבדק badge on the card. */
+  source_reviewed?: boolean;
   match_count?: number | null;
   other_fields?: Record<string, unknown> | null;
   top_entities?: Array<{ name: string; type: string }> | null;

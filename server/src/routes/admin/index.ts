@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAdmin } from '../../middleware/auth.js';
+import { requireRole, requireAdminOrContentManager } from '../../middleware/auth.js';
 import { adminApiLimiter } from '../../middleware/rateLimiter.js';
 import { authRouter } from './auth.js';
 import { adminSourcesRouter } from './sources.js';
@@ -14,25 +14,43 @@ import { adminContentRouter } from './content.js';
 import { adminAutomationRouter } from './automation.js';
 import { adminManualUploadsRouter } from './manualUploads.js';
 import { adminExpenseImportsRouter } from './expenseImports.js';
+import { adminUsersRouter } from './users.js';
+import { adminCoiImportsRouter } from './coiImports.js';
+import { adminCoiArrangementsRouter } from './coiArrangements.js';
+import { adminDocumentsRouter } from './documents.js';
 
 export const adminRoutes = Router();
 
 // Auth routes (no auth required for login flow)
 adminRoutes.use('/auth', authRouter);
 
-// All other admin routes require authentication
+// All other admin routes require authentication + rate limit.
 adminRoutes.use(adminApiLimiter);
-adminRoutes.use(requireAdmin);
 
-adminRoutes.use('/sources', adminSourcesRouter);
-adminRoutes.use('/sync', adminSyncRouter);
-adminRoutes.use('/events', adminEventsRouter);
-adminRoutes.use('/exceptions', adminExceptionsRouter);
-adminRoutes.use('/people', adminPeopleRouter);
-adminRoutes.use('/organizations', adminOrgsRouter);
-adminRoutes.use('/entities', adminEntitiesRouter);
-adminRoutes.use('/export', adminExportRouter);
-adminRoutes.use('/content', adminContentRouter);
-adminRoutes.use('/automation', adminAutomationRouter);
-adminRoutes.use('/manual-uploads', adminManualUploadsRouter);
-adminRoutes.use('/expense-imports', adminExpenseImportsRouter);
+// ── Read + edit + approve — open to admin AND content_manager ─────
+adminRoutes.use('/sources',          requireAdminOrContentManager, adminSourcesRouter);
+adminRoutes.use('/events',           requireAdminOrContentManager, adminEventsRouter);
+adminRoutes.use('/people',           requireAdminOrContentManager, adminPeopleRouter);
+adminRoutes.use('/organizations',    requireAdminOrContentManager, adminOrgsRouter);
+adminRoutes.use('/entities',         requireAdminOrContentManager, adminEntitiesRouter);
+adminRoutes.use('/manual-uploads',   requireAdminOrContentManager, adminManualUploadsRouter);
+adminRoutes.use('/expense-imports',  requireAdminOrContentManager, adminExpenseImportsRouter);
+adminRoutes.use('/coi-imports',      requireAdminOrContentManager, adminCoiImportsRouter);
+adminRoutes.use('/coi-arrangements', requireAdminOrContentManager, adminCoiArrangementsRouter);
+adminRoutes.use('/documents',        requireAdminOrContentManager, adminDocumentsRouter);
+adminRoutes.use('/export',           requireAdminOrContentManager, adminExportRouter);
+
+// ── Destructive / global config — admin only ──────────────────────
+// /sync triggers CKAN imports + resyncs, /automation manages the
+// auto-scan worker, /exceptions persists permanent excludes,
+// /content edits homepage copy, /users manages the admin team.
+adminRoutes.use('/sync',        requireRole('admin'), adminSyncRouter);
+adminRoutes.use('/automation',  requireRole('admin'), adminAutomationRouter);
+adminRoutes.use('/exceptions',  requireRole('admin'), adminExceptionsRouter);
+adminRoutes.use('/content',     requireRole('admin'), adminContentRouter);
+adminRoutes.use('/users',       requireRole('admin'), adminUsersRouter);
+
+// NOTE: per-method gates inside individual routers (e.g. DELETE on
+// manual-uploads is admin-only even though the rest is open to CMs)
+// are applied inline using requireRole('admin') as route-level
+// middleware. See routes/admin/manualUploads.ts:DELETE for the pattern.
