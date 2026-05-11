@@ -15,8 +15,6 @@ import { adminAutomationRouter } from './automation.js';
 import { adminManualUploadsRouter } from './manualUploads.js';
 import { adminExpenseImportsRouter } from './expenseImports.js';
 import { adminUsersRouter } from './users.js';
-import { adminCoiImportsRouter } from './coiImports.js';
-import { adminCoiArrangementsRouter } from './coiArrangements.js';
 import { adminDocumentsRouter } from './documents.js';
 
 export const adminRoutes = Router();
@@ -35,8 +33,6 @@ adminRoutes.use('/organizations',    requireAdminOrContentManager, adminOrgsRout
 adminRoutes.use('/entities',         requireAdminOrContentManager, adminEntitiesRouter);
 adminRoutes.use('/manual-uploads',   requireAdminOrContentManager, adminManualUploadsRouter);
 adminRoutes.use('/expense-imports',  requireAdminOrContentManager, adminExpenseImportsRouter);
-adminRoutes.use('/coi-imports',      requireAdminOrContentManager, adminCoiImportsRouter);
-adminRoutes.use('/coi-arrangements', requireAdminOrContentManager, adminCoiArrangementsRouter);
 adminRoutes.use('/documents',        requireAdminOrContentManager, adminDocumentsRouter);
 adminRoutes.use('/export',           requireAdminOrContentManager, adminExportRouter);
 

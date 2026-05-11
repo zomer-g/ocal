@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare, Tags, Zap, FileUp, Receipt, FileCheck, Files, Users } from 'lucide-react';
+import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare, Tags, Zap, FileUp, Receipt, Files, Users } from 'lucide-react';
 import { useAuth, type AdminUserRole } from '@/hooks/useAuth';
 
 type NavItem = {
@@ -19,7 +19,6 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/admin/sync', label: 'ייבוא', icon: Download, exact: false, allowedRoles: ['admin'] },
   { path: '/admin/manual-import', label: 'ייבוא PDF', icon: FileUp, exact: false },
   { path: '/admin/expense-imports', label: 'הוצאות ח"כ', icon: Receipt, exact: false },
-  { path: '/admin/coi-imports', label: 'ניגוד עניינים', icon: FileCheck, exact: false },
   { path: '/admin/sources', label: 'מקורות', icon: Database, exact: false },
   { path: '/admin/entities', label: 'ישויות', icon: Tags, exact: false },
   { path: '/admin/content', label: 'תוכן', icon: PenSquare, exact: false, allowedRoles: ['admin'] },

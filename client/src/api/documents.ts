@@ -3,10 +3,9 @@ import { api } from './client';
 export type DocumentKind =
   | 'manual_diary_upload'
   | 'mk_expense_import'
-  | 'diary_source'
-  | 'coi_arrangement';
+  | 'diary_source';
 
-export type DocumentOrigin = 'odata' | 'gov_il_zip' | 'ckan' | 'manual_upload';
+export type DocumentOrigin = 'ckan' | 'manual_upload';
 
 export interface AdminDocumentRow {
   kind: DocumentKind;

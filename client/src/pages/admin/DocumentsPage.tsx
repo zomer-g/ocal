@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Files, Search, FileUp, Receipt, FileCheck, Database } from 'lucide-react';
+import { Files, Search, FileUp, Receipt, Database } from 'lucide-react';
 import { listDocuments, type DocumentKind, type DocumentOrigin } from '@/api/documents';
 import { ReviewedBadge } from '@/components/shared/ReviewedBadge';
 
@@ -9,19 +9,15 @@ const KIND_LABEL: Record<DocumentKind, string> = {
   manual_diary_upload: 'יומן PDF',
   mk_expense_import: 'הוצאות ח"כ',
   diary_source: 'יומן CKAN',
-  coi_arrangement: 'הסדר ניגוד עניינים',
 };
 
 const KIND_ICON: Record<DocumentKind, typeof Files> = {
   manual_diary_upload: FileUp,
   mk_expense_import: Receipt,
   diary_source: Database,
-  coi_arrangement: FileCheck,
 };
 
 const ORIGIN_LABEL: Record<DocumentOrigin, string> = {
-  odata: 'ODATA',
-  gov_il_zip: 'GOV.IL ZIP',
   ckan: 'CKAN',
   manual_upload: 'הועלה ידנית',
 };
@@ -31,7 +27,6 @@ function detailPath(kind: DocumentKind, id: string): string {
     case 'manual_diary_upload': return `/admin/manual-import/${id}`;
     case 'mk_expense_import':   return `/admin/expense-imports`; // history is on the page, no dedicated detail route yet
     case 'diary_source':        return `/admin/sources?highlight=${id}`;
-    case 'coi_arrangement':     return `/admin/coi-arrangements/${id}`;
   }
 }
 
@@ -73,7 +68,7 @@ export function DocumentsPage() {
       <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs text-gray-500">סוג:</span>
-          {(['all', 'manual_diary_upload', 'mk_expense_import', 'diary_source', 'coi_arrangement'] as const).map((k) => (
+          {(['all', 'manual_diary_upload', 'mk_expense_import', 'diary_source'] as const).map((k) => (
             <button
               key={k}
               type="button"
@@ -90,7 +85,7 @@ export function DocumentsPage() {
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs text-gray-500">מקור:</span>
-          {(['all', 'odata', 'gov_il_zip', 'ckan', 'manual_upload'] as const).map((o) => (
+          {(['all', 'ckan', 'manual_upload'] as const).map((o) => (
             <button
               key={o}
               type="button"

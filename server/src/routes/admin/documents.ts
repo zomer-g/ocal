@@ -18,16 +18,15 @@ export const adminDocumentsRouter = Router();
 export type DocumentKind =
   | 'manual_diary_upload'
   | 'mk_expense_import'
-  | 'diary_source'
-  | 'coi_arrangement';
+  | 'diary_source';
 
-export type DocumentOrigin = 'odata' | 'gov_il_zip' | 'ckan' | 'manual_upload' | null;
+export type DocumentOrigin = 'ckan' | 'manual_upload' | null;
 
 const listSchema = z.object({
   kind: z.enum([
-    'manual_diary_upload', 'mk_expense_import', 'diary_source', 'coi_arrangement',
+    'manual_diary_upload', 'mk_expense_import', 'diary_source',
   ]).optional(),
-  origin: z.enum(['odata', 'gov_il_zip', 'ckan', 'manual_upload']).optional(),
+  origin: z.enum(['ckan', 'manual_upload']).optional(),
   reviewed: z.enum(['true', 'false']).optional(),
   q: z.string().optional(),
   page: z.coerce.number().optional(),
@@ -87,13 +86,6 @@ adminDocumentsRouter.get('/', validate(listSchema, 'query'), async (req, res, ne
           id, name AS title, NULL::integer AS file_size,
           reviewed_at, reviewed_by, created_at
         FROM diary_sources
-        UNION ALL
-        SELECT
-          'coi_arrangement'::text     AS kind,
-          origin,
-          id, title, file_size,
-          reviewed_at, reviewed_by, created_at
-        FROM coi_arrangements
       )
       SELECT d.* FROM d
       ${where}
