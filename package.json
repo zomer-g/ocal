@@ -17,6 +17,7 @@
     "migrate:rollback": "npm run migrate:rollback --workspace=server",
     "migrate:unlock": "npm run migrate:unlock --workspace=server",
     "backfill:search-vectors": "npm run backfill:search-vectors --workspace=server",
+    "drop:coi": "npm run drop:coi --workspace=server",
     "seed": "npm run seed --workspace=server",
     "worker": "npm run worker --workspace=server"
   },

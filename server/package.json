@@ -13,7 +13,8 @@
     "migrate:unlock": "knex --knexfile src/db/knexfile.ts migrate:unlock",
     "migrate:make": "knex --knexfile src/db/knexfile.ts migrate:make",
     "seed": "knex --knexfile src/db/knexfile.ts seed:run",
-    "backfill:search-vectors": "tsx src/scripts/backfill-search-vectors.ts"
+    "backfill:search-vectors": "tsx src/scripts/backfill-search-vectors.ts",
+    "drop:coi": "tsx src/scripts/drop-coi-data.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.0",
