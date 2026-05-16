@@ -13,73 +13,233 @@ interface EndpointDoc {
   example: string;
 }
 
-const ENDPOINTS: EndpointDoc[] = [
+interface EndpointGroup {
+  title: string;
+  endpoints: EndpointDoc[];
+}
+
+const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
-    path: '/api/public/events',
-    description: 'חיפוש אירועים עם סינון, מיון ועימוד',
-    params: [
-      { name: 'q', description: 'חיפוש טקסט חופשי' },
-      { name: 'from_date / to_date', description: 'טווח תאריכים (YYYY-MM-DD)' },
-      { name: 'source_ids', description: 'מזהי מקורות מופרדים בפסיק' },
-      { name: 'entity_names', description: 'שמות ישויות מופרדים ב-|| (למשל: שם1||שם2)' },
-      { name: 'page / per_page', description: 'עימוד (ברירת מחדל: 50)' },
-      { name: 'sort', description: 'date_asc | date_desc | relevance' },
+    title: 'אירועים',
+    endpoints: [
+      {
+        path: '/api/public/events',
+        description: 'חיפוש אירועים עם סינון, מיון ועימוד',
+        params: [
+          { name: 'q', description: 'חיפוש טקסט חופשי' },
+          { name: 'from_date / to_date', description: 'טווח תאריכים (YYYY-MM-DD)' },
+          { name: 'source_ids', description: 'מזהי מקורות מופרדים בפסיק' },
+          { name: 'location', description: 'סינון לפי מיקום' },
+          { name: 'participants', description: 'סינון לפי משתתפים' },
+          { name: 'entity_names', description: 'שמות ישויות מופרדים ב-|| (למשל: שם1||שם2)' },
+          { name: 'cross_ref_status', description: 'סטטוס הצלבה בין יומנים' },
+          { name: 'page / per_page', description: 'עימוד (ברירת מחדל: 50)' },
+          { name: 'sort', description: 'date_asc | date_desc | relevance' },
+        ],
+        example: '/api/public/events?from_date=2024-01-01&per_page=10&sort=date_desc',
+      },
+      {
+        path: '/api/public/events/:id',
+        description: 'פרטי אירוע יחיד לפי מזהה',
+        example: '/api/public/events/EVENT_ID',
+      },
+      {
+        path: '/api/public/events/:id/entities',
+        description: 'ישויות שחולצו מאירוע מסוים (אנשים, ארגונים, מקומות)',
+        example: '/api/public/events/EVENT_ID/entities',
+      },
+      {
+        path: '/api/public/events/:id/cross-refs',
+        description: 'הצלבות של ישויות מהאירוע ליומנים אחרים',
+        example: '/api/public/events/EVENT_ID/cross-refs',
+      },
+      {
+        path: '/api/public/events/:id/matches',
+        description: 'אירועים תואמים שזוהו בין יומנים שונים',
+        example: '/api/public/events/EVENT_ID/matches',
+      },
     ],
-    example: '/api/public/events?from_date=2024-01-01&per_page=10&sort=date_desc',
   },
   {
-    path: '/api/public/sources',
-    description: 'רשימת כל מקורות היומנים הפעילים עם מטא-דאטה',
-    example: '/api/public/sources',
-  },
-  {
-    path: '/api/public/calendar',
-    description: 'אירועים לטווח תאריכים לפי תצוגת לוח שנה',
-    params: [
-      { name: 'date', description: 'תאריך מרכזי (YYYY-MM-DD)' },
-      { name: 'view', description: 'month | week | 4day | day' },
-      { name: 'source_ids', description: 'מזהי מקורות (אופציונלי)' },
-      { name: 'max_date', description: 'תאריך מקסימלי לחיתוך (YYYY-MM-DD)' },
+    title: 'מקורות (יומנים)',
+    endpoints: [
+      {
+        path: '/api/public/sources',
+        description: 'רשימת כל מקורות היומנים הפעילים עם מטא-דאטה',
+        example: '/api/public/sources',
+      },
+      {
+        path: '/api/public/sources/:id',
+        description: 'פרטי מקור יחיד (יומן ספציפי)',
+        example: '/api/public/sources/SOURCE_ID',
+      },
     ],
-    example: '/api/public/calendar?date=2024-06-01&view=month',
   },
   {
-    path: '/api/public/stats',
-    description: 'סטטיסטיקות כלליות — מספר אירועים, מקורות וארגונים',
-    example: '/api/public/stats',
-  },
-  {
-    path: '/api/public/entities',
-    description: 'ישויות שחולצו מהאירועים — אנשים, ארגונות ומקומות',
-    params: [
-      { name: 'source_ids', description: 'סינון לפי מקורות (אופציונלי)' },
-      { name: 'type', description: 'person | organization | place' },
+    title: 'לוח שנה',
+    endpoints: [
+      {
+        path: '/api/public/calendar',
+        description: 'אירועים לטווח תאריכים לפי תצוגת לוח שנה',
+        params: [
+          { name: 'date', description: 'תאריך מרכזי (YYYY-MM-DD)' },
+          { name: 'view', description: 'month | week | 4day | day' },
+          { name: 'source_ids', description: 'מזהי מקורות (אופציונלי)' },
+          { name: 'entity_names', description: 'שמות ישויות מופרדים ב-||' },
+          { name: 'max_date', description: 'תאריך מקסימלי לחיתוך (YYYY-MM-DD)' },
+        ],
+        example: '/api/public/calendar?date=2024-06-01&view=month',
+      },
     ],
-    example: '/api/public/entities?type=person',
   },
   {
-    path: '/api/public/download/source/:id',
-    description: 'הורדת כל אירועי יומן ספציפי (CSV או JSON)',
-    params: [
-      { name: 'format', description: 'csv (ברירת מחדל) | json' },
+    title: 'ישויות',
+    endpoints: [
+      {
+        path: '/api/public/entities',
+        description: 'ישויות שחולצו מהאירועים — אנשים, ארגונים ומקומות',
+        params: [
+          { name: 'source_ids', description: 'סינון לפי מקורות (אופציונלי)' },
+          { name: 'type', description: 'person | organization | place' },
+          { name: 'from_date / to_date', description: 'טווח תאריכים (YYYY-MM-DD)' },
+        ],
+        example: '/api/public/entities?type=person',
+      },
     ],
-    example: '/api/public/download/source/SOURCE_ID?format=csv',
   },
   {
-    path: '/api/public/download/all',
-    description: 'הורדת כל האירועים מכל היומנים הפעילים (CSV או JSON)',
-    params: [
-      { name: 'format', description: 'csv (ברירת מחדל) | json' },
+    title: 'הוצאות חברי-כנסת',
+    endpoints: [
+      {
+        path: '/api/public/expenses',
+        description: 'חיפוש הוצאות חברי-כנסת עם סינון, מיון ועימוד',
+        params: [
+          { name: 'q', description: 'חיפוש טקסט חופשי' },
+          { name: 'from_date / to_date', description: 'טווח תאריכים (YYYY-MM-DD)' },
+          { name: 'person_ids', description: 'מזהי אנשים מופרדים בפסיק' },
+          { name: 'entity_names', description: 'שמות ישויות מופרדים ב-||' },
+          { name: 'category', description: 'סינון לפי קטגוריית הוצאה' },
+          { name: 'page / per_page', description: 'עימוד (ברירת מחדל: 50)' },
+          { name: 'sort', description: 'date_asc | date_desc | amount_asc | amount_desc' },
+        ],
+        example: '/api/public/expenses?from_date=2024-01-01&per_page=10',
+      },
+      {
+        path: '/api/public/expenses/categories',
+        description: 'רשימת קטגוריות ההוצאה האפשריות',
+        example: '/api/public/expenses/categories',
+      },
+      {
+        path: '/api/public/expenses/summary',
+        description: 'סיכומי הוצאות יומיים ולפי אדם',
+        params: [
+          { name: 'from_date / to_date', description: 'טווח תאריכים (YYYY-MM-DD)' },
+          { name: 'person_ids', description: 'מזהי אנשים מופרדים בפסיק' },
+          { name: 'entity_names', description: 'שמות ישויות מופרדים ב-||' },
+        ],
+        example: '/api/public/expenses/summary?from_date=2024-01-01',
+      },
+      {
+        path: '/api/public/expenses/:id',
+        description: 'רשומת הוצאה יחידה לפי מזהה',
+        example: '/api/public/expenses/EXPENSE_ID',
+      },
     ],
-    example: '/api/public/download/all?format=json',
+  },
+  {
+    title: 'סטטיסטיקות',
+    endpoints: [
+      {
+        path: '/api/public/stats',
+        description: 'סטטיסטיקות כלליות — מספר אירועים, מקורות וארגונים',
+        example: '/api/public/stats',
+      },
+    ],
+  },
+  {
+    title: 'תוכן האתר',
+    endpoints: [
+      {
+        path: '/api/public/content',
+        description: 'תוכן האתר המנוהל ב-CMS (header, footer, עמוד אודות)',
+        example: '/api/public/content',
+      },
+    ],
+  },
+  {
+    title: 'הורדות',
+    endpoints: [
+      {
+        path: '/api/public/download/source/:id',
+        description: 'הורדת כל אירועי יומן ספציפי (CSV או JSON)',
+        params: [
+          { name: 'format', description: 'csv (ברירת מחדל) | json' },
+          { name: 'from_date / to_date', description: 'טווח תאריכים (אופציונלי)' },
+        ],
+        example: '/api/public/download/source/SOURCE_ID?format=csv',
+      },
+      {
+        path: '/api/public/download/all',
+        description: 'הורדת כל האירועים מכל היומנים הפעילים (CSV או JSON)',
+        params: [
+          { name: 'format', description: 'csv (ברירת מחדל) | json' },
+          { name: 'from_date / to_date', description: 'טווח תאריכים (אופציונלי)' },
+        ],
+        example: '/api/public/download/all?format=json',
+      },
+    ],
   },
 ];
+
+function EndpointCard({ ep }: { ep: EndpointDoc }) {
+  return (
+    <div
+      className="bg-gray-50 border border-gray-200 rounded-lg p-4"
+      role="listitem"
+    >
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="text-[11px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded shrink-0">
+          GET
+        </span>
+        <code className="text-sm font-mono text-gray-800 min-w-0" style={{ overflowWrap: 'anywhere' }}>
+          {ep.path}
+        </code>
+      </div>
+      <p className="text-sm text-gray-600 mb-2">{ep.description}</p>
+
+      {ep.params && ep.params.length > 0 && (
+        <ul className="text-xs text-gray-500 space-y-1 mb-2">
+          {ep.params.map((p) => (
+            <li key={p.name}>
+              <code className="bg-white border border-gray-200 px-1 py-0.5 rounded text-primary-700">
+                {p.name}
+              </code>
+              {' — '}{p.description}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex items-start gap-2 mt-2">
+        <span className="text-[10px] text-gray-400 mt-0.5 shrink-0">דוגמה:</span>
+        <a
+          href={ep.example}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-mono text-primary-600 hover:underline break-all"
+        >
+          {ep.example}
+        </a>
+      </div>
+    </div>
+  );
+}
 
 function EndpointList() {
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
-    <div className="space-y-3" role="list">
+    <div className="space-y-6">
       <p className="text-sm text-gray-500">
         כל נקודות הקצה פתוחות לציבור ואינן דורשות אימות.
         בסיס ה-URL:{' '}
@@ -88,45 +248,15 @@ function EndpointList() {
         </code>
       </p>
 
-      {ENDPOINTS.map((ep) => (
-        <div
-          key={ep.path}
-          className="bg-gray-50 border border-gray-200 rounded-lg p-4"
-          role="listitem"
-        >
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[11px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded shrink-0">
-              GET
-            </span>
-            <code className="text-sm font-mono text-gray-800 min-w-0" style={{ overflowWrap: 'anywhere' }}>
-              {ep.path}
-            </code>
-          </div>
-          <p className="text-sm text-gray-600 mb-2">{ep.description}</p>
-
-          {ep.params && ep.params.length > 0 && (
-            <ul className="text-xs text-gray-500 space-y-1 mb-2">
-              {ep.params.map((p) => (
-                <li key={p.name}>
-                  <code className="bg-white border border-gray-200 px-1 py-0.5 rounded text-primary-700">
-                    {p.name}
-                  </code>
-                  {' — '}{p.description}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="flex items-start gap-2 mt-2">
-            <span className="text-[10px] text-gray-400 mt-0.5 shrink-0">דוגמה:</span>
-            <a
-              href={ep.example}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs font-mono text-primary-600 hover:underline break-all"
-            >
-              {ep.example}
-            </a>
+      {ENDPOINT_GROUPS.map((group) => (
+        <div key={group.title}>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2 border-b border-gray-200 pb-1">
+            {group.title}
+          </h3>
+          <div className="space-y-3" role="list">
+            {group.endpoints.map((ep) => (
+              <EndpointCard key={ep.path} ep={ep} />
+            ))}
           </div>
         </div>
       ))}
