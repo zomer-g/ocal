@@ -19,8 +19,12 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().default(''),
   DEEPSEEK_API_KEY: z.string().default(''),
   ANTHROPIC_API_KEY: z.string().default(''),
-  ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-5'),
-  OPENAI_VISION_MODEL: z.string().default('gpt-4o'),
+  ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-6'),
+  OPENAI_VISION_MODEL: z.string().default('gpt-4o-2024-11-20'),
+  /** Optional override for the Anthropic `max_tokens` cap on the PDF extractor.
+   *  Leave unset to use the in-code default (16384). Useful when pinning to a
+   *  model with a lower output ceiling. */
+  ANTHROPIC_MAX_TOKENS: z.coerce.number().int().positive().optional(),
   // Dedicated keys for the PDF-extraction feature. Prefer these over the
   // generic *_API_KEY values when set, so the user can keep PDF spend on a
   // separate key from entity extraction. If empty, code falls back to the

@@ -17,7 +17,13 @@ import { z } from 'zod';
 import { db } from '../../config/database.js';
 import { validate } from '../../middleware/validate.js';
 import { logger } from '../../utils/logger.js';
-import { extractDiaryFromPdf, LLMNotConfiguredError, type LLMProvider } from '../../services/llm/index.js';
+import {
+  extractDiaryFromPdf,
+  LLMNotConfiguredError,
+  type LLMProvider,
+  type ExtractMode,
+} from '../../services/llm/index.js';
+import { pdfPageCount } from '../../services/llm/rasterize.js';
 import { extractEntitiesForSource } from '../../services/entityExtractor.js';
 import { requireRole } from '../../middleware/auth.js';
 
@@ -132,12 +138,14 @@ adminManualUploadsRouter.get('/:id/file', async (req, res, next) => {
 const extractQuerySchema = z.object({
   provider: z.enum(['claude', 'gpt4o']),
   page: z.coerce.number().int().min(1).optional(),
+  mode: z.enum(['auto', 'native', 'raster']).default('auto'),
 });
 
 adminManualUploadsRouter.post('/:id/extract', validate(extractQuerySchema, 'query'), async (req, res, next) => {
   try {
     const provider = (req.query.provider as LLMProvider);
     const page = req.query.page ? Number(req.query.page) : undefined;
+    const mode = (req.query.mode as ExtractMode | undefined) ?? 'auto';
     const row = await db('manual_diary_uploads')
       .select('id', 'file_data', 'committed_at')
       .where({ id: req.params.id })
@@ -155,18 +163,22 @@ adminManualUploadsRouter.post('/:id/extract', validate(extractQuerySchema, 'quer
     });
 
     try {
-      const result = await extractDiaryFromPdf(row.file_data, provider, { page });
+      const result = await extractDiaryFromPdf(row.file_data, provider, { page, mode });
       await db('manual_diary_uploads').where({ id: row.id }).update({
         extraction_status: 'completed',
         extraction_result: JSON.stringify(result),
       });
       logger.info(
-        { uploadId: row.id, provider, eventCount: result.events.length, tokens: result.tokens_used },
+        {
+          uploadId: row.id,
+          provider,
+          mode,
+          eventCount: result.events.length,
+          tokens: result.tokens_used,
+          diagnostics: result.diagnostics,
+        },
         'PDF extraction complete',
       );
-      // Surface a text preview so the UI can show *why* an extraction
-      // returned zero events (e.g. LLM said "no readable text") instead of
-      // silently appearing inert.
       const rawText = (result.raw_response as { text?: string } | undefined)?.text;
       res.json({
         provider,
@@ -174,6 +186,7 @@ adminManualUploadsRouter.post('/:id/extract', validate(extractQuerySchema, 'quer
         tokens_used: result.tokens_used,
         event_count: result.events.length,
         raw_text_preview: typeof rawText === 'string' ? rawText.slice(0, 1500) : null,
+        diagnostics: result.diagnostics,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -185,13 +198,170 @@ adminManualUploadsRouter.post('/:id/extract', validate(extractQuerySchema, 'quer
         res.status(503).json({ error: msg });
         return;
       }
-      logger.error({ uploadId: row.id, provider, err: msg }, 'PDF extraction failed');
+      logger.error({ uploadId: row.id, provider, mode, err: msg }, 'PDF extraction failed');
       res.status(502).json({ error: `Extraction failed: ${msg}` });
     }
   } catch (err) {
     next(err);
   }
 });
+
+// ──────────────────────────────────────────────
+// POST /api/admin/manual-uploads/:id/extract-batch
+// SSE-streamed chunked extraction over the full document.
+//
+// Query params: provider, mode, chunk_size (default 5)
+// Streams `progress` events of the form:
+//   { type: 'progress', chunk_index, total_chunks, range, events, diagnostics }
+// followed by one terminal `done` event:
+//   { type: 'done', total_events, chunks_completed, partial_failures }
+// On fatal error, a single `error` event with `{ message }` then close.
+//
+// Partial progress is also persisted into `extraction_result` so a client
+// reconnect / network drop doesn't lose accumulated events.
+// ──────────────────────────────────────────────
+const extractBatchQuerySchema = z.object({
+  provider: z.enum(['claude', 'gpt4o']),
+  mode: z.enum(['auto', 'native', 'raster']).default('auto'),
+  chunk_size: z.coerce.number().int().min(1).max(20).default(5),
+});
+
+adminManualUploadsRouter.post(
+  '/:id/extract-batch',
+  validate(extractBatchQuerySchema, 'query'),
+  async (req, res, next) => {
+    try {
+      const provider = req.query.provider as LLMProvider;
+      const mode = (req.query.mode as ExtractMode | undefined) ?? 'auto';
+      const chunkSize = req.query.chunk_size ? Number(req.query.chunk_size) : 5;
+
+      const row = await db('manual_diary_uploads')
+        .select('id', 'file_data', 'committed_at')
+        .where({ id: req.params.id })
+        .first();
+      if (!row) { res.status(404).json({ error: 'Upload not found' }); return; }
+      if (row.committed_at) {
+        res.status(409).json({ error: 'Upload already committed' });
+        return;
+      }
+
+      const totalPages = await pdfPageCount(row.file_data);
+      const chunks: Array<{ from: number; to: number }> = [];
+      for (let from = 1; from <= totalPages; from += chunkSize) {
+        chunks.push({ from, to: Math.min(from + chunkSize - 1, totalPages) });
+      }
+
+      // SSE headers
+      res.set({
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      });
+      res.flushHeaders?.();
+
+      const send = (data: unknown) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+
+      await db('manual_diary_uploads').where({ id: row.id }).update({
+        extraction_status: 'running',
+        extraction_provider: provider,
+        extraction_error: null,
+      });
+
+      const aggregateEvents: unknown[] = [];
+      const partialFailures: Array<{ chunk_index: number; range: { from: number; to: number }; error: string }> = [];
+      let lastDiagnostics: unknown = null;
+
+      send({ type: 'init', total_pages: totalPages, total_chunks: chunks.length, chunk_size: chunkSize });
+
+      for (let i = 0; i < chunks.length; i++) {
+        const range = chunks[i];
+        try {
+          const result = await extractDiaryFromPdf(row.file_data, provider, { range, mode });
+          aggregateEvents.push(...result.events);
+          lastDiagnostics = result.diagnostics;
+          send({
+            type: 'progress',
+            chunk_index: i,
+            total_chunks: chunks.length,
+            range,
+            events: result.events,
+            tokens_used: result.tokens_used,
+            diagnostics: result.diagnostics,
+          });
+
+          // Persist partial progress
+          await db('manual_diary_uploads').where({ id: row.id }).update({
+            extraction_result: JSON.stringify({
+              events: aggregateEvents,
+              provider,
+              mode,
+              partial: i < chunks.length - 1,
+              last_chunk_index: i,
+              total_chunks: chunks.length,
+              partial_failures: partialFailures,
+              last_diagnostics: lastDiagnostics,
+            }),
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          partialFailures.push({ chunk_index: i, range, error: msg });
+          send({
+            type: 'chunk_error',
+            chunk_index: i,
+            total_chunks: chunks.length,
+            range,
+            error: msg,
+          });
+          if (err instanceof LLMNotConfiguredError) {
+            await db('manual_diary_uploads').where({ id: row.id }).update({
+              extraction_status: 'failed',
+              extraction_error: msg,
+            });
+            send({ type: 'error', message: msg });
+            res.end();
+            return;
+          }
+          // continue with next chunk
+        }
+      }
+
+      await db('manual_diary_uploads').where({ id: row.id }).update({
+        extraction_status: 'completed',
+        extraction_result: JSON.stringify({
+          events: aggregateEvents,
+          provider,
+          mode,
+          partial: false,
+          last_chunk_index: chunks.length - 1,
+          total_chunks: chunks.length,
+          partial_failures: partialFailures,
+          last_diagnostics: lastDiagnostics,
+        }),
+      });
+
+      send({
+        type: 'done',
+        total_events: aggregateEvents.length,
+        chunks_completed: chunks.length - partialFailures.length,
+        partial_failures: partialFailures,
+      });
+      res.end();
+    } catch (err) {
+      // Pre-stream error — fall back to JSON
+      if (!res.headersSent) return next(err);
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error({ err: msg }, 'extract-batch fatal error mid-stream');
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: msg })}\n\n`);
+      } finally {
+        res.end();
+      }
+    }
+  },
+);
 
 // ──────────────────────────────────────────────
 // PATCH /api/admin/manual-uploads/:id/draft-events — autosave

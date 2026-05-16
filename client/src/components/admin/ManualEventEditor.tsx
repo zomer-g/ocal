@@ -7,11 +7,14 @@ import {
 import {
   saveDraftEvents,
   extractFromPdf,
+  extractBatchStream,
   commitManualUpload,
   type DraftEvent,
   type ExtractResponse,
+  type ExtractMode,
   type LLMProvider,
   type ManualUpload,
+  type BatchProgressEvent,
 } from '@/api/manualUploads';
 import { getAdminSources, getPeople } from '@/api/admin';
 import {
@@ -136,7 +139,17 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
   const queryClient = useQueryClient();
   const [events, setEvents] = useState<DraftEvent[]>(upload.draft_events ?? []);
   const [selectedProvider, setSelectedProvider] = useState<LLMProvider>('claude');
+  const [selectedMode, setSelectedMode] = useState<ExtractMode>('auto');
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
+  const [batchProgress, setBatchProgress] = useState<{
+    total_chunks: number;
+    chunks_completed: number;
+    current_range?: { from: number; to: number };
+    total_pages?: number;
+    failures: number;
+  } | null>(null);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const batchAbortRef = useRef<AbortController | null>(null);
   const [viewDate, setViewDate] = useState<Date>(() => {
     // If existing events, anchor view on the earliest event's date
     const first = (upload.draft_events ?? []).find((e) => e.start_time);
@@ -203,8 +216,8 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
   }, [events, upload.id]);
 
   const extractMutation = useMutation({
-    mutationFn: (params: { provider: LLMProvider; page?: number }) =>
-      extractFromPdf(upload.id, params.provider, params.page),
+    mutationFn: (params: { provider: LLMProvider; page?: number; mode?: ExtractMode }) =>
+      extractFromPdf(upload.id, params.provider, { page: params.page, mode: params.mode }),
     onSuccess: (resp) => {
       setLastExtraction(resp);
       setShowRawText(false);
@@ -225,6 +238,89 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
       setError(`חילוץ נכשל: ${err.message}`);
     },
   });
+
+  const startBatchExtraction = useCallback(async () => {
+    if (batchRunning) return;
+    const abort = new AbortController();
+    batchAbortRef.current = abort;
+    setBatchRunning(true);
+    setBatchProgress({ total_chunks: 0, chunks_completed: 0, failures: 0 });
+    setError('');
+    setLastExtraction(null);
+    try {
+      let failures = 0;
+      let totalChunks = 0;
+      let totalPages: number | undefined;
+      let chunksCompleted = 0;
+      let lastDiagnostics: BatchProgressEvent['diagnostics'];
+      let lastRawTextPreview: string | null = null;
+      let aggregateEventCount = 0;
+
+      await extractBatchStream(
+        upload.id,
+        { provider: selectedProvider, mode: selectedMode, chunk_size: 5 },
+        (ev) => {
+          if (ev.type === 'init') {
+            totalChunks = ev.total_chunks ?? 0;
+            totalPages = ev.total_pages;
+            setBatchProgress({
+              total_chunks: totalChunks,
+              chunks_completed: 0,
+              total_pages: totalPages,
+              failures: 0,
+            });
+          } else if (ev.type === 'progress' && ev.events) {
+            chunksCompleted += 1;
+            lastDiagnostics = ev.diagnostics ?? lastDiagnostics;
+            aggregateEventCount += ev.events.length;
+            const tagged = ev.events.map((e) => ({ ...e, provider: selectedProvider }));
+            setEvents((prev) => [...prev, ...tagged]);
+            setBatchProgress({
+              total_chunks: totalChunks,
+              chunks_completed: chunksCompleted,
+              current_range: ev.range,
+              total_pages: totalPages,
+              failures,
+            });
+            const earliest = tagged
+              .map((e) => parseDateKey(dateKeyOf(e.start_time)))
+              .filter((d): d is Date => !!d)
+              .sort((a, b) => a.getTime() - b.getTime())[0];
+            if (earliest) setViewDate(earliest);
+          } else if (ev.type === 'chunk_error') {
+            failures += 1;
+            chunksCompleted += 1;
+            setBatchProgress({
+              total_chunks: totalChunks,
+              chunks_completed: chunksCompleted,
+              current_range: ev.range,
+              total_pages: totalPages,
+              failures,
+            });
+          } else if (ev.type === 'done') {
+            setLastExtraction({
+              provider: selectedProvider,
+              events: [],
+              event_count: aggregateEventCount,
+              raw_text_preview: lastRawTextPreview,
+              diagnostics: lastDiagnostics,
+            });
+          } else if (ev.type === 'error') {
+            setError(`חילוץ ב-batch נכשל: ${ev.message ?? 'unknown'}`);
+          }
+        },
+        abort.signal,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg !== 'AbortError' && !msg.toLowerCase().includes('abort')) {
+        setError(`חילוץ ב-batch נכשל: ${msg}`);
+      }
+    } finally {
+      setBatchRunning(false);
+      batchAbortRef.current = null;
+    }
+  }, [batchRunning, upload.id, selectedProvider, selectedMode]);
 
   const commitMutation = useMutation({
     mutationFn: () =>
@@ -313,7 +409,7 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
     <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 overflow-hidden">
       {/* Toolbar */}
       <div className="flex flex-col gap-2 p-3 bg-gray-50 border-b border-gray-200 shrink-0">
-        {/* Extraction controls — provider + scoped/full extraction */}
+        {/* Extraction controls — provider + mode + scoped/full extraction */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             <select
@@ -321,31 +417,53 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
               onChange={(e) => setSelectedProvider(e.target.value as LLMProvider)}
               className="text-sm border border-gray-300 rounded px-2 py-1 bg-white"
               dir="rtl"
-              disabled={isCommitted}
+              disabled={isCommitted || batchRunning}
             >
               <option value="claude">Claude (PDF native)</option>
               <option value="gpt4o">GPT-4o (vision)</option>
             </select>
+            <select
+              value={selectedMode}
+              onChange={(e) => setSelectedMode(e.target.value as ExtractMode)}
+              className="text-sm border border-gray-300 rounded px-2 py-1 bg-white"
+              dir="rtl"
+              disabled={isCommitted || batchRunning}
+              title="auto: זיהוי אוטומטי | מקור: PDF גולמי | תמונה: רסטריזציה (מומלץ לסריקות)"
+            >
+              <option value="auto">אוטומטי</option>
+              <option value="native">מקור (PDF)</option>
+              <option value="raster">תמונה (סריקה)</option>
+            </select>
             <button
               type="button"
-              onClick={() => extractMutation.mutate({ provider: selectedProvider, page: currentPdfPage })}
-              disabled={extractMutation.isPending || isCommitted || !currentPdfPage}
+              onClick={() => extractMutation.mutate({ provider: selectedProvider, page: currentPdfPage, mode: selectedMode })}
+              disabled={extractMutation.isPending || isCommitted || !currentPdfPage || batchRunning}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary-700 text-white rounded hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed"
               title="שלח רק את העמוד המוצג כעת ל-LLM"
             >
               {extractMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               קטלג עמוד {currentPdfPage > 0 ? currentPdfPage : ''}
             </button>
-            <button
-              type="button"
-              onClick={() => extractMutation.mutate({ provider: selectedProvider })}
-              disabled={extractMutation.isPending || isCommitted}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary-100 text-primary-800 border border-primary-300 rounded hover:bg-primary-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="שלח את כל הקובץ ל-LLM (יקר יותר ועלול לקחת זמן)"
-            >
-              <Sparkles className="w-4 h-4" />
-              קטלג את כל הקובץ
-            </button>
+            {!batchRunning ? (
+              <button
+                type="button"
+                onClick={() => startBatchExtraction()}
+                disabled={extractMutation.isPending || isCommitted}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary-100 text-primary-800 border border-primary-300 rounded hover:bg-primary-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="חלוקה לקבוצות של ~5 עמודים, התקדמות חיה, ושמירת ביניים"
+              >
+                <Sparkles className="w-4 h-4" />
+                קטלג את כל הקובץ
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => batchAbortRef.current?.abort()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-red-100 text-red-800 border border-red-300 rounded hover:bg-red-200"
+              >
+                עצור חילוץ
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -353,6 +471,24 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
             {saveStatus === 'saved' && <span className="inline-flex items-center gap-1 text-green-600"><CheckCircle2 className="w-3 h-3" />נשמר</span>}
           </div>
         </div>
+
+        {batchProgress && (
+          <div className="text-xs bg-blue-50 border border-blue-200 rounded px-2 py-1.5 text-blue-900 flex items-center gap-2 flex-wrap">
+            <Loader2 className={`w-3.5 h-3.5 ${batchRunning ? 'animate-spin' : ''}`} />
+            <span>
+              חלוקה: {batchProgress.chunks_completed}/{batchProgress.total_chunks}
+              {batchProgress.current_range && ` · עמודים ${batchProgress.current_range.from}–${batchProgress.current_range.to}`}
+              {batchProgress.total_pages && ` · מתוך ${batchProgress.total_pages} עמודים`}
+              {batchProgress.failures > 0 && ` · ${batchProgress.failures} כשלי-קטע`}
+            </span>
+            <div className="flex-1 min-w-[120px] h-1.5 bg-blue-100 rounded overflow-hidden">
+              <div
+                className="h-full bg-blue-500 transition-all"
+                style={{ width: `${Math.round((batchProgress.chunks_completed / Math.max(1, batchProgress.total_chunks)) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* View mode + date pager.
             Layout: [view-mode pills] ··· [today] [←] [date-input] [→] [Hebrew label]
@@ -429,51 +565,106 @@ export function ManualEventEditor({ upload, currentPdfPage, onCommitted }: Props
       </div>
 
       {/* Extraction status banner */}
-      {lastExtraction && (
-        <div
-          className={`px-3 py-2 text-sm border-b ${
-            lastExtraction.event_count > 0
-              ? 'bg-blue-50 border-blue-200 text-blue-900'
-              : 'bg-amber-50 border-amber-200 text-amber-900'
-          }`}
-        >
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <strong>{lastExtraction.provider === 'claude' ? 'Claude' : 'GPT-4o'}:</strong>{' '}
-              {lastExtraction.event_count > 0
-                ? `חולצו ${lastExtraction.event_count} אירועים והוספו לרשימה.`
-                : 'לא חולצו אירועים. ייתכן שהמודל לא הצליח לקרוא את הקובץ או שהפלט אינו בפורמט הנדרש.'}
-              {typeof lastExtraction.tokens_used === 'number' && (
-                <span className="text-xs text-gray-500 mx-2">({lastExtraction.tokens_used} tokens)</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {lastExtraction.raw_text_preview && (
+      {lastExtraction && (() => {
+        const d = lastExtraction.diagnostics;
+        const zero = lastExtraction.event_count === 0;
+        const truncated = !!d?.truncated;
+        const pageLimited = !!d?.page_limited;
+        const showRawByDefault = zero;
+        const showRawNow = showRawByDefault || showRawText;
+        return (
+          <div
+            className={`px-3 py-2 text-sm border-b ${
+              zero ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-blue-50 border-blue-200 text-blue-900'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <strong>{lastExtraction.provider === 'claude' ? 'Claude' : 'GPT-4o'}:</strong>{' '}
+                {zero
+                  ? 'לא חולצו אירועים. ייתכן שהמודל לא הצליח לקרוא את הקובץ.'
+                  : `חולצו ${lastExtraction.event_count} אירועים והוספו לרשימה.`}
+                {typeof lastExtraction.tokens_used === 'number' && (
+                  <span className="text-xs text-gray-500 mx-2">({lastExtraction.tokens_used} tokens)</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {lastExtraction.raw_text_preview && !showRawByDefault && (
+                  <button
+                    type="button"
+                    onClick={() => setShowRawText((v) => !v)}
+                    className="text-xs underline hover:no-underline"
+                  >
+                    {showRawText ? 'הסתר תשובת מודל' : 'הצג תשובת מודל'}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setShowRawText((v) => !v)}
-                  className="text-xs underline hover:no-underline"
+                  onClick={() => setLastExtraction(null)}
+                  className="text-xs opacity-60 hover:opacity-100"
+                  aria-label="סגור"
                 >
-                  {showRawText ? 'הסתר תשובת מודל' : 'הצג תשובת מודל'}
+                  ✕
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setLastExtraction(null)}
-                className="text-xs opacity-60 hover:opacity-100"
-                aria-label="סגור"
-              >
-                ✕
-              </button>
+              </div>
             </div>
+
+            {d && (
+              <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
+                <span className="px-1.5 py-0.5 rounded border bg-white">
+                  נתיב: {d.used_path === 'raster' ? 'תמונה' : 'מקור'}
+                </span>
+                {d.text_layer_detected !== null && (
+                  <span className="px-1.5 py-0.5 rounded border bg-white">
+                    שכבת טקסט: {d.text_layer_detected ? 'נמצאה' : 'לא נמצאה (סריקה)'}
+                  </span>
+                )}
+                {d.stop_reason && (
+                  <span className="px-1.5 py-0.5 rounded border bg-white">
+                    stop_reason: <code dir="ltr">{d.stop_reason}</code>
+                  </span>
+                )}
+                {d.sent_pages && d.sent_pages.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded border bg-white">
+                    עמודים שנשלחו: {d.sent_pages.join(', ')}
+                  </span>
+                )}
+                {d.tool_use_succeeded === false && (
+                  <span className="px-1.5 py-0.5 rounded border bg-yellow-100 border-yellow-300 text-yellow-900">
+                    fallback ל-text parsing
+                  </span>
+                )}
+              </div>
+            )}
+
+            {zero && d?.used_path === 'native' && (
+              <div className="mt-2 text-[12px] bg-white border border-amber-300 rounded px-2 py-1.5">
+                ⓘ אם זה קובץ סרוק — נסה לעבור למצב <strong>"תמונה (סריקה)"</strong> שמפעיל רסטריזציה ויעיל יותר על סריקות עברית.
+              </div>
+            )}
+
+            {truncated && (
+              <div className="mt-2 text-[12px] bg-red-50 border border-red-300 text-red-900 rounded px-2 py-1.5">
+                ⚠ הפלט נחתך (max_tokens). נסה לחלץ עמוד יחיד או הקטן את הטווח.
+              </div>
+            )}
+            {pageLimited && (
+              <div className="mt-2 text-[12px] bg-yellow-50 border border-yellow-300 text-yellow-900 rounded px-2 py-1.5">
+                ⚠ נשלח רק חלק מהקובץ (חריגה ממכסת העמודים לקריאה אחת). השתמש ב"קטלג את כל הקובץ" שמחלק לקבוצות.
+              </div>
+            )}
+
+            {showRawNow && lastExtraction.raw_text_preview && (
+              <pre
+                className="mt-2 max-h-48 overflow-auto bg-white border border-gray-200 rounded p-2 text-[11px] whitespace-pre-wrap"
+                dir="ltr"
+              >
+                {lastExtraction.raw_text_preview}
+              </pre>
+            )}
           </div>
-          {showRawText && lastExtraction.raw_text_preview && (
-            <pre className="mt-2 max-h-48 overflow-auto bg-white border border-gray-200 rounded p-2 text-[11px] whitespace-pre-wrap" dir="ltr">
-              {lastExtraction.raw_text_preview}
-            </pre>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* Body — view-mode specific */}
       <div className="flex-1 overflow-auto">
