@@ -12,7 +12,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': {
+      // Match /api/<anything> but NOT bare /api so the frontend can own the /api docs route.
+      '^/api/.+': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },

@@ -6,6 +6,7 @@ import { SearchPage } from '@/pages/SearchPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { AboutPage } from '@/pages/AboutPage';
 import { DiariesPage } from '@/pages/DiariesPage';
+import { ApiPage } from '@/pages/ApiPage';
 import { LoginPage } from '@/pages/admin/LoginPage';
 import { DashboardPage } from '@/pages/admin/DashboardPage';
 import { SyncPage } from '@/pages/admin/SyncPage';
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/" element={<SearchPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/diaries" element={<DiariesPage />} />
+        <Route path="/api" element={<ApiPage />} />
         <Route path="/about" element={<AboutPage />} />
       </Route>
 
