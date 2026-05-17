@@ -49,6 +49,9 @@ app.get('/.well-known/oauth-authorization-server/mcp', mcpCors, authorizationSer
 
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
+// OAuth 2.0 RFC 6749 §4.1.3: the /token endpoint MUST accept
+// application/x-www-form-urlencoded bodies. Mounted globally; tiny payloads.
+app.use(express.urlencoded({ extended: false, limit: '64kb' }));
 app.use(cookieParser());
 
 // Health check
