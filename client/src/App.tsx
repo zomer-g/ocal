@@ -17,6 +17,7 @@ import { AutomationPage } from '@/pages/admin/AutomationPage';
 import { ManualImportPage } from '@/pages/admin/ManualImportPage';
 import { ExpenseImportsPage } from '@/pages/admin/ExpenseImportsPage';
 import { UsersPage } from '@/pages/admin/UsersPage';
+import { McpUsersPage } from '@/pages/admin/McpUsersPage';
 import { DocumentsPage } from '@/pages/admin/DocumentsPage';
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="manual-import/:uploadId" element={<ManualImportPage />} />
         <Route path="expense-imports" element={<ExpenseImportsPage />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="mcp-users" element={<McpUsersPage />} />
         <Route path="documents" element={<DocumentsPage />} />
         {/* Redirects from old routes */}
         <Route path="people" element={<Navigate to="/admin/entities" replace />} />

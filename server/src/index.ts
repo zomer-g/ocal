@@ -9,7 +9,9 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { globalApiLimiter, publicApiLimiter } from './middleware/rateLimiter.js';
 import { publicRoutes } from './routes/public/index.js';
 import { adminRoutes } from './routes/admin/index.js';
+import { mcpRoutes } from './mcp/routes.js';
 import { startScheduler } from './services/scheduler.js';
+import { startMcpUsageAggregator } from './services/mcpUsageAggregator.js';
 import { warmEntityCache } from './routes/public/entities.js';
 
 const app = express();
@@ -32,6 +34,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', globalApiLimiter);
 app.use('/api/public', publicApiLimiter, publicRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/mcp', mcpRoutes);
 
 // Serve React build in production
 if (env.NODE_ENV === 'production') {
@@ -49,6 +52,7 @@ app.use(errorHandler);
 app.listen(env.PORT, () => {
   logger.info(`Server running on port ${env.PORT}`);
   startScheduler().catch((err) => logger.error({ err }, 'Failed to start auto-import scheduler'));
+  startMcpUsageAggregator();
   warmEntityCache().catch(() => {});
 });
 

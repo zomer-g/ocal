@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare, Tags, Zap, FileUp, Receipt, Files, Users } from 'lucide-react';
+import { Calendar, Database, Download, RefreshCw, Settings, Menu, X, LogOut, PenSquare, Tags, Zap, FileUp, Receipt, Files, Users, Plug } from 'lucide-react';
 import { useAuth, type AdminUserRole } from '@/hooks/useAuth';
 
 type NavItem = {
@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/admin/content', label: 'תוכן', icon: PenSquare, exact: false, allowedRoles: ['admin'] },
   { path: '/admin/automation', label: 'אוטומציה', icon: Zap, exact: false, allowedRoles: ['admin'] },
   { path: '/admin/users', label: 'משתמשים', icon: Users, exact: false, allowedRoles: ['admin'] },
+  { path: '/admin/mcp-users', label: 'MCP API', icon: Plug, exact: false, allowedRoles: ['admin'] },
 ];
 
 export function AdminLayout() {
