@@ -21,6 +21,22 @@ app.set('trust proxy', 1);
 
 // Core middleware
 app.use(helmet({ contentSecurityPolicy: false }));
+
+// MCP is consumed cross-origin by Claude.ai / ChatGPT / MCP Inspector — must
+// run BEFORE the global cors() below, otherwise the global one short-circuits
+// OPTIONS preflight requests with the ocal.org.il-only origin and external
+// clients are blocked. Per-route handler in mcp/routes.ts handles per-method
+// CORS; this layer is here just to intercept the preflight before the global
+// cors() can see it.
+app.use('/mcp', cors({
+  origin: true,
+  credentials: false,
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Mcp-Session-Id', 'Last-Event-Id'],
+  exposedHeaders: ['Mcp-Session-Id', 'WWW-Authenticate'],
+  maxAge: 86400,
+}));
+
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
