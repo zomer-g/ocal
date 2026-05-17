@@ -33,3 +33,26 @@ export const downloadLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many download requests, please try again later' },
 });
+
+// Tight limit on OAuth-bootstrap endpoints. These are unauthenticated by
+// design (anyone can discover metadata or attempt to register a client) so we
+// cap them aggressively to make spam pointless. The real access gate is the
+// email allow-list in /oauth/authorize.
+export const mcpOauthLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'too_many_requests' },
+});
+
+// Limit per IP on authenticated MCP tool calls. We rely on Bearer-token auth
+// + per-user usage tracking for real billing limits; this is just a guardrail
+// against a leaked token being abused.
+export const mcpToolLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'too_many_requests' },
+});

@@ -16,6 +16,8 @@ import { adminManualUploadsRouter } from './manualUploads.js';
 import { adminExpenseImportsRouter } from './expenseImports.js';
 import { adminUsersRouter } from './users.js';
 import { adminDocumentsRouter } from './documents.js';
+import { adminMcpUsersRouter } from './mcpUsers.js';
+import { adminMcpUsageRouter } from './mcpUsage.js';
 
 export const adminRoutes = Router();
 
@@ -45,6 +47,8 @@ adminRoutes.use('/automation',  requireRole('admin'), adminAutomationRouter);
 adminRoutes.use('/exceptions',  requireRole('admin'), adminExceptionsRouter);
 adminRoutes.use('/content',     requireRole('admin'), adminContentRouter);
 adminRoutes.use('/users',       requireRole('admin'), adminUsersRouter);
+adminRoutes.use('/mcp-users',   requireRole('admin'), adminMcpUsersRouter);
+adminRoutes.use('/mcp-usage',   requireRole('admin'), adminMcpUsageRouter);
 
 // NOTE: per-method gates inside individual routers (e.g. DELETE on
 // manual-uploads is admin-only even though the rest is open to CMs)
