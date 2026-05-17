@@ -84,6 +84,14 @@ export async function token(req: Request, res: Response, next: NextFunction): Pr
   try {
     const parsed = tokenBodySchema.safeParse(req.body);
     if (!parsed.success) {
+      logger.warn(
+        {
+          contentType: req.headers['content-type'],
+          bodyKeys: req.body ? Object.keys(req.body) : null,
+          zodIssues: parsed.error.issues,
+        },
+        'MCP /oauth/token: body validation failed',
+      );
       oauthError(res, 400, 'invalid_request', parsed.error.message);
       return;
     }
