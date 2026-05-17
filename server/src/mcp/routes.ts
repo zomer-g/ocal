@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import cors from 'cors';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { protectedResourceMetadata, authorizationServerMetadata } from './oauth/metadata.js';
 import { authorize, googleCallback } from './oauth/authorize.js';
@@ -10,6 +11,24 @@ import { buildMcpServerForUser } from './server.js';
 import { logger } from '../utils/logger.js';
 
 export const mcpRoutes = Router();
+
+// ── CORS — MCP clients are by definition cross-origin ───────────────────
+// Claude.ai, ChatGPT, MCP Inspector, etc. all run on different domains than
+// ours. The global cors() middleware in index.ts locks to CORS_ORIGIN
+// (ocal.org.il), so /mcp gets an override that allows any origin. Safety is
+// preserved because (a) all /mcp endpoints are auth-gated by Bearer token,
+// and (b) the OAuth flow itself requires Google login + api_users allow-list.
+// credentials:false because MCP uses Bearer tokens, not cookies.
+const mcpCors = cors({
+  origin: true,
+  credentials: false,
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Mcp-Session-Id', 'Last-Event-Id'],
+  exposedHeaders: ['Mcp-Session-Id', 'WWW-Authenticate'],
+  maxAge: 86400,
+});
+mcpRoutes.use(mcpCors);
+mcpRoutes.options('*', mcpCors);
 
 // ── OAuth 2.1 metadata (RFC 8414 + RFC 9728) ────────────────────────────
 // Metadata is public per spec but cheap; keep behind the limiter anyway.
