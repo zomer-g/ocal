@@ -10,6 +10,7 @@ import { globalApiLimiter, publicApiLimiter } from './middleware/rateLimiter.js'
 import { publicRoutes } from './routes/public/index.js';
 import { adminRoutes } from './routes/admin/index.js';
 import { mcpRoutes } from './mcp/routes.js';
+import { protectedResourceMetadata, authorizationServerMetadata } from './mcp/oauth/metadata.js';
 import { startScheduler } from './services/scheduler.js';
 import { startMcpUsageAggregator } from './services/mcpUsageAggregator.js';
 import { warmEntityCache } from './routes/public/entities.js';
@@ -28,14 +29,23 @@ app.use(helmet({ contentSecurityPolicy: false }));
 // clients are blocked. Per-route handler in mcp/routes.ts handles per-method
 // CORS; this layer is here just to intercept the preflight before the global
 // cors() can see it.
-app.use('/mcp', cors({
+const mcpCors = cors({
   origin: true,
   credentials: false,
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Mcp-Session-Id', 'Last-Event-Id'],
   exposedHeaders: ['Mcp-Session-Id', 'WWW-Authenticate'],
   maxAge: 86400,
-}));
+});
+app.use('/mcp', mcpCors);
+
+// RFC 8414 / RFC 9728 require the metadata at /.well-known/<type>/<path>
+// when the issuer URL has a path component. Claude.ai expects discovery at
+// these paths — without them it can't find the auth server and shows a
+// "start_error". Must be registered BEFORE the SPA static fallback below or
+// it'll be served index.html.
+app.get('/.well-known/oauth-protected-resource/mcp', mcpCors, protectedResourceMetadata);
+app.get('/.well-known/oauth-authorization-server/mcp', mcpCors, authorizationServerMetadata);
 
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
