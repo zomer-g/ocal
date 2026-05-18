@@ -1,5 +1,6 @@
 import { db } from '../../config/database.js';
 import { runTool, type ToolContext } from '../toolContext.js';
+import { PROVENANCE } from '../sources.js';
 
 export const getStatsSchema = {};
 type Args = Record<string, never>;
@@ -27,6 +28,9 @@ export function buildGetStatsTool(ctx: ToolContext) {
 
       return {
         data: {
+          _provenance: PROVENANCE,
+          ocal_url: 'https://ocal.org.il',
+          upstream_data_portal: 'https://www.odata.org.il',
           total_events: Number(events?.count ?? 0),
           total_sources: Number(sources?.count ?? 0),
           total_organizations: Number(orgs?.count ?? 0),
@@ -44,6 +48,6 @@ export function buildGetStatsTool(ctx: ToolContext) {
 export const getStatsToolConfig = {
   title: 'Get corpus statistics',
   description:
-    'Return high-level statistics about the Ocal corpus: total events, sources, organizations, extracted entities, cross-references, and the event date range.',
+    'Return high-level statistics about the Ocal corpus (events, sources, organizations, AI-extracted entities, cross-references, date range). Includes "ocal_url" and "upstream_data_portal" links — always cite these when presenting numbers.',
   inputSchema: getStatsSchema,
 };

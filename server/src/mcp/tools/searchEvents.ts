@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { db } from '../../config/database.js';
 import { DiaryEventModel } from '../../models/DiaryEvent.js';
 import { runTool, type ToolContext } from '../toolContext.js';
+import { PROVENANCE, buildEventLinks, buildOcalSearchUrl } from '../sources.js';
 
 export const searchEventsSchema = {
   query: z.string().describe('Full-text search query in Hebrew or English. Supports AND/OR/NOT.').optional(),
@@ -18,6 +20,12 @@ export const searchEventsSchema = {
 const argsSchema = z.object(searchEventsSchema);
 type Args = z.infer<typeof argsSchema>;
 
+interface SourceRow {
+  id: string;
+  dataset_url: string | null;
+  resource_url: string | null;
+}
+
 export function buildSearchEventsTool(ctx: ToolContext) {
   return async (args: Args) =>
     runTool(ctx, 'search_events', args, async (a) => {
@@ -33,9 +41,42 @@ export function buildSearchEventsTool(ctx: ToolContext) {
         offset: a.offset,
         limit: a.limit,
       });
+
+      const sourceIds = [...new Set(rows.map((r: { source_id: string }) => r.source_id))];
+      const sourceRows: SourceRow[] = sourceIds.length
+        ? await db('diary_sources').whereIn('id', sourceIds).select('id', 'dataset_url', 'resource_url')
+        : [];
+      const sourceMap = new Map(sourceRows.map((s) => [s.id, s]));
+
+      const enriched = rows.map((r: Record<string, unknown>) => {
+        const src = sourceMap.get(r.source_id as string);
+        return {
+          ...r,
+          links: buildEventLinks({
+            source_id: r.source_id as string,
+            event_date: r.event_date as string | Date | null | undefined,
+            dataset_link: r.dataset_link as string | null | undefined,
+            source_dataset_url: src?.dataset_url,
+            source_resource_url: src?.resource_url,
+          }),
+        };
+      });
+
       return {
-        data: { total, returned: rows.length, offset: a.offset, events: rows },
-        count: rows.length,
+        data: {
+          _provenance: PROVENANCE,
+          search_url: buildOcalSearchUrl({
+            q: a.query,
+            from_date: a.date_from,
+            to_date: a.date_to,
+            source_id: a.source_ids?.[0],
+          }),
+          total,
+          returned: enriched.length,
+          offset: a.offset,
+          events: enriched,
+        },
+        count: enriched.length,
       };
     });
 }
@@ -43,6 +84,6 @@ export function buildSearchEventsTool(ctx: ToolContext) {
 export const searchEventsToolConfig = {
   title: 'Search events',
   description:
-    'Full-text search across all ingested Israeli government officials\' diary events. Returns events with their extracted entities (people, organizations, locations) and cross-reference summary.',
+    'Full-text search across Ocal\'s processed corpus of Israeli officials\' diary events (ingested from data.gov.il, deduplicated, entity-extracted). Every event in the response carries a "links" object with URLs back to Ocal and to the upstream CKAN resource — always cite these when presenting results.',
   inputSchema: searchEventsSchema,
 };
