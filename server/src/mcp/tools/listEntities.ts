@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { db } from '../../config/database.js';
 import { runTool, type ToolContext } from '../toolContext.js';
+import { PROVENANCE, buildOcalSearchUrl } from '../sources.js';
 
 export const listEntitiesSchema = {
   type: z.enum(['person', 'organization', 'place']).describe('Filter by entity type.').optional(),
@@ -30,10 +31,16 @@ export function buildListEntitiesTool(ctx: ToolContext) {
       const rows = await q;
       return {
         data: {
+          _provenance: {
+            ...PROVENANCE,
+            note:
+              'Entities are extracted from free-text event titles/descriptions by AI NER (named-entity recognition). Each mention has a confidence score; names may include misspellings or near-duplicates. Use the "search_url" for each entity to view the events that mention it on Ocal.',
+          },
           entities: rows.map((r) => ({
             type: r.entity_type,
             name: r.entity_name,
             mentions: Number(r.mentions),
+            search_url: buildOcalSearchUrl({ q: String(r.entity_name) }),
           })),
         },
         count: rows.length,
@@ -44,6 +51,6 @@ export function buildListEntitiesTool(ctx: ToolContext) {
 export const listEntitiesToolConfig = {
   title: 'List entities',
   description:
-    'List unique entities (people, organizations, places) extracted from diary events, ranked by number of mentions.',
+    'List unique entities (people, organizations, places) extracted by AI from Ocal-processed diary event text, ranked by mention count. Each entity includes a "search_url" linking to the Ocal events that mention it — always cite this URL.',
   inputSchema: listEntitiesSchema,
 };

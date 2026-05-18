@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { db } from '../../config/database.js';
 import { runTool, type ToolContext } from '../toolContext.js';
+import { PROVENANCE, buildEventLinks } from '../sources.js';
 
 export const findMeetingsBetweenSchema = {
   person_a: z.string().describe('Name of the first person (case-insensitive substring match on extracted entities).'),
@@ -42,7 +43,11 @@ export function buildFindMeetingsBetweenTool(ctx: ToolContext) {
           'e.end_time',
           'e.location',
           'e.event_date',
+          'e.source_id',
+          'e.dataset_link',
           's.name as source_name',
+          's.dataset_url as source_dataset_url',
+          's.resource_url as source_resource_url',
         )
         .orderBy('e.start_time', 'desc')
         .limit(a.limit);
@@ -51,13 +56,28 @@ export function buildFindMeetingsBetweenTool(ctx: ToolContext) {
       if (a.date_to) q = q.where('e.event_date', '<=', a.date_to);
 
       const rows = await q;
-      return { data: { matches: rows }, count: rows.length };
+      const enriched = rows.map((r) => ({
+        ...r,
+        links: buildEventLinks(r),
+      }));
+
+      return {
+        data: {
+          _provenance: {
+            ...PROVENANCE,
+            note:
+              'Matches are based on AI-extracted entities in both event records — they indicate the *mention* of both people in the same event text, not necessarily a confirmed meeting. Verify via the "ocal_view" link for each match.',
+          },
+          matches: enriched,
+        },
+        count: enriched.length,
+      };
     });
 }
 
 export const findMeetingsBetweenToolConfig = {
   title: 'Find meetings between two people',
   description:
-    'Find events whose extracted entities include both given names. Useful for tracing who-met-with-whom across the diary corpus.',
+    'Find Ocal events whose AI-extracted entities include both given names. Useful for tracing who-met-with-whom across the diary corpus. Each match includes a "links" object — always cite "ocal_view" and "ckan_resource" URLs and note that matches are heuristic, not confirmed.',
   inputSchema: findMeetingsBetweenSchema,
 };
