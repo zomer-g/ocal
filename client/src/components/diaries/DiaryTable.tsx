@@ -78,7 +78,7 @@ const ExpandedDetails = memo(({ source, colSpan }: { source: DiarySource; colSpa
                 className="text-primary-600 hover:underline inline-flex items-center gap-1"
               >
                 {(() => { try { return new URL(datasetUrl).hostname.replace(/^www\./, ''); } catch { return 'קישור'; } })()}
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="w-3 h-3" aria-hidden="true" />
               </a>
             </div>
           )}
@@ -92,7 +92,7 @@ const ExpandedDetails = memo(({ source, colSpan }: { source: DiarySource; colSpa
                 className="text-primary-600 hover:underline inline-flex items-center gap-1"
               >
                 משאב
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="w-3 h-3" aria-hidden="true" />
               </a>
             </div>
           )}
@@ -129,7 +129,7 @@ export function DiaryTable({ sources, selectionMode = false, selectedIds, onTogg
     <div>
       {/* Search bar */}
       <div className="mb-4 relative">
-        <Search className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <Search className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
         <input
           type="text"
           value={search}
@@ -205,8 +205,8 @@ export function DiaryTable({ sources, selectionMode = false, selectedIds, onTogg
                       {/* Expand toggle */}
                       <td className="px-3 py-3 text-gray-400">
                         {isExpanded
-                          ? <ChevronUp className="w-4 h-4" />
-                          : <ChevronDown className="w-4 h-4" />}
+                          ? <ChevronUp className="w-4 h-4" aria-hidden="true" />
+                          : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
                       </td>
 
                       {/* Name + color */}
@@ -249,7 +249,7 @@ export function DiaryTable({ sources, selectionMode = false, selectedIds, onTogg
                             className="text-primary-600 hover:underline inline-flex items-center gap-1 text-xs"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <ExternalLink className="w-3 h-3" />
+                            <ExternalLink className="w-3 h-3" aria-hidden="true" />
                             מקור
                           </a>
                         ) : (
@@ -269,7 +269,7 @@ export function DiaryTable({ sources, selectionMode = false, selectedIds, onTogg
                               className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-primary-50 text-primary-700 border border-primary-200 rounded hover:bg-primary-100 transition-colors"
                               title={`הורד ${source.name} כ-CSV`}
                             >
-                              <Download className="w-3 h-3" />
+                              <Download className="w-3 h-3" aria-hidden="true" />
                               CSV
                             </button>
                           </td>
@@ -282,7 +282,7 @@ export function DiaryTable({ sources, selectionMode = false, selectedIds, onTogg
                               className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded hover:bg-gray-100 transition-colors"
                               title={`הורד ${source.name} כ-JSON`}
                             >
-                              <Download className="w-3 h-3" />
+                              <Download className="w-3 h-3" aria-hidden="true" />
                               JSON
                             </button>
                           </td>
