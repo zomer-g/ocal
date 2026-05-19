@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { BookOpen, Download, Loader2, LayoutGrid, Table2, Code2, CheckSquare, X, AlertCircle } from 'lucide-react';
 import { useSources } from '@/hooks/useSources';
 import { bulkDownload } from '@/api/download';
@@ -25,6 +25,10 @@ export function DiariesPage() {
   const [downloadingFormat, setDownloadingFormat] = useState<'csv' | 'json' | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
+  // Focus management: remember the trigger so we can restore focus on exit
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const firstActionRef = useRef<HTMLButtonElement | null>(null);
+
   const sourceIds = useMemo(() => sources.map((s) => s.id), [sources]);
   const allSelected = selectedIds.size > 0 && selectedIds.size === sourceIds.length;
   const someSelected = selectedIds.size > 0 && selectedIds.size < sourceIds.length;
@@ -39,6 +43,8 @@ export function DiariesPage() {
     setSelectionMode(false);
     setSelectedIds(new Set());
     setDownloadError(null);
+    // Return focus to the trigger button on the next paint
+    setTimeout(() => triggerRef.current?.focus(), 0);
   }
 
   function toggleOne(id: string) {
@@ -74,6 +80,27 @@ export function DiariesPage() {
     }
   }
 
+  // Escape exits selection mode (when not downloading)
+  useEffect(() => {
+    if (!selectionMode) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && downloadingFormat === null) {
+        exitSelectionMode();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectionMode, downloadingFormat]);
+
+  // Move focus into the action bar when entering selection mode so keyboard
+  // users land on a useful control instead of being stranded on the (now
+  // hidden) trigger button.
+  useEffect(() => {
+    if (selectionMode) {
+      setTimeout(() => firstActionRef.current?.focus(), 50);
+    }
+  }, [selectionMode]);
+
   return (
     <div>
       {/* ── Hero ── */}
@@ -88,11 +115,14 @@ export function DiariesPage() {
           {!selectionMode && (
             <div className="flex items-center justify-center">
               <button
+                ref={triggerRef}
                 onClick={enterSelectionMode}
                 disabled={sources.length === 0}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white text-primary-800 font-semibold rounded-lg hover:bg-primary-50 transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-expanded={selectionMode}
+                aria-controls="bulk-action-bar"
+                className="flex items-center gap-2 px-5 py-2.5 bg-white text-primary-800 font-semibold rounded-lg hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary-700 transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <CheckSquare className="w-4 h-4" />
+                <CheckSquare className="w-4 h-4" aria-hidden="true" />
                 הורדה מרובה
               </button>
             </div>
@@ -112,22 +142,22 @@ export function DiariesPage() {
         {/* Loading */}
         {isLoading && (
           <div className="flex items-center justify-center py-20" role="status" aria-live="polite">
-            <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
-            <span className="mr-2 text-gray-500">טוען יומנים...</span>
+            <Loader2 className="w-6 h-6 animate-spin text-primary-600" aria-hidden="true" />
+            <span className="mr-2 text-gray-600">טוען יומנים...</span>
           </div>
         )}
 
         {/* Error */}
         {isError && (
-          <div className="text-center py-20 text-red-600" role="alert">
+          <div className="text-center py-20 text-red-700" role="alert">
             שגיאה בטעינת היומנים. נסו שוב.
           </div>
         )}
 
         {/* Empty */}
         {!isLoading && !isError && sources.length === 0 && (
-          <div className="text-center py-20 text-gray-400">
-            <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" aria-hidden="true" />
+          <div className="text-center py-20 text-gray-500">
+            <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-40" aria-hidden="true" />
             <p>אין יומנים זמינים כרגע.</p>
           </div>
         )}
@@ -137,8 +167,8 @@ export function DiariesPage() {
           <>
             {/* Tab bar */}
             <div className="flex items-center justify-between mb-6">
-              <p className="text-sm text-gray-500">{sources.length} יומנים פעילים</p>
-              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg" role="tablist">
+              <p className="text-sm text-gray-600">{sources.length} יומנים פעילים</p>
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg" role="tablist" aria-label="תצוגת יומנים">
                 {TABS.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.key;
@@ -146,15 +176,15 @@ export function DiariesPage() {
                     <button
                       key={tab.key}
                       onClick={() => setActiveTab(tab.key)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors ${
                         isActive
                           ? 'bg-white text-primary-700 shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700'
+                          : 'text-gray-600 hover:text-gray-900'
                       }`}
                       aria-selected={isActive}
                       role="tab"
                     >
-                      <Icon className="w-3.5 h-3.5" />
+                      <Icon className="w-3.5 h-3.5" aria-hidden="true" />
                       {tab.label}
                     </button>
                   );
@@ -195,11 +225,16 @@ export function DiariesPage() {
 
       {/* ── Sticky bulk-download action bar ── */}
       {selectionMode && (
-        <div className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+        <div
+          id="bulk-action-bar"
+          role="region"
+          aria-label="פעולות הורדה מרובה"
+          className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]"
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
             {downloadError && (
-              <div className="flex items-center gap-2 mb-2 text-sm text-red-700">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+              <div className="flex items-center gap-2 mb-2 text-sm text-red-700" role="alert">
+                <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>{downloadError}</span>
               </div>
             )}
@@ -207,19 +242,21 @@ export function DiariesPage() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               {/* Left: selection count + select-all */}
               <div className="flex items-center gap-3 text-sm">
-                <span className="font-medium text-gray-900">
+                <span className="font-medium text-gray-900" aria-live="polite" aria-atomic="true">
                   {selectedIds.size === 0
                     ? 'לא נבחרו יומנים'
                     : `${selectedIds.size.toLocaleString('he-IL')} מתוך ${sources.length.toLocaleString('he-IL')} נבחרו`}
                 </span>
                 <button
+                  ref={firstActionRef}
                   onClick={toggleAll}
-                  className="text-primary-700 hover:text-primary-900 font-medium underline-offset-2 hover:underline"
+                  aria-pressed={allSelected}
+                  className="text-primary-700 hover:text-primary-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded font-medium underline-offset-2 hover:underline"
                 >
                   {allSelected ? 'בטל בחירה של הכל' : 'בחר הכל'}
                 </button>
                 {someSelected && (
-                  <span className="text-xs text-gray-400">({sources.length - selectedIds.size} לא נבחרו)</span>
+                  <span className="text-xs text-gray-600">({sources.length - selectedIds.size} לא נבחרו)</span>
                 )}
               </div>
 
@@ -228,32 +265,34 @@ export function DiariesPage() {
                 <button
                   onClick={() => handleBulkDownload('csv')}
                   disabled={selectedIds.size === 0 || downloadingFormat !== null}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-700 text-white font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-700 text-white font-medium rounded-lg hover:bg-primary-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="הורד ZIP עם קובץ CSV אחד לכל יומן"
+                  aria-busy={downloadingFormat === 'csv'}
                 >
                   {downloadingFormat === 'csv'
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <Download className="w-4 h-4" />}
+                    ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                    : <Download className="w-4 h-4" aria-hidden="true" />}
                   הורד ZIP (CSV)
                 </button>
                 <button
                   onClick={() => handleBulkDownload('json')}
                   disabled={selectedIds.size === 0 || downloadingFormat !== null}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-700 text-white font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-700 text-white font-medium rounded-lg hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="הורד ZIP עם קובץ JSON אחד לכל יומן"
+                  aria-busy={downloadingFormat === 'json'}
                 >
                   {downloadingFormat === 'json'
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <Download className="w-4 h-4" />}
+                    ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                    : <Download className="w-4 h-4" aria-hidden="true" />}
                   הורד ZIP (JSON)
                 </button>
                 <button
                   onClick={exitSelectionMode}
                   disabled={downloadingFormat !== null}
-                  className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-                  aria-label="יציאה ממצב בחירה"
+                  className="flex items-center gap-1 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-lg transition-colors disabled:opacity-50"
+                  aria-label="יציאה ממצב בחירה מרובה (Escape)"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4" aria-hidden="true" />
                   יציאה
                 </button>
               </div>
