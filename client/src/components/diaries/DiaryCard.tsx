@@ -5,9 +5,13 @@ import { formatDateShort } from '@/lib/formatters';
 
 interface DiaryCardProps {
   source: DiarySource;
+  /** When true, the whole card becomes a checkbox-style toggle. */
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
-export function DiaryCard({ source }: DiaryCardProps) {
+export function DiaryCard({ source, selectionMode = false, selected = false, onToggleSelect }: DiaryCardProps) {
   const subtitle = source.person_name ?? source.organization_name ?? null;
   const dateRange =
     source.first_event_date && source.last_event_date
@@ -16,10 +20,40 @@ export function DiaryCard({ source }: DiaryCardProps) {
 
   const datasetUrl = source.dataset_url ?? source.ckan_metadata?.datasetUrl ?? null;
 
+  const cardClasses = [
+    'bg-white rounded-xl border p-5 flex flex-col gap-3 shadow-sm transition-all',
+    selectionMode ? 'cursor-pointer' : '',
+    selectionMode && selected
+      ? 'border-primary-500 ring-2 ring-primary-200 bg-primary-50/30'
+      : 'border-gray-200 hover:shadow-md',
+  ].join(' ');
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow">
+    <div
+      className={cardClasses}
+      onClick={selectionMode ? onToggleSelect : undefined}
+      role={selectionMode ? 'button' : undefined}
+      tabIndex={selectionMode ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (selectionMode && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onToggleSelect?.();
+        }
+      }}
+      aria-pressed={selectionMode ? selected : undefined}
+    >
       {/* Header */}
       <div className="flex items-start gap-3">
+        {selectionMode && (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1.5 w-4 h-4 accent-primary-600 cursor-pointer"
+            aria-label={`בחר ${source.name}`}
+          />
+        )}
         <div
           className="w-3 h-3 rounded-full mt-1.5 shrink-0"
           style={{ backgroundColor: source.color }}
@@ -44,6 +78,7 @@ export function DiaryCard({ source }: DiaryCardProps) {
             href={datasetUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
             className="flex items-center gap-1 text-primary-600 hover:underline"
           >
             {(() => { try { return new URL(datasetUrl).hostname.replace(/^www\./, ''); } catch { return 'מקור'; } })()}
@@ -52,26 +87,28 @@ export function DiaryCard({ source }: DiaryCardProps) {
         )}
       </div>
 
-      {/* Download buttons */}
-      <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
-        <span className="text-xs text-gray-400 ml-auto">הורד:</span>
-        <button
-          onClick={() => triggerDownload(getSourceDownloadUrl(source.id, 'csv', { from_date: source.first_event_date, to_date: source.last_event_date }))}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary-50 text-primary-700 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
-          title={`הורד ${source.name} כ-CSV`}
-        >
-          <Download className="w-3 h-3" />
-          CSV
-        </button>
-        <button
-          onClick={() => triggerDownload(getSourceDownloadUrl(source.id, 'json', { from_date: source.first_event_date, to_date: source.last_event_date }))}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
-          title={`הורד ${source.name} כ-JSON`}
-        >
-          <Download className="w-3 h-3" />
-          JSON
-        </button>
-      </div>
+      {/* Download buttons — hidden in selection mode (bulk bar handles it) */}
+      {!selectionMode && (
+        <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+          <span className="text-xs text-gray-400 ml-auto">הורד:</span>
+          <button
+            onClick={() => triggerDownload(getSourceDownloadUrl(source.id, 'csv', { from_date: source.first_event_date, to_date: source.last_event_date }))}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary-50 text-primary-700 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+            title={`הורד ${source.name} כ-CSV`}
+          >
+            <Download className="w-3 h-3" />
+            CSV
+          </button>
+          <button
+            onClick={() => triggerDownload(getSourceDownloadUrl(source.id, 'json', { from_date: source.first_event_date, to_date: source.last_event_date }))}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+            title={`הורד ${source.name} כ-JSON`}
+          >
+            <Download className="w-3 h-3" />
+            JSON
+          </button>
+        </div>
+      )}
     </div>
   );
 }

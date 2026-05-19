@@ -6,6 +6,11 @@ import { formatDateShort } from '@/lib/formatters';
 
 interface DiaryTableProps {
   sources: DiarySource[];
+  /** When true, a leading checkbox column appears and the inline CSV/JSON
+   * buttons hide — the page-level sticky bar handles the bulk download. */
+  selectionMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
 }
 
 /** Compute year range string from min/max dates, e.g. "2019–2026" or "2024" */
@@ -16,15 +21,16 @@ function yearRange(first: string | null, last: string | null): string {
   return y1 === y2 ? String(y1) : `${y1}–${y2}`;
 }
 
-const TOTAL_COLS = 8; // must match number of <th> in thead
+const TOTAL_COLS_NORMAL = 8;
+const TOTAL_COLS_SELECTION = 7; // +checkbox −CSV −JSON (we hide the action cols in selection mode)
 
-const ExpandedDetails = memo(({ source }: { source: DiarySource }) => {
+const ExpandedDetails = memo(({ source, colSpan }: { source: DiarySource; colSpan: number }) => {
   const datasetUrl = source.dataset_url ?? source.ckan_metadata?.datasetUrl ?? null;
   const resourceUrl = source.resource_url ?? source.ckan_metadata?.resourceUrl ?? null;
 
   return (
     <tr>
-      <td colSpan={TOTAL_COLS} className="bg-gray-50 px-5 py-4 border-b border-gray-200">
+      <td colSpan={colSpan} className="bg-gray-50 px-5 py-4 border-b border-gray-200">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 text-xs">
           <div>
             <span className="text-gray-400 block mb-0.5">תאריך ראשון</span>
@@ -102,9 +108,10 @@ const ExpandedDetails = memo(({ source }: { source: DiarySource }) => {
   );
 });
 
-export function DiaryTable({ sources }: DiaryTableProps) {
+export function DiaryTable({ sources, selectionMode = false, selectedIds, onToggleSelect }: DiaryTableProps) {
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const totalCols = selectionMode ? TOTAL_COLS_SELECTION : TOTAL_COLS_NORMAL;
 
   const filtered = useMemo(() => {
     if (!search.trim()) return sources;
@@ -142,20 +149,27 @@ export function DiaryTable({ sources }: DiaryTableProps) {
         <table className="w-full text-sm" dir="rtl">
           <thead>
             <tr className="bg-gray-50 text-right">
+              {selectionMode && (
+                <th className="px-3 py-3 text-xs font-medium text-gray-500 w-8" />
+              )}
               <th className="px-3 py-3 text-xs font-medium text-gray-500 w-8" />
               <th className="px-3 py-3 text-xs font-medium text-gray-500">שם היומן</th>
               <th className="px-3 py-3 text-xs font-medium text-gray-500 hidden md:table-cell">בעל היומן</th>
               <th className="px-3 py-3 text-xs font-medium text-gray-500">אירועים</th>
               <th className="px-3 py-3 text-xs font-medium text-gray-500 hidden sm:table-cell">שנים</th>
               <th className="px-3 py-3 text-xs font-medium text-gray-500 hidden sm:table-cell">מקור</th>
-              <th className="px-3 py-3 text-xs font-medium text-gray-500">CSV</th>
-              <th className="px-3 py-3 text-xs font-medium text-gray-500">JSON</th>
+              {!selectionMode && (
+                <>
+                  <th className="px-3 py-3 text-xs font-medium text-gray-500">CSV</th>
+                  <th className="px-3 py-3 text-xs font-medium text-gray-500">JSON</th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={TOTAL_COLS} className="text-center py-10 text-gray-400 text-sm">
+                <td colSpan={totalCols} className="text-center py-10 text-gray-400 text-sm">
                   {search ? 'לא נמצאו יומנים התואמים לחיפוש' : 'אין יומנים להצגה'}
                 </td>
               </tr>
@@ -164,13 +178,30 @@ export function DiaryTable({ sources }: DiaryTableProps) {
                 const isExpanded = expandedId === source.id;
                 const datasetUrl = source.dataset_url ?? source.ckan_metadata?.datasetUrl ?? null;
                 const downloadDates = { from_date: source.first_event_date, to_date: source.last_event_date };
+                const isSelected = selectedIds?.has(source.id) ?? false;
+                const handleRowClick = selectionMode
+                  ? () => onToggleSelect?.(source.id)
+                  : () => setExpandedId(isExpanded ? null : source.id);
                 return (
                   <>
                     <tr
                       key={source.id}
-                      className="hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => setExpandedId(isExpanded ? null : source.id)}
+                      className={`transition-colors cursor-pointer ${
+                        selectionMode && isSelected ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-gray-50'
+                      }`}
+                      onClick={handleRowClick}
                     >
+                      {selectionMode && (
+                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => onToggleSelect?.(source.id)}
+                            className="w-4 h-4 accent-primary-600 cursor-pointer"
+                            aria-label={`בחר ${source.name}`}
+                          />
+                        </td>
+                      )}
                       {/* Expand toggle */}
                       <td className="px-3 py-3 text-gray-400">
                         {isExpanded
@@ -226,40 +257,42 @@ export function DiaryTable({ sources }: DiaryTableProps) {
                         )}
                       </td>
 
-                      {/* CSV download */}
-                      <td className="px-3 py-3">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            triggerDownload(getSourceDownloadUrl(source.id, 'csv', downloadDates));
-                          }}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-primary-50 text-primary-700 border border-primary-200 rounded hover:bg-primary-100 transition-colors"
-                          title={`הורד ${source.name} כ-CSV`}
-                        >
-                          <Download className="w-3 h-3" />
-                          CSV
-                        </button>
-                      </td>
-
-                      {/* JSON download */}
-                      <td className="px-3 py-3">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            triggerDownload(getSourceDownloadUrl(source.id, 'json', downloadDates));
-                          }}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded hover:bg-gray-100 transition-colors"
-                          title={`הורד ${source.name} כ-JSON`}
-                        >
-                          <Download className="w-3 h-3" />
-                          JSON
-                        </button>
-                      </td>
+                      {/* CSV + JSON columns — hidden in selection mode */}
+                      {!selectionMode && (
+                        <>
+                          <td className="px-3 py-3">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                triggerDownload(getSourceDownloadUrl(source.id, 'csv', downloadDates));
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-primary-50 text-primary-700 border border-primary-200 rounded hover:bg-primary-100 transition-colors"
+                              title={`הורד ${source.name} כ-CSV`}
+                            >
+                              <Download className="w-3 h-3" />
+                              CSV
+                            </button>
+                          </td>
+                          <td className="px-3 py-3">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                triggerDownload(getSourceDownloadUrl(source.id, 'json', downloadDates));
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded hover:bg-gray-100 transition-colors"
+                              title={`הורד ${source.name} כ-JSON`}
+                            >
+                              <Download className="w-3 h-3" />
+                              JSON
+                            </button>
+                          </td>
+                        </>
+                      )}
                     </tr>
 
                     {/* Expanded row */}
                     {isExpanded && (
-                      <ExpandedDetails key={`${source.id}-expand`} source={source} />
+                      <ExpandedDetails key={`${source.id}-expand`} source={source} colSpan={totalCols} />
                     )}
                   </>
                 );
