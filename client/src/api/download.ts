@@ -17,10 +17,10 @@ export function triggerDownload(url: string): void {
 /**
  * Bulk download of multiple sources via POST /api/public/download/bulk.
  *
- * Server streams the CSV/JSON so neither side has to hold the entire corpus
- * in memory. We use fetch() rather than window.open() because URL length
- * caps make GET with hundreds of UUIDs impractical, and because we want to
- * surface server errors to the caller instead of silently opening a tab.
+ * Server returns a ZIP containing one CSV or JSON file per selected diary.
+ * We use fetch() rather than window.open() because URL length caps make
+ * GET with hundreds of UUIDs impractical, and because we want to surface
+ * server errors to the caller instead of silently opening a tab.
  *
  * Returns the filename the server suggested (parsed from Content-Disposition)
  * so callers can show feedback. Throws on HTTP error.
@@ -57,7 +57,7 @@ export async function bulkDownload(opts: {
 
   const blob = await res.blob();
   const filename = parseFilename(res.headers.get('Content-Disposition'))
-    ?? `ocal-${opts.source_ids.length}-diaries.${opts.format}`;
+    ?? `ocal-${opts.source_ids.length}-diaries.zip`;
 
   // Trigger browser download via a temporary <a> tag (works in all browsers)
   const url = URL.createObjectURL(blob);

@@ -229,21 +229,23 @@ export function DiariesPage() {
                   onClick={() => handleBulkDownload('csv')}
                   disabled={selectedIds.size === 0 || downloadingFormat !== null}
                   className="flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-700 text-white font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="הורד ZIP עם קובץ CSV אחד לכל יומן"
                 >
                   {downloadingFormat === 'csv'
                     ? <Loader2 className="w-4 h-4 animate-spin" />
                     : <Download className="w-4 h-4" />}
-                  הורד CSV
+                  הורד ZIP (CSV)
                 </button>
                 <button
                   onClick={() => handleBulkDownload('json')}
                   disabled={selectedIds.size === 0 || downloadingFormat !== null}
                   className="flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-700 text-white font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="הורד ZIP עם קובץ JSON אחד לכל יומן"
                 >
                   {downloadingFormat === 'json'
                     ? <Loader2 className="w-4 h-4 animate-spin" />
                     : <Download className="w-4 h-4" />}
-                  הורד JSON
+                  הורד ZIP (JSON)
                 </button>
                 <button
                   onClick={exitSelectionMode}

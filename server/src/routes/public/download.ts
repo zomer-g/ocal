@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import archiver from 'archiver';
 import * as XLSX from 'xlsx';
 import { db } from '../../config/database.js';
 import { validate } from '../../middleware/validate.js';
@@ -82,18 +83,21 @@ function safeName(name: string): string {
   return name.replace(/[<>:"/\\|?*]/g, '').trim().replace(/\s+/g, '_');
 }
 
-// ── Streaming CSV writer ──────────────────────────────────────────────────────
-// Escapes one CSV field per RFC 4180. Wraps in quotes if it contains comma,
-// quote, newline, or CR; doubles internal quotes.
-function csvField(v: unknown): string {
-  if (v === null || v === undefined) return '';
-  const s = String(v);
-  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
-function csvLine(values: unknown[]): string {
-  return values.map(csvField).join(',') + '\r\n';
+/**
+ * Disambiguate filenames inside the ZIP. Two diaries can share a name (e.g.
+ * "—" stripped from both); without this the second entry would overwrite the
+ * first.
+ */
+function uniqueZipName(used: Set<string>, base: string, ext: string): string {
+  const sanitized = safeName(base) || 'diary';
+  let candidate = `${sanitized}.${ext}`;
+  let n = 2;
+  while (used.has(candidate)) {
+    candidate = `${sanitized}_${n}.${ext}`;
+    n++;
+  }
+  used.add(candidate);
+  return candidate;
 }
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -107,9 +111,8 @@ const sourceParamsSchema = z.object({
   sourceId: z.string().uuid(),
 });
 
-// Cap on how many source_ids a single bulk download can request — 612 sources
-// in the corpus today; cap a bit higher to allow for growth without letting a
-// caller pass arbitrarily large arrays.
+// Cap on how many sources fit into one bulk request. 612 sources today; cap a
+// bit higher for growth but bounded so a caller can't spam arbitrarily.
 const MAX_SOURCES_PER_BULK = 1000;
 
 const bulkBodySchema = z.object({
@@ -120,6 +123,7 @@ const bulkBodySchema = z.object({
 });
 
 // ── GET /api/public/download/source/:sourceId ─────────────────────────────────
+// Single-diary download. Returns the raw CSV/JSON file directly (no ZIP).
 downloadRouter.get('/source/:sourceId', validate(downloadSchema, 'query'), async (req, res, next) => {
   try {
     const { format } = req.query as z.infer<typeof downloadSchema>;
@@ -141,19 +145,7 @@ downloadRouter.get('/source/:sourceId', validate(downloadSchema, 'query'), async
     }
 
     const { from_date, to_date } = req.query as z.infer<typeof downloadSchema>;
-
-    let sourceQuery = db('diary_events as e')
-      .join('diary_sources as s', 'e.source_id', 's.id')
-      .select(EXPORT_COLS)
-      .where('e.source_id', sourceId)
-      .where('e.is_active', true)
-      .where('s.is_enabled', true);
-
-    if (from_date) sourceQuery = sourceQuery.where('e.event_date', '>=', from_date);
-    if (to_date) sourceQuery = sourceQuery.where('e.event_date', '<=', to_date);
-
-    const rows: EventRow[] = await sourceQuery.orderBy('e.start_time', 'asc');
-
+    const rows = await fetchRowsForSource(sourceId, from_date, to_date);
     const filename = safeName(source.name);
 
     if (format === 'json') {
@@ -173,109 +165,98 @@ downloadRouter.get('/source/:sourceId', validate(downloadSchema, 'query'), async
 });
 
 // ── POST /api/public/download/bulk ────────────────────────────────────────────
-// Streamed download of events across a user-selected list of diary sources.
-// Replaces the old GET /all which loaded the entire corpus (~325k rows) into
-// memory and timed out. With knex stream() we hold one row at a time.
+// Streams a ZIP containing one CSV/JSON file per selected diary. We use the
+// per-source query (the proven path) once per source, packing each result as
+// a separate entry. Archiver pipes to the response without buffering the
+// full archive in memory.
 downloadRouter.post('/bulk', validate(bulkBodySchema, 'body'), async (req, res, next) => {
   try {
     const body = req.body as z.infer<typeof bulkBodySchema>;
     const { format, source_ids, from_date, to_date } = body;
 
-    // Filter to enabled sources only. If the caller passed any disabled or
-    // unknown UUIDs they're silently dropped — better than 404 because the
-    // rest of the selection should still work.
-    const validSourceIds: string[] = (
-      await db('diary_sources')
-        .whereIn('id', source_ids)
-        .where('is_enabled', true)
-        .pluck('id')
-    );
-    if (validSourceIds.length === 0) {
+    // Validate + resolve names. Disabled or unknown ids are dropped silently;
+    // we only fail if NOTHING is valid.
+    const validSources = await db('diary_sources')
+      .whereIn('id', source_ids)
+      .where('is_enabled', true)
+      .select('id', 'name');
+
+    if (validSources.length === 0) {
       res.status(404).json({ error: 'None of the requested sources exist or are enabled' });
       return;
     }
 
-    let query = db('diary_events as e')
-      .join('diary_sources as s', 'e.source_id', 's.id')
-      .select(EXPORT_COLS)
-      .where('e.is_active', true)
-      .where('s.is_enabled', true)
-      .whereIn('e.source_id', validSourceIds);
+    const zipFilename = validSources.length === 1
+      ? `${safeName(validSources[0].name)}.zip`
+      : `ocal-${validSources.length}-diaries.zip`;
 
-    if (from_date) query = query.where('e.event_date', '>=', from_date);
-    if (to_date) query = query.where('e.event_date', '<=', to_date);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(zipFilename)}`);
+    // Hint to reverse proxies (nginx-style) NOT to buffer the stream
+    res.setHeader('X-Accel-Buffering', 'no');
 
-    query = query.orderBy('s.name', 'asc').orderBy('e.start_time', 'asc');
+    const archive = archiver('zip', { zlib: { level: 6 } });
 
-    const filename = validSourceIds.length === 1
-      ? 'ocal-diary'
-      : `ocal-${validSourceIds.length}-diaries`;
-
-    // Stream rows from Postgres — never buffer the full corpus in memory.
-    const stream = query.stream({ highWaterMark: 1000 });
-
-    // Cancel the DB query if the client aborts the download.
-    req.on('close', () => {
-      // knex stream destroy is idempotent; safe to call even on success
+    archive.on('warning', (err) => {
+      logger.warn({ err }, 'Bulk ZIP: archiver warning');
+    });
+    archive.on('error', (err) => {
+      logger.error({ err }, 'Bulk ZIP: archiver error');
+      // If headers are already sent we can't change status; just end.
       try {
-        stream.destroy();
-      } catch {
-        /* ignore */
-      }
+        res.end();
+      } catch { /* ignore */ }
     });
 
-    if (format === 'json') {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
-      res.write('[\n');
-      let isFirst = true;
-      stream.on('data', (row: EventRow) => {
-        const json = JSON.stringify({
-          title:        row.title,
-          event_date:   row.event_date,
-          start_time:   row.start_time,
-          end_time:     row.end_time,
-          location:     row.location,
-          participants: row.participants,
-          source_name:  row.source_name,
-          dataset_link: row.dataset_link,
-        });
-        const ok = res.write(isFirst ? json : `,\n${json}`);
-        isFirst = false;
-        // Backpressure: if the client buffer is full, pause the DB stream
-        if (!ok) stream.pause();
-      });
-      res.on('drain', () => stream.resume());
-      stream.on('end', () => {
-        res.write('\n]\n');
-        res.end();
-      });
-      stream.on('error', (err: Error) => {
-        logger.error({ err }, 'Bulk JSON download stream error');
-        // We can't change status once headers are flushed; just end the
-        // response so the client doesn't hang.
-        res.end();
-      });
-    } else {
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
-      // UTF-8 BOM so Excel opens Hebrew correctly
-      res.write('﻿');
-      res.write(csvLine(HEBREW_HEADERS));
-      stream.on('data', (row: EventRow) => {
-        const ok = res.write(csvLine(formatRow(row)));
-        if (!ok) stream.pause();
-      });
-      res.on('drain', () => stream.resume());
-      stream.on('end', () => {
-        res.end();
-      });
-      stream.on('error', (err: Error) => {
-        logger.error({ err }, 'Bulk CSV download stream error');
-        res.end();
-      });
+    // If the client disconnects mid-download, abort the archive cleanly.
+    let aborted = false;
+    req.on('close', () => {
+      aborted = true;
+      try {
+        archive.abort();
+      } catch { /* ignore */ }
+    });
+
+    archive.pipe(res);
+
+    const usedNames = new Set<string>();
+    const ext = format === 'json' ? 'json' : 'csv';
+
+    for (const source of validSources) {
+      if (aborted) break;
+      try {
+        const rows = await fetchRowsForSource(source.id, from_date, to_date);
+        const entryName = uniqueZipName(usedNames, source.name, ext);
+        const buf = format === 'json' ? buildJson(rows) : buildCsv(rows);
+        archive.append(buf, { name: entryName });
+      } catch (err) {
+        logger.error({ err, sourceId: source.id, sourceName: source.name }, 'Bulk ZIP: failed to build entry');
+        // Skip this entry but continue with the rest — partial download is
+        // better than total failure.
+      }
+    }
+
+    if (!aborted) {
+      await archive.finalize();
     }
   } catch (err) {
     next(err);
   }
 });
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+async function fetchRowsForSource(
+  sourceId: string,
+  fromDate: string | undefined,
+  toDate: string | undefined,
+): Promise<EventRow[]> {
+  let q = db('diary_events as e')
+    .join('diary_sources as s', 'e.source_id', 's.id')
+    .select(EXPORT_COLS)
+    .where('e.source_id', sourceId)
+    .where('e.is_active', true)
+    .where('s.is_enabled', true);
+  if (fromDate) q = q.where('e.event_date', '>=', fromDate);
+  if (toDate) q = q.where('e.event_date', '<=', toDate);
+  return q.orderBy('e.start_time', 'asc');
+}
