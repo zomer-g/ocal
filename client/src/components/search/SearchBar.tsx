@@ -21,25 +21,43 @@ export function SearchBar({ value, onChange, variant = 'default' }: SearchBarPro
     return () => clearTimeout(timer);
   }, [local, value, onChange]);
 
-  const isHero = variant === 'hero';
+  // Hero variant follows the "לעם" family contract: a single solid-white
+  // pill (rounded-full) with the search icon at the start (RTL → right) and
+  // the input filling the rest. No separate submit button — Enter sends.
+  // Used only on Home; other pages stick with the bordered "default" style.
+  if (variant === 'hero') {
+    return (
+      <div role="search" className="w-full">
+        <label htmlFor="hero-search-input" className="sr-only">חיפוש אירועים</label>
+        <div className="flex items-center bg-white rounded-full shadow-lg overflow-hidden border border-white/20">
+          <Search className="w-5 h-5 text-gray-400 shrink-0 mr-4" aria-hidden="true" />
+          <input
+            id="hero-search-input"
+            type="text"
+            value={local}
+            onChange={(e) => setLocal(e.target.value)}
+            placeholder="חפשו אירוע, נושא או שם..."
+            aria-label="חיפוש אירועים"
+            className="flex-1 bg-transparent border-0 outline-none text-base text-gray-900 placeholder:text-gray-400 py-3 px-4"
+            dir="rtl"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full" role="search">
-      <label htmlFor={isHero ? 'hero-search-input' : 'search-input'} className="sr-only">חיפוש אירועים</label>
-      <Search className={`absolute top-1/2 -translate-y-1/2 ${
-        isHero ? 'w-6 h-6 text-gray-400 right-4' : 'w-5 h-5 text-gray-400 right-3'
-      }`} aria-hidden="true" />
+      <label htmlFor="search-input" className="sr-only">חיפוש אירועים</label>
+      <Search className="absolute top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 right-3" aria-hidden="true" />
       <input
-        id={isHero ? 'hero-search-input' : 'search-input'}
+        id="search-input"
         type="text"
         value={local}
         onChange={(e) => setLocal(e.target.value)}
-        placeholder={isHero ? 'חפשו אירוע, נושא או שם...' : 'חיפוש באירועים...'}
+        placeholder="חיפוש באירועים..."
         aria-label="חיפוש אירועים"
-        className={isHero
-          ? 'w-full pr-12 pl-4 py-4 rounded-xl text-lg text-gray-900 shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2 focus:ring-offset-primary-700'
-          : 'w-full pr-10 pl-4 py-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
-        }
+        className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
         dir="rtl"
       />
     </div>

@@ -123,43 +123,46 @@ export function SearchPage() {
 
   return (
     <div>
-      {/* ── Hero Section ── */}
-      <section className="bg-gradient-to-b from-primary-800 to-primary-700 text-white py-10 sm:py-14 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">
+      {/* ── Hero Section (לעם family contract) ── */}
+      <section className="bg-gradient-to-b from-primary-800 to-primary-700 text-white py-12 sm:py-16 px-4">
+        <div className="max-w-3xl mx-auto text-center">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-2">
             יומן לעם
           </h1>
-          <p className="text-primary-100 text-sm sm:text-base mb-6">
+          <p className="text-primary-100 text-sm sm:text-base mb-8">
             חיפוש ביומני נבחרי ציבור וגורמים ממשלתיים
           </p>
-        </div>
-        <div className="max-w-3xl mx-auto px-4">
+
           {filters.advancedMode ? (
             <AdvancedSearchBuilder />
           ) : (
-            <div className="flex flex-col items-center gap-2 w-full">
+            <>
               <SearchBar value={filters.q} onChange={filters.setQuery} variant="hero" />
-              <button
-                type="button"
-                onClick={() => filters.setAdvancedMode(true)}
-                className="text-xs text-primary-200 hover:text-white transition-colors underline-offset-2 hover:underline"
-              >
-                חיפוש מתקדם ▾
-              </button>
+              <div className="mt-3 mb-8">
+                <button
+                  type="button"
+                  onClick={() => filters.setAdvancedMode(true)}
+                  className="text-sm text-primary-100/80 hover:text-white transition-colors underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary-700 rounded"
+                >
+                  חיפוש מתקדם ▾
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Stats — 3 columns, family contract */}
+          {stats && (stats.total_events > 0 || stats.total_sources > 0) && (
+            <div
+              className="grid grid-cols-3 gap-8 sm:gap-12 max-w-2xl mx-auto"
+              role="region"
+              aria-label="סטטיסטיקות"
+            >
+              <StatBadge value={stats.total_organizations} label="ארגונים" />
+              <StatBadge value={stats.total_sources} label="מקורות" />
+              <StatBadge value={stats.total_events} label="אירועים" />
             </div>
           )}
         </div>
-
-        {/* Stats row */}
-        {stats && (stats.total_events > 0 || stats.total_sources > 0) && (
-          <div className="flex items-center justify-center gap-6 sm:gap-10 mt-8" role="region" aria-label="סטטיסטיקות">
-            <StatBadge value={stats.total_events} label="אירועים" />
-            <StatBadge value={stats.total_sources} label="מקורות" />
-            {stats.total_organizations > 0 && (
-              <StatBadge value={stats.total_organizations} label="ארגונים" />
-            )}
-          </div>
-        )}
       </section>
 
       {/* ── Main Content ── */}
@@ -277,10 +280,10 @@ export function SearchPage() {
 function StatBadge({ value, label }: { value: number; label: string }) {
   return (
     <div className="text-center">
-      <div className="text-2xl sm:text-3xl font-bold text-white">
+      <div className="text-3xl sm:text-4xl font-bold text-white">
         {value.toLocaleString('he-IL')}
       </div>
-      <div className="text-xs sm:text-sm text-primary-200">{label}</div>
+      <div className="text-primary-200 text-sm mt-1">{label}</div>
     </div>
   );
 }
