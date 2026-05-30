@@ -1,17 +1,15 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { BookOpen, Download, Loader2, LayoutGrid, Table2, Code2, CheckSquare, X, AlertCircle } from 'lucide-react';
+import { BookOpen, Download, Loader2, LayoutGrid, Table2, CheckSquare, X, AlertCircle } from 'lucide-react';
 import { useSources } from '@/hooks/useSources';
 import { bulkDownload } from '@/api/download';
 import { DiaryCard } from '@/components/diaries/DiaryCard';
 import { DiaryTable } from '@/components/diaries/DiaryTable';
-import { ApiDocsSection } from '@/components/diaries/ApiDocsSection';
 
-type Tab = 'cards' | 'table' | 'api';
+type Tab = 'cards' | 'table';
 
 const TABS: { key: Tab; label: string; icon: typeof LayoutGrid }[] = [
   { key: 'cards', label: 'כרטיסיות', icon: LayoutGrid },
   { key: 'table', label: 'טבלה', icon: Table2 },
-  { key: 'api', label: 'API', icon: Code2 },
 ];
 
 export function DiariesPage() {
@@ -214,10 +212,6 @@ export function DiariesPage() {
                 selectedIds={selectedIds}
                 onToggleSelect={toggleOne}
               />
-            )}
-
-            {activeTab === 'api' && (
-              <ApiDocsSection alwaysOpen />
             )}
           </>
         )}
