@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Code2, Plug, Lock, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Code2 } from 'lucide-react';
 
 interface EndpointParam {
   name: string;
@@ -208,7 +208,7 @@ function EndpointCard({ ep }: { ep: EndpointDoc }) {
           : 'bg-green-100 text-green-700';
   return (
     <div
-      className="bg-gray-50 border border-gray-200 rounded-lg p-4"
+      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
       role="listitem"
     >
       <div className="flex items-center gap-2 mb-1.5">
@@ -255,134 +255,18 @@ function EndpointCard({ ep }: { ep: EndpointDoc }) {
   );
 }
 
-const MCP_TOOLS: { name: string; description: string }[] = [
-  { name: 'search_events', description: 'חיפוש Full-Text באירועי יומן (כולל תאריכים, מקורות, ישויות, מיקומים)' },
-  { name: 'get_event', description: 'אירוע בודד + כל הישויות שחולצו + הצלבות + אירועים זהים' },
-  { name: 'list_entities', description: 'אנשים, ארגונים ומקומות שחולצו מהאירועים, ממוינים לפי תדירות אזכור' },
-  { name: 'list_sources', description: 'רשימת היומנים הציבוריים שמופעים במערכת' },
-  { name: 'find_meetings_between', description: 'אירועים שמזכירים שני אנשים — לעקיבה מי-נפגש-עם-מי' },
-  { name: 'get_stats', description: 'סטטיסטיקות מצרפיות (כמה אירועים, ישויות, הצלבות, טווח תאריכים)' },
-];
-
-function McpSection() {
-  return (
-    <section
-      aria-labelledby="mcp-heading"
-      className="bg-gradient-to-br from-primary-50 to-blue-50 border border-primary-200 rounded-xl p-5 sm:p-6"
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <Sparkles className="w-5 h-5 text-primary-700 shrink-0" aria-hidden="true" />
-        <h3 id="mcp-heading" className="text-base sm:text-lg font-semibold text-gray-900">
-          MCP — חיבור ישיר ל-Claude / ChatGPT
-        </h3>
-        <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded">
-          <Lock className="w-3 h-3" aria-hidden="true" />
-          דורש הזמנה
-        </span>
-      </div>
-
-      <p className="text-sm text-gray-700 mb-4 leading-relaxed">
-        ה-MCP server של Ocal מאפשר ל-Claude.ai, ChatGPT וכלי AI אחרים לשלוף את הנתונים המעובדים
-        ישירות בתוך השיחה — חיפוש אירועים, הצלבות בין יומנים, סטטיסטיקות ועוד.
-        בניגוד ל-API הציבורי שלמטה, ה-MCP פתוח רק למשתמשים מוזמנים מראש (closed beta).
-      </p>
-
-      {/* Request access */}
-      <div className="bg-white/70 border border-primary-200 rounded-lg p-4 mb-4">
-        <h4 className="text-sm font-semibold text-gray-900 mb-2">קבלת הרשאות</h4>
-        <p className="text-sm text-gray-700">
-          לבקשת גישה, יש לפנות בדוא"ל:{' '}
-          <a
-            href="mailto:guy@z-g.co.il?subject=בקשת%20גישה%20ל-MCP%20של%20Ocal&body=שלום,%0A%0Aאשמח%20לקבל%20גישה%20ל-MCP%20server.%0A%0Aכתובת%20ה-Gmail%20להתחברות:%20%0Aמטרת%20השימוש:%20%0A%0Aתודה."
-            className="text-primary-700 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
-          >
-            guy@z-g.co.il
-          </a>
-        </p>
-        <ul className="text-xs text-gray-600 mt-2 space-y-1 mr-4 list-disc">
-          <li>יש לציין את כתובת ה-Gmail שתשמש להתחברות (חובה — לפי הכתובת ההזמנה תיווצר)</li>
-          <li>בקצרה — לאיזו מטרה הגישה מבוקשת</li>
-        </ul>
-      </div>
-
-      {/* Connection steps */}
-      <div className="bg-white/70 border border-primary-200 rounded-lg p-4 mb-4">
-        <h4 className="text-sm font-semibold text-gray-900 mb-3 inline-flex items-center gap-1.5">
-          <Plug className="w-4 h-4 text-primary-700" aria-hidden="true" />
-          לאחר קבלת הזמנה — איך להתחבר מ-Claude.ai
-        </h4>
-        <ol className="text-sm text-gray-700 space-y-2 mr-5 list-decimal">
-          <li>
-            ב-Claude.ai לחץ על <strong>Settings</strong> (סמל המסטרל בצד) ←{' '}
-            <strong>Connectors</strong>
-          </li>
-          <li>
-            לחץ על הכפתור <strong>Add custom connector</strong>
-          </li>
-          <li>
-            הדבק את ה-URL הבא בשדה:{' '}
-            <code className="font-mono bg-gray-100 border border-gray-300 px-1.5 py-0.5 rounded text-primary-700 text-xs" dir="ltr">
-              https://ocal.org.il/mcp
-            </code>
-          </li>
-          <li>
-            לחץ <strong>Add</strong> — תיפתח אוטומטית חלונית התחברות של Google
-          </li>
-          <li>
-            התחבר עם אותה כתובת Gmail שהזמנתי (חשוב: זו חייבת להיות אותה כתובת בדיוק)
-          </li>
-          <li>
-            לאישור הסיום — בשיחה חדשה לחץ על כפתור ה- <strong>+</strong> ליד תיבת ההודעה, סמן את OCAL,
-            ושאל למשל: <em>"באוקאל, מה הסטטיסטיקות של המאגר?"</em>
-          </li>
-        </ol>
-        <p className="text-xs text-gray-500 mt-3">
-          ב-ChatGPT / Cursor / MCP Inspector התהליך זהה — הוסף connector בשם OCAL עם אותו URL.
-        </p>
-      </div>
-
-      {/* Available tools */}
-      <div className="bg-white/70 border border-primary-200 rounded-lg p-4">
-        <h4 className="text-sm font-semibold text-gray-900 mb-2">הכלים הזמינים</h4>
-        <ul className="space-y-1.5 text-sm" role="list">
-          {MCP_TOOLS.map((t) => (
-            <li key={t.name} className="flex items-start gap-2">
-              <code className="font-mono text-xs bg-gray-100 border border-gray-300 px-1.5 py-0.5 rounded text-primary-700 shrink-0 mt-0.5" dir="ltr">
-                {t.name}
-              </code>
-              <span className="text-gray-700 text-xs sm:text-sm">{t.description}</span>
-            </li>
-          ))}
-        </ul>
-        <p className="text-xs text-gray-500 mt-3">
-          כל קריאה ל-tool מתועדת בצד השרת לצורך מדידת שימוש — הנתונים אינם משותפים עם צד שלישי.
-        </p>
-      </div>
-    </section>
-  );
-}
-
 function EndpointList() {
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
     <div className="space-y-6">
-      {/* MCP section — must come first because it's qualitatively different
-       *  (authenticated, invite-only) and is the most-asked-for capability. */}
-      <McpSection />
-
-      <div className="border-t border-gray-200 pt-6">
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">
-          נקודות קצה פתוחות (REST API ללא אימות)
-        </h3>
-        <p className="text-sm text-gray-600">
-          כל נקודות הקצה למטה פתוחות לציבור ואינן דורשות אימות.
-          בסיס ה-URL:{' '}
-          <code className="bg-gray-100 px-1.5 py-0.5 rounded text-primary-700 text-xs">
-            {baseUrl}
-          </code>
-        </p>
-      </div>
+      <p className="text-sm text-gray-600">
+        כל נקודות הקצה למטה פתוחות לציבור ואינן דורשות אימות.
+        בסיס ה-URL:{' '}
+        <code className="bg-gray-100 px-1.5 py-0.5 rounded text-primary-700 text-xs">
+          {baseUrl}
+        </code>
+      </p>
 
       {ENDPOINT_GROUPS.map((group) => (
         <div key={group.title}>
