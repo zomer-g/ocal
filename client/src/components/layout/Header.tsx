@@ -23,9 +23,9 @@ export function Header() {
     <header className="bg-primary-800 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16">
-          <Link to="/" className="flex items-center gap-2">
-            <Calendar className="w-7 h-7 sm:w-8 sm:h-8 text-primary-200" aria-hidden="true" />
-            <span className="text-lg sm:text-xl font-bold text-white">{siteName}</span>
+          <Link to="/" className="flex items-center gap-2 min-w-0">
+            <Calendar className="w-7 h-7 sm:w-8 sm:h-8 text-primary-200 shrink-0" aria-hidden="true" />
+            <span className="text-base sm:text-xl font-bold text-white truncate">{siteName}</span>
           </Link>
 
           {/* Desktop nav */}
@@ -49,10 +49,10 @@ export function Header() {
             })}
           </nav>
 
-          {/* Mobile hamburger */}
+          {/* Mobile hamburger — 44×44 minimum touch target (WCAG 2.1 AA) */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="sm:hidden p-2 rounded-lg text-primary-100 hover:bg-white/10 hover:text-white"
+            className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-primary-100 hover:bg-white/10 hover:text-white shrink-0"
             aria-expanded={mobileOpen}
             aria-label="תפריט ניווט"
           >
