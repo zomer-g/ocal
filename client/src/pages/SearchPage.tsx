@@ -150,10 +150,12 @@ export function SearchPage() {
             </>
           )}
 
-          {/* Stats — 3 columns, family contract */}
+          {/* Stats — 3 columns, family contract.
+              gap-4 on mobile (was gap-8) so 6-7 digit numbers fit at 390px;
+              gap-12 from sm+ preserves the canonical look. */}
           {stats && (stats.total_events > 0 || stats.total_sources > 0) && (
             <div
-              className="grid grid-cols-3 gap-8 sm:gap-12 max-w-2xl mx-auto"
+              className="grid grid-cols-3 gap-4 sm:gap-12 max-w-2xl mx-auto"
               role="region"
               aria-label="סטטיסטיקות"
             >
@@ -279,8 +281,12 @@ export function SearchPage() {
 
 function StatBadge({ value, label }: { value: number; label: string }) {
   return (
-    <div className="text-center">
-      <div className="text-3xl sm:text-4xl font-bold text-white">
+    <div className="text-center min-w-0">
+      {/* text-2xl on mobile (was -3xl in the family canonical) so 6-7 digit
+          values like "325,339" fit on a 390-wide viewport across all three
+          columns. Canonical text-4xl preserved from sm+. tabular-nums keeps
+          digits monospaced for cleaner alignment between rows. */}
+      <div className="text-2xl sm:text-4xl font-bold text-white tabular-nums">
         {value.toLocaleString('he-IL')}
       </div>
       <div className="text-primary-200 text-sm mt-1">{label}</div>
